@@ -5,16 +5,14 @@
     "setup": "node scripts/install-terraform.js",
 
     "tf:fmt": "terraform fmt -recursive terraform",
-    "tf:validate": "terraform -chdir=terraform/envs/site-1-onprem validate",
+    "tf:validate": "terraform -chdir=terraform/envs/onprem validate",
 
-    "tf:init:dev": "terraform -chdir=terraform/envs/site-1-onprem init",
-    "tf:plan:dev": "terraform -chdir=terraform/envs/site-1-onprem plan",
-    "tf:apply:dev": "terraform -chdir=terraform/envs/site-1-onprem apply",
+    "tf:init:dev": "terraform -chdir=terraform/envs/onprem init",
+    "tf:plan:dev": "terraform -chdir=terraform/envs/onprem plan",
+    "tf:apply:dev": "terraform -chdir=terraform/envs/onprem apply",
 
-    "tf:init:prod": "terraform -chdir=terraform/envs/site-2-remote init",
-    "tf:plan:prod": "terraform -chdir=terraform/envs/site-2-remote plan",
-
-    "tf:apply:prod": "echo \"❌ Production apply is CI-only\" && exit 1",
+    "tf:init:prod": "terraform -chdir=terraform/envs/remote init",
+    "tf:plan:prod": "terraform -chdir=terraform/envs/remote plan",
 
     "tf:check": "npm run tf:fmt && npm run tf:validate && npm run tf:plan:dev"
   }
