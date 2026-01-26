@@ -1,0 +1,20 @@
+{
+  "name": "infra",
+  "private": true,
+  "scripts": {
+    "setup": "node scripts/install-terraform.js",
+
+    "tf:fmt": "terraform fmt -recursive terraform",
+
+    "tf:validate:onprem": "terraform -chdir=terraform/envs/onprem validate",
+    "tf:validate:remote": "terraform -chdir=terraform/envs/remote validate",
+
+    "tf:init:onprem": "terraform -chdir=terraform/envs/onprem init",
+    "tf:plan:onprem": "terraform -chdir=terraform/envs/onprem plan",
+
+    "tf:init:remote": "terraform -chdir=terraform/envs/remote init",
+    "tf:plan:remote": "terraform -chdir=terraform/envs/remote plan",
+
+    "tf:check": "npm run tf:fmt && npm run tf:validate:onprem && npm run tf:validate:remote"
+  }
+}
