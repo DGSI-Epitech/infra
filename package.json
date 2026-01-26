@@ -9,7 +9,6 @@
 
     "tf:init:dev": "terraform -chdir=terraform/envs/onprem init",
     "tf:plan:dev": "terraform -chdir=terraform/envs/onprem plan",
-    "tf:apply:dev": "terraform -chdir=terraform/envs/onprem apply",
 
     "tf:init:prod": "terraform -chdir=terraform/envs/remote init",
     "tf:plan:prod": "terraform -chdir=terraform/envs/remote plan",
