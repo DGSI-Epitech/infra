@@ -1,0 +1,1 @@
+# Here documentation on OpenVPN config
