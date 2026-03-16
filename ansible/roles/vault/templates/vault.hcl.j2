@@ -1,0 +1,18 @@
+# ansible/roles/vault/templates/vault.hcl.j2
+ui        = true
+log_level = "INFO"
+
+storage "raft" {
+  path    = "{{ vault_data_dir }}"
+  node_id = "vault-node-1"
+}
+
+listener "tcp" {
+  address       = "0.0.0.0:8200"
+  tls_cert_file = "{{ vault_tls_dir }}/vault.crt"
+  tls_key_file  = "{{ vault_tls_dir }}/vault.key"
+}
+
+api_addr      = "{{ vault_api_addr }}"
+cluster_addr  = "{{ vault_cluster_addr }}"
+disable_mlock = true

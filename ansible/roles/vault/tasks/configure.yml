@@ -1,0 +1,68 @@
+- name: Déployer vault.hcl depuis le template
+  template:
+    src: vault.hcl.j2
+    dest: /etc/vault.d/vault.hcl
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: "0640"
+  notify: restart vault
+
+- name: Démarrer Vault
+  systemd:
+    name: vault
+    enabled: true
+    state: started
+
+- name: Attendre que Vault réponde
+  uri:
+    url: "{{ vault_addr }}/v1/sys/health"
+    validate_certs: false
+    status_code: [200, 501]
+  retries: 10
+  delay: 5
+
+- name: Vérifier si déjà initialisé
+  uri:
+    url: "{{ vault_addr }}/v1/sys/init"
+    validate_certs: false
+  register: vault_init_status
+
+- name: Initialiser Vault
+  uri:
+    url: "{{ vault_addr }}/v1/sys/init"
+    method: POST
+    validate_certs: false
+    body_format: json
+    body:
+      secret_shares: 5
+      secret_threshold: 3
+  register: vault_init_result
+  when: not vault_init_status.json.initialized
+
+- name: Chiffrer et sauvegarder les unseal keys (GPG)
+  shell: |
+    echo '{{ vault_init_result.json | to_json }}' | \
+    gpg --batch --yes --encrypt \
+    --recipient "{{ gpg_recipient }}" > /tmp/vault-init.gpg
+  delegate_to: localhost
+  when: vault_init_result.changed
+  no_log: true  # ne jamais logger le contenu
+
+- name: Copier le fichier chiffré dans le repo
+  fetch:
+    src: /tmp/vault-init.gpg
+    dest: "{{ playbook_dir }}/../../vault/init.json.gpg"
+    flat: true
+  when: vault_init_result.changed
+
+- name: Unseal Vault (3 clés sur 5)
+  uri:
+    url: "{{ vault_addr }}/v1/sys/unseal"
+    method: POST
+    validate_certs: false
+    body_format: json
+    body:
+      key: "{{ item }}"
+  loop: "{{ vault_init_result.json.keys_base64[:3] }}"
+  when: vault_init_result.changed
+  no_log: true

@@ -1,0 +1,105 @@
+- name: Activer le moteur KV v2 (stockage secrets)
+  uri:
+    url: "{{ vault_addr }}/v1/sys/mounts/secret"
+    method: POST
+    validate_certs: false
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      type: kv
+      options:
+        version: "2"
+    status_code: [200, 204, 400]
+
+- name: Activer AppRole (pour Terraform)
+  uri:
+    url: "{{ vault_addr }}/v1/sys/auth/approle"
+    method: POST
+    validate_certs: false
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      type: approle
+    status_code: [200, 204, 400]
+
+- name: Activer JWT (pour GitHub Actions)
+  uri:
+    url: "{{ vault_addr }}/v1/sys/auth/jwt"
+    method: POST
+    validate_certs: false
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      type: jwt
+    status_code: [200, 204, 400]
+
+- name: Activer Cert auth (pour VMs cloud)
+  uri:
+    url: "{{ vault_addr }}/v1/sys/auth/cert"
+    method: POST
+    validate_certs: false
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      type: cert
+    status_code: [200, 204, 400]
+
+- name: Charger les policies depuis vault/policies/
+  uri:
+    url: "{{ vault_addr }}/v1/sys/policies/acl/{{ item | splitext | first }}"
+    method: POST
+    validate_certs: false
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      policy: "{{ lookup('file', playbook_dir + '/../../vault/policies/' + item) }}"
+  loop:
+    - terraform.hcl
+    - github-actions.hcl
+    - agent-bastion.hcl
+    - agent-website.hcl
+  no_log: true
+
+- name: Configurer le role AppRole Terraform
+  uri:
+    url: "{{ vault_addr }}/v1/auth/approle/role/terraform"
+    method: POST
+    validate_certs: false
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      token_policies: ["terraform"]
+      token_ttl: "1h"
+      secret_id_num_uses: 1  # usage unique
+
+- name: Configurer JWT GitHub Actions
+  uri:
+    url: "{{ vault_addr }}/v1/auth/jwt/config"
+    method: POST
+    validate_certs: false
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      oidc_discovery_url: "https://token.actions.githubusercontent.com"
+      bound_issuer: "https://token.actions.githubusercontent.com"
+
+- name: Activer les audit logs vers fichier
+  uri:
+    url: "{{ vault_addr }}/v1/sys/audit/file"
+    method: POST
+    validate_certs: false
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      type: file
+      options:
+        file_path: "{{ vault_log_dir }}/audit.log"
+    status_code: [200, 204, 400]

@@ -1,0 +1,3 @@
+- import_tasks: install.yml    # étape 1 : installer Vault
+- import_tasks: configure.yml  # étape 2 : configurer et initialiser
+- import_tasks: policies.yml   # étape 3 : créer les policies et auth methods

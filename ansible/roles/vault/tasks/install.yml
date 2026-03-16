@@ -1,0 +1,55 @@
+
+- name: Créer utilisateur vault
+  user:
+    name: "{{ vault_user }}"
+    system: true
+    shell: /bin/false
+
+- name: Créer les répertoires
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: "0750"
+  loop:
+    - "{{ vault_data_dir }}"
+    - "{{ vault_tls_dir }}"
+    - "{{ vault_log_dir }}"
+    - /etc/vault.d
+
+- name: Ajouter la clé GPG HashiCorp
+  apt_key:
+    url: https://apt.releases.hashicorp.com/gpg
+    state: present
+
+- name: Ajouter le repo apt HashiCorp
+  apt_repository:
+    repo: "deb https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+    state: present
+
+- name: Installer Vault
+  apt:
+    name: "vault={{ vault_version }}-*"
+    state: present
+    update_cache: true
+
+- name: Générer le certificat TLS
+  command: >
+    openssl req -x509 -nodes -days 3650
+    -newkey rsa:4096
+    -keyout {{ vault_tls_dir }}/vault.key
+    -out {{ vault_tls_dir }}/vault.crt
+    -subj "/CN=vault.cia.internal"
+    -addext "subjectAltName=IP:172.16.255.243"
+  args:
+    creates: "{{ vault_tls_dir }}/vault.crt"
+
+- name: Fixer les permissions TLS
+  file:
+    path: "{{ item.path }}"
+    owner: "{{ vault_user }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ vault_tls_dir }}/vault.crt", mode: "0644" }
+    - { path: "{{ vault_tls_dir }}/vault.key", mode: "0600" }

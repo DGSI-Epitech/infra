@@ -1,0 +1,6 @@
+  path "secret/data/teleport/*" {
+    capabilities = ["read"]
+}
+    path "ssh/creds/bastion-role" {
+    capabilities = ["create", "update"]
+}
