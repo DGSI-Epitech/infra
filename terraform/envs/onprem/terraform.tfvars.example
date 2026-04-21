@@ -1,8 +1,9 @@
-proxmox_endpoint  = "https://192.168.100.2:8006"
-proxmox_node      = "pve"
-vm_ip_cidr        = "192.168.100.50/24"
-vm_gateway        = "192.168.100.1"
-vm_ssh_public_key = "ssh-ed25519 AAAA..."
+proxmox_endpoint     = "https://<PROXMOX_IP>:8006"
+proxmox_node         = "pve"
+proxmox_node_address = "<PROXMOX_IP>"
+vm_ip_cidr           = "<VM_IP>/24"
+vm_gateway           = "<GATEWAY_IP>"
+vm_ssh_public_key    = "ssh-ed25519 AAAA..."
 
-# proxmox_api_token must be set via environment variable:
-# export TF_VAR_proxmox_api_token="root@pam!terraform=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+# proxmox_api_token must be set via environment variable — never in this file:
+# export TF_VAR_proxmox_api_token='root@pam!terraform=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'

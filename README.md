@@ -33,13 +33,13 @@ Copier le fichier d'exemple et remplir les valeurs :
 cp terraform/envs/onprem/terraform.tfvars.example terraform/envs/onprem/terraform.tfvars
 ```
 
-Le token Proxmox ne doit jamais être dans un fichier — il s'injecte uniquement via variable d'environnement :
+Le token Proxmox ne doit jamais être dans un fichier — il s'injecte uniquement via variable d'environnement (single quotes obligatoires pour éviter que bash interprète `!`) :
 
 ```bash
-export TF_VAR_proxmox_api_token="root@pam!terraform=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+export TF_VAR_proxmox_api_token='root@pam!terraform=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 ```
 
-Pour créer le token : PVE UI → Datacenter → Permissions → API Tokens → Add.
+Pour le détail complet (création du token, permissions, SSH) : voir [`docs/runbooks/RUNBOOKS.md`](docs/runbooks/RUNBOOKS.md).
 
 ---
 
