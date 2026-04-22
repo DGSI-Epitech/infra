@@ -25,3 +25,5 @@
 
 # Vault — contient les unseal keys et root token
 vault-init.json
+
+CLAUDE.md
