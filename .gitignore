@@ -18,3 +18,10 @@
 **/*.tfvars
 !**/*.tfvars.example
 .terraform.lock.hcl
+
+# Packer
+**/*.pkrvars.hcl
+!**/*.pkrvars.hcl.example
+
+# Vault — contient les unseal keys et root token
+vault-init.json

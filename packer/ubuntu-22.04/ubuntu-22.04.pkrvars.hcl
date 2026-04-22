@@ -1,0 +1,14 @@
+proxmox_url         = "https://192.168.139.128:8006/api2/json"
+proxmox_username    = "root@pam!packer"
+proxmox_node        = "pve"
+proxmox_storage_iso = "local"
+proxmox_storage_vm  = "local-lvm"
+template_vm_id      = 9000
+build_username      = "ubuntu"
+iso_url             = "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso"
+iso_checksum        = "<SHA256_FROM_RELEASES_PAGE>"
+
+# Secrets — set via environment variables, never in this file:
+# export PKR_VAR_proxmox_token='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+# export PKR_VAR_build_password='ubuntu'
+# export PKR_VAR_build_password_encrypted=$(echo 'ubuntu' | openssl passwd -6 -stdin)

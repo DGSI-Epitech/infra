@@ -3,25 +3,31 @@ variable "proxmox_node" {
   type        = string
 }
 
+variable "template_vm_id" {
+  description = "Proxmox VM ID of the Packer-built template to clone"
+  type        = number
+  default     = 9000
+}
+
+variable "vm_id" {
+  description = "Proxmox VM ID"
+  type        = number
+  default     = 201
+}
+
 variable "vm_ip_cidr" {
-  description = "VM IP address in CIDR notation (e.g. 192.168.100.50/24)"
+  description = "Vault VM IP address in CIDR notation (e.g. 192.168.100.51/24)"
   type        = string
 }
 
 variable "vm_gateway" {
-  description = "VM default gateway"
+  description = "Default gateway"
   type        = string
 }
 
 variable "vm_ssh_public_key" {
   description = "SSH public key injected via cloud-init"
   type        = string
-}
-
-variable "vm_id" {
-  description = "Proxmox VM ID"
-  type        = number
-  default     = 200
 }
 
 variable "vm_cores" {
@@ -42,14 +48,8 @@ variable "disk_size_gb" {
   default     = 8
 }
 
-variable "template_vm_id" {
-  description = "Proxmox VM ID of the Packer-built template to clone"
-  type        = number
-  default     = 9000
-}
-
 variable "storage_vm" {
-  description = "Proxmox storage for VM disks"
+  description = "Proxmox storage pool for VM disk"
   type        = string
   default     = "local-lvm"
 }

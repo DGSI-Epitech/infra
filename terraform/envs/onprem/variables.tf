@@ -26,6 +26,24 @@ variable "proxmox_ssh_private_key" {
   default     = "~/.ssh/id_ed25519"
 }
 
+variable "template_vm_id" {
+  description = "Proxmox VM ID for the Ubuntu template"
+  type        = number
+  default     = 9000
+}
+
+variable "storage_iso" {
+  description = "Proxmox storage for cloud image download"
+  type        = string
+  default     = "local"
+}
+
+variable "storage_vm" {
+  description = "Proxmox storage for VM disks"
+  type        = string
+  default     = "local-lvm"
+}
+
 variable "vm_ip_cidr" {
   description = "Services VM IP address in CIDR notation"
   type        = string
@@ -41,4 +59,16 @@ variable "vm_gateway" {
 variable "vm_ssh_public_key" {
   description = "SSH public key injected via cloud-init"
   type        = string
+}
+
+variable "vault_vm_id" {
+  description = "Proxmox VM ID for Vault"
+  type        = number
+  default     = 201
+}
+
+variable "vault_vm_ip_cidr" {
+  description = "Vault VM IP address in CIDR notation"
+  type        = string
+  default     = "192.168.100.51/24"
 }

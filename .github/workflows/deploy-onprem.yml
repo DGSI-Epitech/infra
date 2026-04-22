@@ -1,0 +1,83 @@
+name: Deploy On-Prem
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "ansible/**"
+
+jobs:
+  terraform:
+    name: Terraform apply
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: terraform/envs/onprem
+    outputs:
+      vault_ip: ${{ steps.outputs.outputs.vault_ip }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: terraform init
+        env:
+          TF_VAR_proxmox_api_token: ${{ secrets.PROXMOX_API_TOKEN }}
+
+      - name: Terraform plan
+        run: terraform plan -out=tfplan
+        env:
+          TF_VAR_proxmox_api_token: ${{ secrets.PROXMOX_API_TOKEN }}
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_proxmox_api_token: ${{ secrets.PROXMOX_API_TOKEN }}
+
+      - name: Capture outputs
+        id: outputs
+        run: echo "vault_ip=$(terraform output -raw vault_vm_ip)" >> "$GITHUB_OUTPUT"
+        env:
+          TF_VAR_proxmox_api_token: ${{ secrets.PROXMOX_API_TOKEN }}
+
+  ansible:
+    name: Ansible configure
+    runs-on: self-hosted
+    needs: terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for VMs to be SSH-ready
+        run: |
+          for host in 192.168.100.50 192.168.100.51; do
+            echo "Waiting for $host..."
+            timeout 120 bash -c "until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@$host true 2>/dev/null; do sleep 5; done"
+          done
+
+      - name: Configure services-vm
+        run: ansible-playbook playbooks/services-vm.yml
+        working-directory: ansible
+        env:
+          ANSIBLE_PRIVATE_KEY_FILE: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY_PATH }}
+
+      - name: Deploy and initialize Vault
+        run: ansible-playbook playbooks/vault.yml
+        working-directory: ansible
+        env:
+          ANSIBLE_PRIVATE_KEY_FILE: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY_PATH }}
+
+      - name: Upload vault-init.json as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vault-init
+          path: vault-init.json
+          retention-days: 1
+        if: hashFiles('vault-init.json') != ''

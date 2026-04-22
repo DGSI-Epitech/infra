@@ -1,8 +1,8 @@
-resource "proxmox_virtual_environment_vm" "services_vm" {
-  name      = "services-vm"
+resource "proxmox_virtual_environment_vm" "vault_vm" {
+  name      = "vault-vm"
   node_name = var.proxmox_node
   vm_id     = var.vm_id
-  tags      = ["services", "ubuntu-22-04"]
+  tags      = ["vault", "ubuntu-22-04"]
 
   clone {
     vm_id = var.template_vm_id

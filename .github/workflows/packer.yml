@@ -1,0 +1,41 @@
+name: Build Packer Template
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "packer/**"
+
+jobs:
+  build-template:
+    name: Build Ubuntu 22.04 template
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: packer/ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: "latest"
+
+      - name: Packer init
+        run: packer init .
+
+      - name: Packer validate
+        run: packer validate -var-file=ubuntu-22.04.pkrvars.hcl .
+        env:
+          PKR_VAR_proxmox_token: ${{ secrets.PROXMOX_PACKER_TOKEN }}
+          PKR_VAR_build_password: ${{ secrets.PACKER_BUILD_PASSWORD }}
+          PKR_VAR_build_password_encrypted: ${{ secrets.PACKER_BUILD_PASSWORD_ENCRYPTED }}
+
+      - name: Packer build
+        run: packer build -var-file=ubuntu-22.04.pkrvars.hcl .
+        env:
+          PKR_VAR_proxmox_token: ${{ secrets.PROXMOX_PACKER_TOKEN }}
+          PKR_VAR_build_password: ${{ secrets.PACKER_BUILD_PASSWORD }}
+          PKR_VAR_build_password_encrypted: ${{ secrets.PACKER_BUILD_PASSWORD_ENCRYPTED }}

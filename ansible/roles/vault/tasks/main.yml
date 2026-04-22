@@ -1,0 +1,96 @@
+---
+- name: Install HashiCorp GPG key
+  get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /etc/apt/keyrings/hashicorp.asc
+    mode: "0644"
+
+- name: Add HashiCorp apt repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/hashicorp.asc] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+    state: present
+    filename: hashicorp
+
+- name: Install Vault
+  apt:
+    name: "vault={{ vault_version }}-1"
+    state: present
+    update_cache: true
+
+- name: Create Vault data directory
+  file:
+    path: "{{ vault_data_dir }}"
+    state: directory
+    owner: vault
+    group: vault
+    mode: "0700"
+
+- name: Deploy Vault configuration
+  template:
+    src: vault.hcl.j2
+    dest: "{{ vault_config_dir }}/vault.hcl"
+    owner: vault
+    group: vault
+    mode: "0640"
+  notify: restart vault
+
+- name: Enable and start Vault
+  systemd:
+    name: vault
+    enabled: true
+    state: started
+
+- name: Wait for Vault to be ready
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/health"
+    status_code: [200, 429, 472, 473, 501, 503]
+  register: vault_health
+  until: vault_health.status in [200, 429, 472, 473, 501, 503]
+  retries: 10
+  delay: 3
+
+- name: Check Vault init status
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/init"
+    method: GET
+  register: vault_init_status
+
+- name: Initialize Vault
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/init"
+    method: PUT
+    body_format: json
+    body:
+      secret_shares: 5
+      secret_threshold: 3
+    status_code: 200
+  register: vault_init_output
+  when: not vault_init_status.json.initialized
+
+- name: Save Vault init output on the server
+  copy:
+    content: "{{ vault_init_output.json | to_nice_json }}"
+    dest: /root/vault-init.json
+    owner: root
+    group: root
+    mode: "0600"
+  when: vault_init_output is changed
+
+- name: Fetch vault-init.json to Ansible controller
+  fetch:
+    src: /root/vault-init.json
+    dest: "{{ playbook_dir }}/../vault-init.json"
+    flat: true
+  when: vault_init_output is changed
+
+- name: Unseal Vault
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/unseal"
+    method: PUT
+    body_format: json
+    body:
+      key: "{{ item }}"
+    status_code: 200
+  loop: "{{ vault_init_output.json.keys_base64[:3] }}"
+  when: vault_init_output is changed
+  no_log: true
