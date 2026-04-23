@@ -10,7 +10,7 @@
 /httpRequests/
 
 /.idea
-
+terraform.tfstate*
 # Terraform
 **/.terraform/
 **/*.tfstate

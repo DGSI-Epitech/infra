@@ -329,3 +329,11 @@ La VM est en train de booter. Cloud-init peut prendre 2-3 minutes. Pendant ce te
 |---|---|---|
 | Teleport | `10.255.255.249` | Bastion SSH |
 | website | `192.168.255.243` | Site web |
+
+
+
+cd packer/pfsense-2.7/
+./packer.exe build -force -var-file="pfsense-2.7.pkrvars.hcl" .
+cd terraform/envs/onprem/
+terraform destroy -target=module.pfsense
+terraform apply -target=module.pfsense
