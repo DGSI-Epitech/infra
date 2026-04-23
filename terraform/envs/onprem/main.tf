@@ -27,3 +27,15 @@ module "vault_vm" {
   vm_gateway        = var.vm_gateway
   vm_ssh_public_key = var.vm_ssh_public_key
 }
+
+module "pfsense" {
+  source = "../../modules/pfsense"
+
+  proxmox_node    = var.proxmox_node
+  template_vm_id  = 9001   
+  # Adressage réseau issu de tes documents pour le Site 1
+  lan_bridge      = "vmbr1" # Ton bridge LAN interne
+  wan_bridge      = "vmbr0" # Ton bridge WAN (accès internet)
+  
+  vm_name         = "pfsense-fw-01"
+}

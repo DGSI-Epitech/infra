@@ -1,16 +1,15 @@
-proxmox_endpoint     = "https://<PROXMOX_IP>:8006"
-proxmox_node         = "pve"
-proxmox_node_address = "<PROXMOX_IP>"
-template_vm_id       = 9000
+proxmox_api_token = "root@pam!packer-auto=XXXXXXXXXXXXXXXXXXXXXXXXXXX"
+proxmox_endpoint  = "https://XXXXXXXXXXXXXXXXXXXXX:8006"
+proxmox_node      = "pve"
+proxmox_node_address = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
-# services-vm
+# --- Templates ---
+template_vm_id       = 9001
+
+# --- Variables Réseau (Ubuntu) ---
 vm_ip_cidr           = "192.168.100.50/24"
-vm_gateway           = "<GATEWAY_IP>"
-vm_ssh_public_key    = "ssh-ed25519 AAAA..."
-
-# vault-vm
+vm_gateway           = "192.168.100.1"
+vm_ssh_public_key    = "ton-ssh-key-ici"
+# --- Vault ---
 vault_vm_id          = 201
 vault_vm_ip_cidr     = "192.168.100.51/24"
-
-# proxmox_api_token must be set via environment variable — never in this file:
-# export TF_VAR_proxmox_api_token='root@pam!terraform=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
