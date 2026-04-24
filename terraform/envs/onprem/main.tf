@@ -2,7 +2,7 @@ module "ubuntu_template" {
   source = "../../modules/ubuntu-template"
 
   proxmox_node = var.proxmox_node
-  vm_id        = var.template_vm_id
+  ubuntu_vm_id = var.template_ubuntu_vm_id
   storage_iso  = var.storage_iso
   storage_vm   = var.storage_vm
 }
@@ -31,11 +31,11 @@ module "vault_vm" {
 module "pfsense" {
   source = "../../modules/pfsense"
 
-  proxmox_node    = var.proxmox_node
-  template_vm_id  = 9001   
-  # Adressage réseau issu de tes documents pour le Site 1
-  lan_bridge      = "vmbr1" # Ton bridge LAN interne
-  wan_bridge      = "vmbr0" # Ton bridge WAN (accès internet)
+  proxmox_node        = var.proxmox_node
+  pfsense_template_id = 9000 
   
-  vm_name         = "pfsense-fw-01"
+  lan_bridge          = "vmbr1"
+  wan_bridge          = "vmbr0"
+  
+  vm_name             = "pfsense-fw-01"
 }

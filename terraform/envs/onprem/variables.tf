@@ -26,10 +26,10 @@ variable "proxmox_ssh_private_key" {
   default     = "~/.ssh/id_ed25519"
 }
 
-variable "template_vm_id" {
+variable "template_ubuntu_vm_id" {
   description = "Proxmox VM ID for the Ubuntu template"
   type        = number
-  default     = 9000
+  default     = 9001
 }
 
 variable "storage_iso" {
@@ -71,4 +71,10 @@ variable "vault_vm_ip_cidr" {
   description = "Vault VM IP address in CIDR notation"
   type        = string
   default     = "192.168.100.51/24"
+}
+
+variable "pfsense_template_id" {
+  description = "ID du template pfSense (Packer)"
+  type        = number
+  default     = 9000
 }

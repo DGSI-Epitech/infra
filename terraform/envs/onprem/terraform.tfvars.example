@@ -9,7 +9,7 @@ template_vm_id       = 9001
 # --- Variables Réseau (Ubuntu) ---
 vm_ip_cidr           = "192.168.100.50/24"
 vm_gateway           = "192.168.100.1"
-vm_ssh_public_key    = "ton-ssh-key-ici"
+vm_ssh_public_key    = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 # --- Vault ---
 vault_vm_id          = 201
 vault_vm_ip_cidr     = "192.168.100.51/24"
