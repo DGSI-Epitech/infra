@@ -6,40 +6,18 @@ Procédures pas à pas pour déployer et maintenir l'infrastructure.
 
 ## Sommaire
 
-1. [Préparer Proxmox (première fois)](#1-préparer-proxmox-première-fois)
+1. [Bootstrap Proxmox (première fois)](#1-bootstrap-proxmox-première-fois)
 2. [Déployer les VMs avec Terraform](#2-déployer-les-vms-avec-terraform)
 3. [Configurer Vault avec Ansible](#3-configurer-vault-avec-ansible)
 4. [Résolution des problèmes fréquents](#4-résolution-des-problèmes-fréquents)
 
 ---
 
-## 1. Préparer Proxmox (première fois)
+## 1. Bootstrap Proxmox (première fois)
 
-Ces étapes ne sont à faire qu'une seule fois sur un Proxmox vierge.
+Ces étapes ne sont à faire qu'une seule fois sur un Proxmox vierge. Tout est géré par Terraform — aucune action manuelle dans l'UI Proxmox.
 
-### 1.1 Créer un token API pour Terraform
-
-Le token permet à Terraform de parler à l'API Proxmox sans mot de passe.
-
-1. Ouvre l'interface web Proxmox (ex: `https://192.168.139.128:8006`)
-2. Dans le menu à gauche : **Datacenter → Permissions → API Tokens**
-3. Clique **Add**
-4. Remplis :
-   - **User** : `root@pam`
-   - **Token ID** : `terraform`
-   - **Privilege Separation** : **décocher** (important — sinon le token ne peut pas créer de VMs)
-5. Clique **Add** → une fenêtre affiche le secret UUID, **copie-le maintenant** (affiché une seule fois)
-
-Le token ressemble à : `root@pam!terraform` et le secret à `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
-
-6. Ajoute la permission sur toute l'infra :
-   - **Datacenter → Permissions → Add → API Token Permission**
-   - Path : `/`
-   - API Token : `root@pam!terraform`
-   - Role : `Administrator`
-   - Check **Propagate**
-
-### 1.2 Autoriser ta clé SSH sur Proxmox
+### 1.1 Autoriser ta clé SSH sur Proxmox
 
 Le provider Terraform `bpg/proxmox` a besoin d'un accès SSH root pour importer les disques des VMs. Il faut donc que ta clé publique soit autorisée.
 
@@ -61,6 +39,27 @@ ssh-add ~/.ssh/id_ed25519
 
 > **Pourquoi SSH en plus de l'API token ?**
 > L'API Proxmox ne permet pas d'importer directement une image disque. Le provider Terraform se connecte en SSH pour exécuter les commandes `qm` nécessaires.
+
+### 1.2 Lancer le bootstrap Terraform
+
+Le bootstrap crée le rôle `TerraformRole`, génère le token `root@pam!terraform` et lui assigne les permissions nécessaires.
+
+```bash
+cd terraform/envs/bootstrap
+cp terraform.tfvars.example terraform.tfvars
+# Éditer terraform.tfvars : remplir proxmox_endpoint et proxmox_node_address
+
+# Passer le mot de passe root via variable d'env (jamais dans un fichier)
+export TF_VAR_proxmox_password='ton-mot-de-passe-root'
+
+terraform init
+terraform apply
+
+# Afficher le token généré — à copier pour l'étape suivante
+terraform output -raw terraform_token_id
+```
+
+> **Note** : si le token `root@pam!terraform` existe déjà sur Proxmox, le supprimer d'abord via l'UI (Datacenter → Permissions → API Tokens) avant de lancer le bootstrap.
 
 ### 1.3 Vérifier l'espace disque disponible
 
@@ -311,7 +310,7 @@ La VM est en train de booter. Cloud-init peut prendre 2-3 minutes. Pendant ce te
 |---|---|---|
 | services-vm (ID 200) | `172.16.255.242` | Netbox, website |
 | vault-vm (ID 201) | `172.16.255.243` | HashiCorp Vault, Elastic |
-| Template Ubuntu (ID 9000) | — | Base pour les clones |
+| Template Ubuntu (ID 9001) | — | Base pour les clones |
 
 ### PVE2 — Cloud (Site 2)
 
@@ -330,10 +329,19 @@ La VM est en train de booter. Cloud-init peut prendre 2-3 minutes. Pendant ce te
 | Teleport | `10.255.255.249` | Bastion SSH |
 | website | `192.168.255.243` | Site web |
 
+---
 
+## 5. Reconstruire le template pfSense
 
+Si le template pfSense doit être reconstruit (changement de config réseau, mise à jour) :
+
+```bash
+# 1. Rebuild le template avec Packer
 cd packer/pfsense-2.7/
-./packer.exe build -force -var-file="pfsense-2.7.pkrvars.hcl" .
+packer build -force -var-file="pfsense-2.7.pkrvars.hcl" .
+
+# 2. Redéployer uniquement le module pfSense
 cd terraform/envs/onprem/
 terraform destroy -target=module.pfsense
 terraform apply -target=module.pfsense
+```

@@ -1,0 +1,6 @@
+proxmox_endpoint     = "https://192.168.139.128:8006"
+proxmox_node         = "pve"
+proxmox_node_address = "192.168.139.128"
+
+# proxmox_password doit être passé via variable d'environnement — jamais dans ce fichier :
+# export TF_VAR_proxmox_password='votre-mot-de-passe-root'

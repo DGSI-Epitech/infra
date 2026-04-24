@@ -2,7 +2,7 @@ module "ubuntu_template" {
   source = "../../modules/ubuntu-template"
 
   proxmox_node = var.proxmox_node
-  ubuntu_vm_id = var.template_ubuntu_vm_id
+  vm_id        = var.template_ubuntu_vm_id
   storage_iso  = var.storage_iso
   storage_vm   = var.storage_vm
 }
@@ -32,7 +32,7 @@ module "pfsense" {
   source = "../../modules/pfsense"
 
   proxmox_node        = var.proxmox_node
-  pfsense_template_id = 9000 
+  template_vm_id      = var.pfsense_template_id
   
   lan_bridge          = "vmbr1"
   wan_bridge          = "vmbr0"

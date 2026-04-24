@@ -3,8 +3,14 @@ variable "proxmox_endpoint" {
   type        = string
 }
 
-variable "proxmox_api_token" {
-  description = "Proxmox API token — format: user@realm!tokenid=secret"
+variable "proxmox_username" {
+  description = "Proxmox username (ex: root@pam)"
+  type        = string
+  default     = "root@pam"
+}
+
+variable "proxmox_password" {
+  description = "Proxmox password"
   type        = string
   sensitive   = true
 }
@@ -29,7 +35,7 @@ variable "proxmox_ssh_private_key" {
 variable "template_ubuntu_vm_id" {
   description = "Proxmox VM ID for the Ubuntu template"
   type        = number
-  default     = 9001
+  default     = 9000
 }
 
 variable "storage_iso" {
@@ -76,5 +82,5 @@ variable "vault_vm_ip_cidr" {
 variable "pfsense_template_id" {
   description = "ID du template pfSense (Packer)"
   type        = number
-  default     = 9000
+  default     = 9001
 }

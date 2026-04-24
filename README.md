@@ -16,9 +16,7 @@ Tout est automatisé : une commande Terraform crée les VMs, Ansible les configu
 | **GitHub Actions** | CI/CD — déploie automatiquement sur push |
 
 ---
-
 ## Prérequis
-
 - Git
 - Terraform ≥ 1.9 (`npm run setup` l'installe automatiquement)
 - Ansible (`pip install ansible`)
@@ -27,25 +25,34 @@ Tout est automatisé : une commande Terraform crée les VMs, Ansible les configu
 
 ---
 
-## Avant de commencer — Proxmox à configurer (une seule fois)
+## Avant de commencer — Bootstrap (une seule fois)
 
-> Ces étapes sont nécessaires uniquement au premier déploiement ou sur un Proxmox vierge.
-> Pour le détail complet avec captures d'écran : voir [`docs/runbooks/RUNBOOKS.md`](docs/runbooks/RUNBOOKS.md)
+> Sur un Proxmox vierge, le bootstrap Terraform crée automatiquement le token et les permissions.
+> Aucune action manuelle dans l'UI Proxmox n'est nécessaire.
 
-**1. Créer un token API Terraform dans Proxmox**
-
-Dans l'interface web Proxmox :
-- Datacenter → Permissions → API Tokens → Add
-- User : `root@pam`, Token ID : `terraform`, décocher "Privilege Separation"
-- Copier le secret affiché (visible une seule fois)
-- Ajouter la permission : Datacenter → Permissions → Add → API Token Permission → path `/`, rôle `Administrator`
-
-**2. Autoriser ta clé SSH sur Proxmox** (nécessaire pour l'import des disques)
+**1. Autoriser ta clé SSH sur Proxmox** (nécessaire pour l'import des disques)
 
 ```bash
 ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<IP_PROXMOX>
 ssh-add ~/.ssh/id_ed25519
 ```
+
+**2. Lancer le bootstrap**
+
+```bash
+cd terraform/envs/bootstrap
+cp terraform.tfvars.example terraform.tfvars
+# Remplir proxmox_endpoint et proxmox_node_address dans terraform.tfvars
+
+export TF_VAR_proxmox_password='ton-mot-de-passe-root-proxmox'
+terraform init
+terraform apply
+
+# Récupérer le token généré
+terraform output -raw terraform_token_id
+```
+
+Le bootstrap crée le rôle `TerraformRole`, le token `root@pam!terraform`, et lui assigne les permissions. Le token généré est à utiliser à l'étape suivante.
 
 ---
 
