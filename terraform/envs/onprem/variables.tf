@@ -35,7 +35,7 @@ variable "proxmox_ssh_private_key" {
 variable "template_ubuntu_vm_id" {
   description = "Proxmox VM ID for the Ubuntu template"
   type        = number
-  default     = 9000
+  default     = 100
 }
 
 variable "storage_iso" {

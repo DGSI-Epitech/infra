@@ -6,7 +6,7 @@ variable "proxmox_node" {
 variable "template_vm_id" {
   description = "Proxmox VM ID of the Packer-built template to clone"
   type        = number
-  default     = 9000
+  default     = 100
 }
 
 variable "vm_id" {
