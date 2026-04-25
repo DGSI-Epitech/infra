@@ -20,6 +20,7 @@ terraform.tfstate*
 .terraform.lock.hcl
 packer/pfsense-2.7/downloaded_iso_path
 terraform/envs/onprem/.terraform.tfstate.lock.info
+packer/ubuntu-22.04/downloaded_iso_path/
 
 # Packer
 **/*.pkrvars.hcl

@@ -14,13 +14,13 @@ variable "proxmox_url" {
 
 variable "proxmox_username" {
   type        = string
-  description = "Proxmox token identifier — format: user@realm!tokenid"
+  description = "Proxmox username (ex: root@pam)"
 }
 
-variable "proxmox_token" {
+variable "proxmox_password" {
   type        = string
   sensitive   = true
-  description = "Proxmox API token secret"
+  description = "Proxmox password"
 }
 
 variable "proxmox_node" {
@@ -71,20 +71,19 @@ variable "iso_url" {
 variable "iso_checksum" {
   type        = string
   description = "SHA256 checksum of the ISO — from https://releases.ubuntu.com/22.04/SHA256SUMS"
+  default     = "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0"
 }
 
 source "proxmox-iso" "ubuntu-2204" {
   proxmox_url              = var.proxmox_url
   username                 = var.proxmox_username
-  token                    = var.proxmox_token
+  password                 = var.proxmox_password
   insecure_skip_tls_verify = true
   node                     = var.proxmox_node
 
   vm_id                = var.template_vm_id
   vm_name              = "ubuntu-22.04-template"
   template_description = "Ubuntu 22.04 LTS — built with Packer on ${formatdate("YYYY-MM-DD", timestamp())}"
-  tags                 = ["template", "ubuntu-22-04", "packer"]
-
   iso_url          = var.iso_url
   iso_checksum     = "sha256:${var.iso_checksum}"
   iso_storage_pool = var.proxmox_storage_iso

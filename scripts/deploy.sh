@@ -3,7 +3,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ONPREM_DIR="$REPO_ROOT/terraform/envs/onprem"
-PACKER_DIR="$REPO_ROOT/packer/pfsense-2.7"
+PACKER_DIR_PFSENSE="$REPO_ROOT/packer/pfsense-2.7"
+PACKER_DIR_UBUNTU="$REPO_ROOT/packer/ubuntu-22.04"
 CONFIG_FILE="$REPO_ROOT/config.env"
 
 # --- Vérifications ---
@@ -100,6 +101,32 @@ else
   echo "    Bridge vmbr1 déjà présent."
 fi
 
+# --- Packer : build template Ubuntu si absent ---
+
+echo ""
+UBUNTU_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
+  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_UBUNTU_TEMPLATE}/status/current" 2>/dev/null | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
+
+if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
+  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) absent — build Packer..."
+  cd "$PACKER_DIR_UBUNTU"
+  export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
+  export PKR_VAR_proxmox_username="${PROXMOX_USER}"
+  export PKR_VAR_proxmox_password="${TF_VAR_proxmox_password}"
+  export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
+  export PKR_VAR_proxmox_storage_iso="local"
+  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
+  export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
+  export PKR_VAR_build_password="${PACKER_BUILD_PASSWORD}"
+  export PKR_VAR_build_password_encrypted="$(echo "${PACKER_BUILD_PASSWORD}" | openssl passwd -6 -stdin)"
+  packer init .
+  packer build ubuntu-22.04.pkr.hcl
+  echo "    Template Ubuntu créé."
+else
+  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) déjà présent, build Packer sauté."
+fi
+
 # --- Packer : build template pfSense si absent ---
 
 echo ""
@@ -109,7 +136,7 @@ PFSENSE_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
 
 if [[ "$PFSENSE_TEMPLATE_STATUS" == "notfound" ]]; then
   echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) absent — build Packer..."
-  cd "$PACKER_DIR"
+  cd "$PACKER_DIR_PFSENSE"
   export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
   export PKR_VAR_proxmox_username="${PROXMOX_USER}"
   export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
