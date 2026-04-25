@@ -42,7 +42,7 @@ variable "proxmox_storage_vm" {
 
 variable "template_vm_id" {
   type        = number
-  default     = 9000
+  default     = 100
   description = "Proxmox VM ID for the resulting template"
 }
 
@@ -105,13 +105,19 @@ source "proxmox-iso" "ubuntu-2204" {
     bridge = "vmbr0"
   }
 
-  http_content = {
-    "/user-data" = templatefile("${path.root}/http/user-data.pkrtpl.hcl", {
-      build_username           = var.build_username
-      build_password_encrypted = var.build_password_encrypted
-    })
-    "/meta-data" = ""
+  additional_iso_files {
+    cd_content = {
+      "/user-data" = templatefile("${path.root}/http/user-data.pkrtpl.hcl", {
+        build_username           = var.build_username
+        build_password_encrypted = var.build_password_encrypted
+      })
+      "/meta-data" = ""
+    }
+    cd_label         = "cidata"
+    iso_storage_pool = var.proxmox_storage_iso
+    device           = "ide3"
   }
+
 
   boot_wait = "5s"
   boot_command = [
