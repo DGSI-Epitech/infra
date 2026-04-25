@@ -19,6 +19,7 @@ terraform.tfstate*
 !**/*.tfvars.example
 .terraform.lock.hcl
 packer/pfsense-2.7/downloaded_iso_path
+terraform/envs/onprem/.terraform.tfstate.lock.info
 
 # Packer
 **/*.pkrvars.hcl
