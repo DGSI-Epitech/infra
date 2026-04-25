@@ -143,7 +143,8 @@ terraform apply -input=false -auto-approve \
   -var "vm_ip_cidr=${VM_IP_SERVICES}" \
   -var "vault_vm_ip_cidr=${VM_IP_VAULT}" \
   -var "vm_gateway=${VM_GATEWAY}" \
-  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}"
+  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
+  -var "vm_password=${VM_PASSWORD}"
 
 echo ""
 echo "==> Déploiement terminé."

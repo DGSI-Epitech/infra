@@ -20,7 +20,7 @@ variable "proxmox_url" { type = string }
 
 variable "proxmox_username" { type = string }
 
-variable "proxmox_token" {
+variable "proxmox_password" {
 
   type      = string
 
@@ -34,6 +34,16 @@ variable "proxmox_storage_vm" { type = string }
 
 variable "template_vm_id" { type = number }
 
+variable "iso_url" {
+  type    = string
+  default = "https://atxfiles.netgate.com/mirror/downloads/pfSense-CE-2.7.2-RELEASE-amd64.iso.gz"
+}
+
+variable "iso_checksum" {
+  type    = string
+  default = "sha256:883fb7bc64fe548442ed007911341dd34e178449f8156ad65f7381a02b7cd9e4"
+}
+
 # --- Source ---
 
 source "proxmox-iso" "pfsense" {
@@ -42,21 +52,17 @@ source "proxmox-iso" "pfsense" {
 
   username                 = var.proxmox_username
 
-  token                    = var.proxmox_token
+  password                 = var.proxmox_password
 
   node                     = var.proxmox_node
 
   insecure_skip_tls_verify = true
-
-  http_directory = "http"
 
   vm_id                = var.template_vm_id
 
   vm_name              = "pfsense-2.7.2-template"
 
   template_description = "pfSense 2.7.2 Template — Built via Packer"
-
-  unmount_iso = true
 
   os       = "l26"
 
@@ -92,7 +98,12 @@ source "proxmox-iso" "pfsense" {
 
   }
 
-  iso_file = "local:iso/pfSense-CE-2.7.2-RELEASE-amd64.iso"
+  boot_iso {
+    iso_url          = var.iso_url
+    iso_checksum     = var.iso_checksum
+    iso_storage_pool = "local"
+    unmount          = true
+  }
 
   communicator = "none"
 

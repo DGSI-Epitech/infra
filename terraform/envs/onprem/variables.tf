@@ -89,3 +89,9 @@ variable "pfsense_vm_id" {
   description = "ID de la VM pfSense déployée"
   type        = number
 }
+
+variable "vm_password" {
+  description = "Password for the ubuntu user on VMs"
+  type        = string
+  sensitive   = true
+}
