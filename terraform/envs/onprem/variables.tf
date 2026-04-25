@@ -67,10 +67,14 @@ variable "vm_ssh_public_key" {
   type        = string
 }
 
+variable "services_vm_id" {
+  description = "Proxmox VM ID for Services"
+  type        = number
+}
+
 variable "vault_vm_id" {
   description = "Proxmox VM ID for Vault"
   type        = number
-  default     = 201
 }
 
 variable "vault_vm_ip_cidr" {
@@ -82,5 +86,9 @@ variable "vault_vm_ip_cidr" {
 variable "pfsense_template_id" {
   description = "ID du template pfSense (Packer)"
   type        = number
-  default     = 9001
+}
+
+variable "pfsense_vm_id" {
+  description = "ID de la VM pfSense déployée"
+  type        = number
 }

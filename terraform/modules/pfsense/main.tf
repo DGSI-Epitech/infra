@@ -9,6 +9,7 @@ terraform {
 resource "proxmox_virtual_environment_vm" "pfsense_vm" {
   name      = var.vm_name
   node_name = var.proxmox_node
+  vm_id     = var.vm_id
 
   # --- Clonage du template ---
   clone {

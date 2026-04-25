@@ -53,3 +53,9 @@ variable "storage_vm" {
   type        = string
   default     = "local-lvm"
 }
+
+variable "storage_iso" {
+  description = "Proxmox storage for cloud-init files (must be dir type)"
+  type        = string
+  default     = "local"
+}

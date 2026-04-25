@@ -23,7 +23,7 @@ resource "proxmox_virtual_environment_vm" "services_vm" {
   }
 
   network_device {
-    bridge = "vmbr0"
+    bridge = "vmbr1"
     model  = "virtio"
   }
 
@@ -32,6 +32,7 @@ resource "proxmox_virtual_environment_vm" "services_vm" {
   }
 
   initialization {
+    datastore_id = var.storage_iso
     ip_config {
       ipv4 {
         address = var.vm_ip_cidr
