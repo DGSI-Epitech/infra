@@ -150,6 +150,33 @@ else
   echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) déjà présent, build Packer sauté."
 fi
 
+# --- Packer : build template Ubuntu si absent ---
+
+echo ""
+UBUNTU_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
+  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_UBUNTU_TEMPLATE}/status/current" 2>/dev/null | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
+
+if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
+  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) absent — build Packer..."
+  cd "$REPO_ROOT/packer/ubuntu-22.04"
+  export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
+  export PKR_VAR_proxmox_username="${PROXMOX_TOKEN_ID}"
+  export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
+  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
+  export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
+  export PKR_VAR_proxmox_token="${PROXMOX_TOKEN}"                   
+  export PKR_VAR_build_password="${VM_PASSWORD}"                    
+  export PKR_VAR_build_password_encrypted="${VM_PASSWORD_HASH}"   
+  export PKR_VAR_iso_checksum="${UBUNTU_ISO_CHECKSUM}"               
+  export PKR_VAR_proxmox_storage_iso="${PROXMOX_STORAGE_ISO:-local}"   
+  packer init .
+  packer build ubuntu-22.04.pkr.hcl
+  echo "    Template Ubuntu créé."
+else
+  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) déjà présent, build Packer sauté."
+fi
+
 # --- Terraform ---
 
 echo ""
