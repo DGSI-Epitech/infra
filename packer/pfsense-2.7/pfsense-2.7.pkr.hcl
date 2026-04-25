@@ -99,8 +99,9 @@ source "proxmox-iso" "pfsense" {
   }
 
   boot_iso {
-    iso_url          = var.iso_url
-    iso_checksum     = var.iso_checksum
+    #iso_url          = var.iso_url
+    #iso_checksum     = var.iso_checksum
+    iso_file = "local:iso/24a35fbd9011bd358bc49b633aacc5c2af375386.iso"
     iso_storage_pool = "local"
     unmount          = true
   }

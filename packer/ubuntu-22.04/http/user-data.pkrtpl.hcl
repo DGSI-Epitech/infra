@@ -20,7 +20,7 @@ autoinstall:
     install-server: true
     allow-pw: true
   packages:
-    - qemu-guest-agent
+    #- qemu-guest-agent -> bug during installation
     - cloud-init
   late-commands:
     - "echo '${build_username} ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/${build_username}"
