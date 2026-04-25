@@ -1,8 +1,8 @@
 # School Infra
 
-Infrastructure as Code pour un lab homelab/école déployé sur deux sites Proxmox.
+Infrastructure as Code pour un lab école déployé sur Proxmox (site on-premise).
 
-Tout est automatisé : une commande Terraform crée les VMs, Ansible les configure. Objectif : lab fonctionnel en moins de 10 minutes sur un environnement vierge.
+Tout est automatisé : une commande déploie pfSense, les templates et les VMs. Objectif : lab fonctionnel en moins de 15 minutes sur un environnement vierge.
 
 ---
 
@@ -10,146 +10,116 @@ Tout est automatisé : une commande Terraform crée les VMs, Ansible les configu
 
 | Outil | Rôle |
 |---|---|
-| **Terraform** | Crée les VMs sur Proxmox (template Ubuntu + clones) |
-| **Ansible** | Configure les services sur les VMs (Vault, Docker, etc.) |
-| **Packer** | Build la template Ubuntu de base (optionnel, déclenché par CI) |
+| **Packer** | Build la template pfSense 2.7.2 sur Proxmox |
+| **Terraform** | Crée les VMs (template Ubuntu + pfSense + clones) |
+| **Ansible** | Configure les services sur les VMs (Vault, etc.) |
 | **GitHub Actions** | CI/CD — déploie automatiquement sur push |
 
 ---
+
 ## Prérequis
-- Git
-- Terraform ≥ 1.9 (`npm run setup` l'installe automatiquement)
+
+- Node.js (pour `npm run`)
+- Terraform ≥ 1.9 (`npm run setup` l'installe)
+- Packer ≥ 1.11
 - Ansible (`pip install ansible`)
 - Une paire de clés SSH (`~/.ssh/id_ed25519`)
-- Accès à l'interface web Proxmox
+- Accès SSH root au Proxmox
 
 ---
 
-## Avant de commencer — Bootstrap (une seule fois)
+## Démarrage rapide
 
-> Sur un Proxmox vierge, le bootstrap Terraform crée automatiquement le token et les permissions.
-> Aucune action manuelle dans l'UI Proxmox n'est nécessaire.
-
-**1. Autoriser ta clé SSH sur Proxmox** (nécessaire pour l'import des disques)
+### 1. Configurer
 
 ```bash
-ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<IP_PROXMOX>
+git clone <repo> && cd infra
+npm run setup                          # installe Terraform
+
+cp config.env.example config.env      # copier le template
+# éditer config.env avec tes valeurs  # voir section ci-dessous
+
+cp terraform/envs/onprem/terraform.tfvars.example terraform/envs/onprem/terraform.tfvars
+# éditer terraform.tfvars (IPs des VMs, clé SSH publique)
+
+ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<PROXMOX_HOST>
 ssh-add ~/.ssh/id_ed25519
 ```
 
-**2. Lancer le bootstrap**
+### 2. Déployer
 
 ```bash
-cd terraform/envs/bootstrap
-cp terraform.tfvars.example terraform.tfvars
-# Remplir proxmox_endpoint et proxmox_node_address dans terraform.tfvars
-
-export TF_VAR_proxmox_password='ton-mot-de-passe-root-proxmox'
-terraform init
-terraform apply
-
-# Récupérer le token généré
-terraform output -raw terraform_token_id
+npm run deploy
 ```
 
-Le bootstrap crée le rôle `TerraformRole`, le token `root@pam!terraform`, et lui assigne les permissions. Le token généré est à utiliser à l'étape suivante.
+Le script fait dans l'ordre :
+1. Authentification Proxmox via API
+2. Suppression des VMs existantes (pfSense, services, vault)
+3. Création du bridge LAN `vmbr1` si absent
+4. Build Packer de la template pfSense (si absente)
+5. `terraform apply` — template Ubuntu + pfSense VM + services-vm + vault-vm
 
----
+### 3. Configurer les services
 
-## Déploiement
-
-### 1. Cloner et configurer
-
-```bash
-git clone <repo>
-cd infra
-
-# Installer Terraform
-npm run setup
-
-# Copier et remplir les variables
-cp terraform/envs/onprem/terraform.tfvars.example terraform/envs/onprem/terraform.tfvars
-# Édite le fichier avec tes vraies valeurs (IP, gateway, clé SSH publique)
-```
-
-### 2. Injecter le token Proxmox
-
-```bash
-# Utilise des guillemets simples — obligatoire à cause du ! dans le token
-export TF_VAR_proxmox_api_token='root@pam!terraform=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-```
-
-### 3. Déployer les VMs
-
-```bash
-cd terraform/envs/onprem
-terraform init
-terraform plan
-terraform apply
-```
-
-Terraform va :
-1. Télécharger l'image Ubuntu 22.04 cloud sur Proxmox (~660 MB, une seule fois)
-2. Créer la VM template (ID 9000)
-3. Cloner la template → services-vm (ID 200) et vault-vm (ID 201)
-4. Injecter l'IP statique et la clé SSH via cloud-init
-
-### 4. Configurer les services avec Ansible
-
-Une fois les VMs démarrées (attendre ~2 min après `terraform apply`) :
+Une fois les VMs démarrées :
 
 ```bash
 cd ansible
 ansible-playbook playbooks/vault.yml -i inventory/onprem.yml
 ```
 
----
+### 4. Tout supprimer
 
-## Variables importantes (terraform.tfvars)
-
-| Variable | Description | Valeur PVE1 |
-|---|---|---|
-| `proxmox_endpoint` | URL de l'API Proxmox | `https://192.168.139.128:8006` |
-| `proxmox_node` | Nom du nœud Proxmox | `pve` |
-| `proxmox_node_address` | IP Proxmox pour SSH | `192.168.139.128` |
-| `template_vm_id` | ID de la VM template | `9000` |
-| `vm_ip_cidr` | IP de services-vm | `172.16.255.242/28` |
-| `vault_vm_ip_cidr` | IP de vault-vm | `172.16.255.243/28` |
-| `vm_gateway` | Passerelle du réseau LAN | `172.16.255.254` |
-| `vm_ssh_public_key` | Clé publique SSH (`cat ~/.ssh/id_ed25519.pub`) | `ssh-ed25519 AAAA...` |
+```bash
+npm run destroy
+```
 
 ---
 
-## CI/CD (GitHub Actions)
+## config.env — Source de vérité
 
-Deux workflows automatiques :
+`config.env` centralise toutes les valeurs partagées entre Packer, Terraform et les scripts.
+Il est gitignored — ne jamais le committer.
 
-| Workflow | Déclencheur | Action |
-|---|---|---|
-| `packer.yml` | Push sur `packer/**` ou manuel | Build la template Ubuntu sur Proxmox |
-| `deploy-onprem.yml` | Push sur `terraform/**` ou `ansible/**` | Terraform apply + Ansible |
+```bash
+# Proxmox
+PROXMOX_HOST="X.X.X.X"          # IP du serveur Proxmox
+PROXMOX_USER="root@pam"
+PROXMOX_PASSWORD="..."           # mot de passe root Proxmox
+PROXMOX_NODE="proxmox-site1"     # nom du nœud dans Proxmox
+PROXMOX_STORAGE_VM="local"       # storage pour les disques VM
 
-Les workflows nécessitent un **self-hosted runner** sur le réseau Proxmox.
+# VM IDs
+VM_ID_UBUNTU_TEMPLATE=9000       # template Ubuntu (Terraform)
+VM_ID_PFSENSE_TEMPLATE=9001      # template pfSense (Packer)
+VM_ID_PFSENSE=1001               # VM pfSense déployée
+VM_ID_SERVICES=1003              # VM services (Netbox, etc.)
+VM_ID_VAULT=1002                 # VM HashiCorp Vault
+```
 
-Secrets GitHub à configurer :
+> Pour passer à Vault comme source de vérité à la place de `config.env` : remplacer le `source "$CONFIG_FILE"` dans les scripts par des appels `vault kv get`.
 
-| Secret | Valeur |
+---
+
+## Infrastructure réseau
+
+### PVE1 — On-premise
+
+| Élément | Valeur |
 |---|---|
-| `PROXMOX_API_TOKEN` | `root@pam!terraform=<uuid>` |
-| `PROXMOX_PACKER_TOKEN` | `root@pam!packer=<uuid>` |
-| `PACKER_BUILD_PASSWORD` | Mot de passe de build Packer |
-| `PACKER_BUILD_PASSWORD_ENCRYPTED` | Hash SHA-512 du mot de passe |
-| `ANSIBLE_SSH_PRIVATE_KEY_PATH` | Chemin de la clé SSH sur le runner |
+| Proxmox IP | `51.75.128.134` |
+| Proxmox node | `proxmox-site1` |
+| pfSense WAN | `vmbr0` (interface physique) |
+| pfSense LAN | `vmbr1` — `172.16.255.254/28` |
+| Réseau LAN | `172.16.255.240/28` |
 
----
-
-## Sécurité
-
-- Aucun secret dans le dépôt
-- Les tokens sont injectés via variables d'environnement ou secrets CI/CD
-- `*.tfstate`, `*.tfvars` et `*.pkrvars.hcl` sont ignorés par git
-- `vault-init.json` (unseal keys) est ignoré par git
-- Toute modification passe par une Pull Request
+| VM | ID | IP | Bridge |
+|---|---|---|---|
+| ubuntu-template | 9000 | — | — |
+| pfsense-template | 9001 | — | — |
+| pfsense-fw-01 | 1001 | 172.16.255.254 (LAN) | vmbr0 + vmbr1 |
+| services-vm | 1003 | 172.16.255.242/28 | vmbr1 |
+| vault-vm | 1002 | 172.16.255.243/28 | vmbr1 |
 
 ---
 
@@ -157,24 +127,36 @@ Secrets GitHub à configurer :
 
 ```
 infra/
-├── terraform/
-│   ├── envs/
-│   │   └── onprem/          # Environnement on-prem (PVE1)
-│   └── modules/
-│       ├── ubuntu-template/ # Télécharge l'image et crée la template
-│       ├── services-vm/     # VM services (Netbox, Docker...)
-│       └── vault-vm/        # VM HashiCorp Vault
-├── ansible/
-│   ├── inventory/
-│   │   └── onprem.yml       # Inventaire des VMs
-│   ├── playbooks/
-│   │   └── vault.yml        # Déploie et initialise Vault
-│   └── roles/
-│       └── vault/           # Rôle Ansible pour Vault
+├── config.env              # Config locale — gitignored
+├── config.env.example      # Template à copier
+├── scripts/
+│   ├── deploy.sh           # Déploiement complet (Packer + Terraform)
+│   └── destroy.sh          # Suppression de toutes les VMs
 ├── packer/
-│   └── ubuntu-22.04/        # Build de la template (optionnel)
-├── .github/workflows/       # CI/CD GitHub Actions
-└── docs/                    # Documentation et runbooks
+│   └── pfsense-2.7/        # Build template pfSense
+├── terraform/
+│   ├── envs/onprem/        # Environnement on-prem
+│   └── modules/
+│       ├── ubuntu-template/
+│       ├── pfsense/
+│       ├── services-vm/
+│       └── vault-vm/
+├── ansible/
+│   ├── inventory/onprem.yml
+│   ├── playbooks/vault.yml
+│   └── roles/vault/
+└── docs/
+    └── runbooks/RUNBOOKS.md
 ```
 
-Pour le détail des problèmes rencontrés et leur résolution : [`docs/runbooks/RUNBOOKS.md`](docs/runbooks/RUNBOOKS.md)
+---
+
+## Commandes utiles
+
+| Commande | Description |
+|---|---|
+| `npm run deploy` | Déploiement complet |
+| `npm run destroy` | Suppression de toutes les VMs |
+| `npm run tf:plan:onprem` | Voir les changements Terraform sans appliquer |
+| `npm run tf:fmt` | Formater les fichiers Terraform |
+| `npm run tf:check` | Valider les configs Terraform |
