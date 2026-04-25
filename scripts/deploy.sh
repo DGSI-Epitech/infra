@@ -18,10 +18,10 @@ fi
 source "$CONFIG_FILE"
 
 PROXMOX_API="https://${PROXMOX_HOST}:8006/api2/json"
+export TF_VAR_proxmox_password="${TF_VAR_proxmox_password:-${PROXMOX_PASSWORD}}"
 
 if [[ -z "${TF_VAR_proxmox_password:-}" ]]; then
-  echo "Erreur : TF_VAR_proxmox_password n'est pas défini."
-  echo "  export TF_VAR_proxmox_password='ton-mot-de-passe-root'"
+  echo "Erreur : PROXMOX_PASSWORD manquant dans config.env."
   exit 1
 fi
 
