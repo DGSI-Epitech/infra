@@ -14,7 +14,6 @@ module "services_vm" {
 
 module "vault_vm" {
   source = "../../modules/vault-vm"
-  depends_on = [module.services_vm]
   proxmox_node      = var.proxmox_node
   template_vm_id    = var.template_ubuntu_vm_id
   vm_id             = var.vault_vm_id
