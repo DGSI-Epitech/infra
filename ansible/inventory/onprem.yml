@@ -3,12 +3,13 @@ all:
     services:
       hosts:
         services-vm:
-          ansible_host: 192.168.100.50
+          ansible_host: 172.16.255.242
           ansible_user: ubuntu
           ansible_ssh_private_key_file: ~/.ssh/id_rsa
     vault:
       hosts:
         vault-vm:
-          ansible_host: 192.168.100.51
+          ansible_host: 172.16.255.243
           ansible_user: ubuntu
           ansible_ssh_private_key_file: ~/.ssh/id_rsa
+
