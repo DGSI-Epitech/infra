@@ -1,9 +1,10 @@
 resource "proxmox_download_file" "ubuntu_cloud_image" {
-  content_type = "iso"
-  datastore_id = var.storage_iso
-  node_name    = var.proxmox_node
-  url          = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
-  file_name    = "ubuntu-22.04-cloudimg-amd64.img"
+  content_type       = "iso"
+  datastore_id       = var.storage_iso
+  node_name          = var.proxmox_node
+  url                = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+  file_name          = "ubuntu-22.04-cloudimg-amd64.img"
+  overwrite_unmanaged = true
 }
 
 resource "proxmox_virtual_environment_vm" "template" {

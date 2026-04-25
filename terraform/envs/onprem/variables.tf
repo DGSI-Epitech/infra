@@ -53,13 +53,11 @@ variable "storage_vm" {
 variable "vm_ip_cidr" {
   description = "Services VM IP address in CIDR notation"
   type        = string
-  default     = "192.168.100.50/24"
 }
 
 variable "vm_gateway" {
   description = "Default gateway for the services VM"
   type        = string
-  default     = "192.168.100.1"
 }
 
 variable "vm_ssh_public_key" {
@@ -80,7 +78,6 @@ variable "vault_vm_id" {
 variable "vault_vm_ip_cidr" {
   description = "Vault VM IP address in CIDR notation"
   type        = string
-  default     = "192.168.100.51/24"
 }
 
 variable "pfsense_template_id" {

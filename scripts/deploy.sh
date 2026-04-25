@@ -139,7 +139,11 @@ terraform apply -input=false -auto-approve \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
   -var "services_vm_id=${VM_ID_SERVICES}" \
   -var "vault_vm_id=${VM_ID_VAULT}" \
-  -var "pfsense_vm_id=${VM_ID_PFSENSE}"
+  -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
+  -var "vm_ip_cidr=${VM_IP_SERVICES}" \
+  -var "vault_vm_ip_cidr=${VM_IP_VAULT}" \
+  -var "vm_gateway=${VM_GATEWAY}" \
+  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}"
 
 echo ""
 echo "==> Déploiement terminé."
