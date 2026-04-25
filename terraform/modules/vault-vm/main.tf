@@ -3,6 +3,7 @@ resource "proxmox_virtual_environment_vm" "vault_vm" {
   node_name = var.proxmox_node
   vm_id     = var.vm_id
   tags      = ["vault", "ubuntu-22-04"]
+  boot_order = ["virtio0"]
 
   clone {
     vm_id = var.template_vm_id
@@ -20,6 +21,8 @@ resource "proxmox_virtual_environment_vm" "vault_vm" {
 
   agent {
     enabled = true
+    timeout = "60s"
+
   }
 
   network_device {

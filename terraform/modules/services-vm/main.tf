@@ -3,6 +3,7 @@ resource "proxmox_virtual_environment_vm" "services_vm" {
   node_name = var.proxmox_node
   vm_id     = var.vm_id
   tags      = ["services", "ubuntu-22-04"]
+  boot_order = ["virtio0"]
 
   clone {
     vm_id = var.template_vm_id
