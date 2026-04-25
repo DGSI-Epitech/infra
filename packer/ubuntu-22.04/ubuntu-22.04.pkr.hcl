@@ -119,10 +119,12 @@ source "proxmox-iso" "ubuntu-2204" {
   }
 
 
-  boot_wait = "5s"
+  boot_wait = "10s"
   boot_command = [
-    "<wait3>c<wait3>",
-    "linux /casper/vmlinuz --- autoinstall ds=nocloud-net\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/<enter><wait3>",
+    "<esc><wait2>",           # abort language menue
+    "<esc><wait2>",           # return to GRUB
+    "c<wait3>",               # ← open GRUB terminal
+    "linux /casper/vmlinuz --- autoinstall ds=nocloud<enter><wait5>",
     "initrd /casper/initrd<enter><wait3>",
     "boot<enter>"
   ]
