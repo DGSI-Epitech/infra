@@ -12,7 +12,7 @@ autoinstall:
           name: "en*"
         addresses:
           - 172.16.0.100/24
-        gateway4: 172.16.0.254
+        gateway4: 172.16.0.1
         nameservers:
           addresses: [1.1.1.1, 8.8.8.8]
   storage:
@@ -33,4 +33,9 @@ autoinstall:
     - "chmod 440 /target/etc/sudoers.d/${build_username}"
     - "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /target/etc/ssh/sshd_config"
     - "sed -i 's/^#*KbdInteractiveAuthentication.*/KbdInteractiveAuthentication yes/' /target/etc/ssh/sshd_config"
-    - "echo '${build_username}:${build_password}' | chpasswd --root /target"
+
+# Appliqué par cloud-init au premier boot (après création de l'utilisateur)
+chpasswd:
+  list: |
+    ${build_username}:${build_password}
+  expire: false

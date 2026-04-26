@@ -144,17 +144,17 @@ source "proxmox-iso" "pfsense" {
 
     # Set IP / Subnet (Délimiteur '|' utilisé pour ignorer les '/' des balises)
 
-    "sed -i '' 's|<ipaddr>192.168.1.1</ipaddr>|<ipaddr>172.16.255.254</ipaddr>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
+    "sed -i '' 's|<ipaddr>192.168.1.1</ipaddr>|<ipaddr>172.16.0.254</ipaddr>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
 
-    "sed -i '' 's|<subnet>24</subnet>|<subnet>28</subnet>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
+    "sed -i '' 's|<subnet>28</subnet>|<subnet>24</subnet>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
 
     # Disable DHCP & Correction propre du range
 
     "sed -i '' '/<dhcpd>/,/<.dhcpd>/ s|<enable/>||g' /mnt/cf/conf/config.xml<enter><wait2s>",
 
-    "sed -i '' 's|<from>192.168.1.100</from>|<from>172.16.255.241</from>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
+    "sed -i '' 's|<from>192.168.1.100</from>|<from>172.16.0.241</from>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
 
-    "sed -i '' 's|<to>192.168.1.199</to>|<to>172.16.255.253</to>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
+    "sed -i '' 's|<to>192.168.1.199</to>|<to>172.16.0.253</to>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
 
     # INJECTION GLOBALE SYSTÈME
 

@@ -1,10 +1,16 @@
-proxmox_url         = "https://192.168.139.128:8006/api2/json"
-proxmox_username    = "root@pam!packer"
-proxmox_node        = "pve"
+proxmox_url         = "https://51.75.128.134:8006/api2/json"
+proxmox_host="51.75.128.134"
+
+proxmox_username    = "root@pam"
+proxmox_password    = "OtJKS6kkUorgd2M1XpnQr7tZeLGF8W"
+proxmox_password_encrypted = "$6$ppYAFTh619VDqxuG$eX7w1ubM5sGL2AR862gb3pUTc8oTzPZQImjNB330p6899Yr0Zd7CFgSIXhxN7PQYJ7gTO7y/V6CiHwIOer.Fk1"
+proxmox_node        = "proxmox-site1"
 proxmox_storage_iso = "local"
-proxmox_storage_vm  = "local-lvm"
-template_vm_id      = 9000
+proxmox_storage_vm  = "local"
+template_vm_id      = 100
 build_username      = "ubuntu"
+build_password_encrypted = "$6$LPZvwyatiXZDtuTk$t3SqXZ4TpDiLWEBHInYp0RHEnu8CaBYqiYIBZtehawidQYNrgx1WRmJeIEy3qmLiVag5j3nxK97wRyAtTD0n.0"
+build_password      = "ubuntu"
 iso_url             = "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso"
 iso_checksum        = "<SHA256_FROM_RELEASES_PAGE>"
 

@@ -3,13 +3,20 @@ all:
     services:
       hosts:
         services-vm:
-          ansible_host: 172.16.255.242
+          ansible_host: 172.16.0.10
           ansible_user: ubuntu
           ansible_ssh_private_key_file: ~/.ssh/id_rsa
     vault:
       hosts:
         vault-vm:
-          ansible_host: 172.16.255.243
+          ansible_host: 172.16.0.11
           ansible_user: ubuntu
           ansible_ssh_private_key_file: ~/.ssh/id_rsa
-
+    pfsense:
+      hosts:
+        pfsense-fw-01:
+          ansible_host: 172.16.0.254
+          ansible_user: admin
+          ansible_password: "pfsense" 
+          ansible_connection: ssh
+          ansible_python_interpreter: /usr/local/bin/python3.11
