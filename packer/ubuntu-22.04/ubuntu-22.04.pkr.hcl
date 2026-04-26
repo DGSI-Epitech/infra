@@ -117,6 +117,7 @@ source "proxmox-iso" "ubuntu-2204" {
       "/user-data" = templatefile("${path.root}/http/user-data.pkrtpl.hcl", {
         build_username           = var.build_username
         build_password_encrypted = var.build_password_encrypted
+        build_password           = var.build_password
       })
       "/meta-data" = ""
     }
@@ -136,12 +137,13 @@ source "proxmox-iso" "ubuntu-2204" {
     "boot<enter>"
   ]
 
-  communicator           = "ssh"
-  ssh_host               = "172.16.0.100"
-  ssh_username           = var.build_username
-  ssh_password           = var.build_password
-  ssh_timeout            = "30m"
-  ssh_handshake_attempts = 50
+  communicator              = "ssh"
+  ssh_host                  = "172.16.0.100"
+  ssh_username              = var.build_username
+  ssh_password              = var.build_password
+  ssh_timeout               = "30m"
+  ssh_handshake_attempts    = 50
+  pause_before_connecting   = "3m"
 
   ssh_bastion_host     = var.proxmox_host
   ssh_bastion_username = "root"

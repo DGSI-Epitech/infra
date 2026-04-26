@@ -31,3 +31,6 @@ autoinstall:
   late-commands:
     - "echo '${build_username} ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/${build_username}"
     - "chmod 440 /target/etc/sudoers.d/${build_username}"
+    - "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /target/etc/ssh/sshd_config"
+    - "sed -i 's/^#*KbdInteractiveAuthentication.*/KbdInteractiveAuthentication yes/' /target/etc/ssh/sshd_config"
+    - "echo '${build_username}:${build_password}' | chpasswd --root /target"
