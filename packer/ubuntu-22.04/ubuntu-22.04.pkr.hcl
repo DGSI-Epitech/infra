@@ -140,8 +140,9 @@ source "proxmox-iso" "ubuntu-2204" {
   ssh_username              = var.build_username
   ssh_password              = var.build_password
   ssh_timeout               = "30m"
-  ssh_handshake_attempts    = 50
-  pause_before_connecting   = "5m"
+  pause_before_connecting   = "3m"
+  ssh_handshake_attempts    = 200
+  
 
   ssh_bastion_host     = var.proxmox_host
   ssh_bastion_username = "root"
@@ -155,6 +156,7 @@ build {
 
   provisioner "shell" {
     inline = [
+      "cloud-init status --wait",
       "sudo apt-get update",
       "sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y",
       "sudo apt-get install -y qemu-guest-agent curl wget git",
