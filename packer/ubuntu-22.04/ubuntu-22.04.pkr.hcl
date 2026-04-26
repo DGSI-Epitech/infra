@@ -74,6 +74,11 @@ variable "iso_checksum" {
   default     = "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0"
 }
 
+variable "proxmox_host" {
+  type        = string
+  description = "IP réelle de Proxmox pour le bastion SSH"
+}
+
 source "proxmox-iso" "ubuntu-2204" {
   proxmox_url              = var.proxmox_url
   username                 = var.proxmox_username
@@ -84,8 +89,10 @@ source "proxmox-iso" "ubuntu-2204" {
   vm_id                = var.template_vm_id
   vm_name              = "ubuntu-22.04-template"
   template_description = "Ubuntu 22.04 LTS — built with Packer on ${formatdate("YYYY-MM-DD", timestamp())}"
-  iso_url          = var.iso_url
-  iso_checksum     = "sha256:${var.iso_checksum}"
+
+  #iso_url          = var.iso_url
+  #iso_checksum     = "sha256:${var.iso_checksum}"
+  iso_file      =  "local:iso/c968bbbeb22702b3f10a07276c8ca06720e80c4c.iso"
   iso_storage_pool = var.proxmox_storage_iso
   unmount_iso      = true
 
@@ -102,7 +109,7 @@ source "proxmox-iso" "ubuntu-2204" {
 
   network_adapters {
     model  = "virtio"
-    bridge = "vmbr0"
+    bridge = "vmbr1"
   }
 
   additional_iso_files {
@@ -130,10 +137,15 @@ source "proxmox-iso" "ubuntu-2204" {
   ]
 
   communicator           = "ssh"
+  ssh_host               = "172.16.0.100"
   ssh_username           = var.build_username
   ssh_password           = var.build_password
   ssh_timeout            = "30m"
   ssh_handshake_attempts = 50
+
+  ssh_bastion_host     = var.proxmox_host
+  ssh_bastion_username = "root"
+  ssh_bastion_password = var.proxmox_password
 
   qemu_agent = true
 }

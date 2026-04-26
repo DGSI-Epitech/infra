@@ -5,10 +5,16 @@ autoinstall:
   keyboard:
     layout: us
   network:
-    ethernets:
-      ens18:
-        dhcp4: true
     version: 2
+    ethernets:
+      any:
+        match:
+          name: "en*"
+        addresses:
+          - 172.16.0.100/24
+        gateway4: 172.16.0.254
+        nameservers:
+          addresses: [1.1.1.1, 8.8.8.8]
   storage:
     layout:
       name: lvm
