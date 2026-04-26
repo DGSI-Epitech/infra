@@ -171,10 +171,11 @@ if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
   export PKR_VAR_proxmox_storage_iso="local"
   export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
   export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
+  export PKR_VAR_build_username="${VM_USERNAME}"
   export PKR_VAR_build_password="${VM_PASSWORD}"
   export PKR_VAR_build_password_encrypted="${VM_PASSWORD_HASH}"
   packer init .
-  packer build ubuntu-22.04.pkr.hcl
+  packer build -on-error=abort ubuntu-22.04.pkr.hcl
   echo "    Template Ubuntu créé — attente 30s pour déverrouillage Proxmox..."
   sleep 30
 else
