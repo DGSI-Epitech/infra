@@ -10,3 +10,26 @@
 /httpRequests/
 
 /.idea
+terraform.tfstate*
+# Terraform
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.backup
+**/*.tfvars
+!**/*.tfvars.example
+.terraform.lock.hcl
+packer/pfsense-2.7/downloaded_iso_path
+terraform/envs/onprem/.terraform.tfstate.lock.info
+packer/ubuntu-22.04/downloaded_iso_path/
+
+# Packer
+**/*.pkrvars.hcl
+!**/*.pkrvars.hcl.example
+
+# Vault — contient les unseal keys et root token
+vault-init.json
+
+# Config locale (IP, IDs VMs)
+config.env
+
+CLAUDE.md

@@ -1,0 +1,8 @@
+proxmox_url        = "https://192.168.139.128:8006/api2/json"
+proxmox_username   = "root@pam"
+proxmox_node       = "pve"
+proxmox_storage_vm = "local-lvm"
+template_vm_id     = 9001
+
+# proxmox_password doit être passé via variable d'environnement :
+# export PKR_VAR_proxmox_password='ton-mot-de-passe-root'

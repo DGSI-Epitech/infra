@@ -1,0 +1,39 @@
+- name: Configure pfSense
+  hosts: pfsense
+  gather_facts: false
+  collections:
+    - pfsensible.core
+
+  tasks:
+    # Règle LAN → WAN
+    - name: Autoriser tout le trafic LAN vers WAN
+      pfsensible.core.pfsense_rule:
+        name: "Allow LAN to WAN"
+        action: pass
+        interface: lan
+        protocol: any
+        source: lan
+        destination: any
+        state: present
+      become: true
+
+    # Règle SSH depuis OVH
+    - name: Autoriser SSH depuis OVH
+      pfsensible.core.pfsense_rule:
+        name: "Allow SSH from OVH"
+        action: pass
+        interface: wan
+        protocol: tcp
+        source: "51.75.128.134"
+        destination: "172.16.0.254"
+        destination_port: "22"
+        state: present
+      become: true
+
+    # DNS
+    - name: Configurer DNS
+      pfsensible.core.pfsense_setup:
+        dnsserver:
+          - "1.1.1.1"
+          - "8.8.8.8"
+      become: true

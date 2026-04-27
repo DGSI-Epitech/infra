@@ -15,6 +15,9 @@
     "tf:init:remote": "terraform -chdir=terraform/envs/remote init",
     "tf:plan:remote": "terraform -chdir=terraform/envs/remote plan",
 
-    "tf:check": "npm run tf:fmt && npm run tf:validate:onprem && npm run tf:validate:remote"
+    "tf:check": "npm run tf:fmt && npm run tf:validate:onprem && npm run tf:validate:remote",
+
+    "deploy": "bash scripts/deploy.sh",
+    "destroy": "bash scripts/destroy.sh"
   }
 }

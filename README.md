@@ -1,91 +1,162 @@
-## 🚀 Terraform – Commandes standardisées
+# School Infra
 
-Afin de garantir une expérience **identique sur Windows, macOS et Linux**, ce projet utilise un `package.json` comme **point d’entrée unique** pour exécuter les commandes Terraform.
-Node.js est utilisé uniquement comme **orchestrateur de commandes**, Terraform restant l’outil principal d’Infrastructure as Code.
+Infrastructure as Code pour un lab école déployé sur Proxmox (site on-premise).
 
----
-
-### 📦 Prérequis
-
-* Node.js ≥ 18
-* Git
-* Accès réseau aux API Proxmox (DEV / PROD selon le contexte)
-
-> Terraform n’a pas besoin d’être installé manuellement : une commande dédiée s’en charge automatiquement.
+Tout est automatisé : une commande déploie pfSense, les templates et les VMs. Objectif : lab fonctionnel en moins de 15 minutes sur un environnement vierge.
 
 ---
 
-## ⚙️ Installation de Terraform
+## Stack technique
+
+| Outil | Rôle |
+|---|---|
+| **Packer** | Build la template pfSense 2.7.2 sur Proxmox |
+| **Terraform** | Crée les VMs (template Ubuntu + pfSense + clones) |
+| **Ansible** | Configure les services sur les VMs (Vault, etc.) |
+| **GitHub Actions** | CI/CD — déploie automatiquement sur push |
+
+---
+
+## Prérequis
+
+- Node.js (pour `npm run`)
+- Terraform ≥ 1.9 (`npm run setup` l'installe)
+- Packer ≥ 1.11
+- Ansible (`pip install ansible`)
+- Une paire de clés SSH (`~/.ssh/id_ed25519`)
+- Accès SSH root au Proxmox
+
+---
+
+## Démarrage rapide
+
+### 1. Configurer
 
 ```bash
-npm run setup
+git clone <repo> && cd infra
+npm run setup                          # installe Terraform
+
+cp config.env.example config.env      # copier le template
+# éditer config.env avec tes valeurs  # voir section ci-dessous
+
+cp terraform/envs/onprem/terraform.tfvars.example terraform/envs/onprem/terraform.tfvars
+# éditer terraform.tfvars (IPs des VMs, clé SSH publique)
+
+ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<PROXMOX_HOST>
+ssh-add ~/.ssh/id_ed25519
 ```
 
-Cette commande :
-
-* détecte le système d’exploitation (Windows / macOS / Linux)
-* installe Terraform via le gestionnaire de paquets approprié :
-
-    * **Windows** : Chocolatey ou Winget
-    * **macOS** : Homebrew
-    * **Linux** : APT (HashiCorp officiel)
-* vérifie la version installée
-
-👉 Cette étape est requise uniquement **la première fois**.
-
----
-
-## 🧪 Vérifications locales (avant un push)
+### 2. Déployer
 
 ```bash
-npm run tf:check
+npm run deploy
 ```
 
-Cette commande exécute, dans l’ordre :
+Le script fait dans l'ordre :
+1. Authentification Proxmox via API
+2. Suppression des VMs existantes (pfSense, services, vault)
+3. Création du bridge LAN `vmbr1` si absent
+4. Build Packer de la template pfSense (si absente)
+5. `terraform apply` — template Ubuntu + pfSense VM + services-vm + vault-vm
 
-1. le formatage du code Terraform
-2. la validation de la configuration
-3. un `terraform plan` sur l’environnement **on-prem (DEV)**
+### 3. Configurer les services
 
-Elle permet de détecter les erreurs de syntaxe ou de configuration **avant toute mise en production**.
-
----
-
-## 🏗️ Environnement DEV (site on-prem)
-
-Les commandes suivantes sont utilisées **uniquement en développement** :
+Une fois les VMs démarrées :
 
 ```bash
-npm run tf:init:dev
-npm run tf:plan:dev
-npm run tf:apply:dev
+cd ansible
+ansible-playbook playbooks/vault.yml -i inventory/onprem.yml
 ```
 
-* `init` : initialise Terraform et le backend de state
-* `plan` : affiche les changements à venir
-* `apply` : applique les changements sur l’environnement DEV
-
----
-
-## 🔒 Environnement PROD (site remote)
-
-Les commandes de production sont volontairement **restreintes** :
+### 4. Tout supprimer
 
 ```bash
-npm run tf:init:prod
-npm run tf:plan:prod
+npm run destroy
 ```
-
-L’application des changements en production (`terraform apply`) est **désactivée en local** et doit obligatoirement passer par la **CI/CD**, afin de respecter l’approche GitOps et éviter toute action manuelle non contrôlée.
 
 ---
 
-## 🛡️ Sécurité et bonnes pratiques
+## config.env — Source de vérité
 
-* Aucune information sensible (tokens, mots de passe) n’est stockée dans le dépôt
-* Les credentials sont injectés via :
+`config.env` centralise toutes les valeurs partagées entre Packer, Terraform et les scripts.
+Il est gitignored — ne jamais le committer.
 
-    * des variables d’environnement
-    * ou les secrets de la CI/CD
-* Chaque site Proxmox dispose de son propre state Terraform
-* Toute modification passe par une Pull Request avec revue
+```bash
+# Proxmox
+PROXMOX_HOST="X.X.X.X"          # IP du serveur Proxmox
+PROXMOX_USER="root@pam"
+PROXMOX_PASSWORD="..."           # mot de passe root Proxmox
+PROXMOX_NODE="proxmox-site1"     # nom du nœud dans Proxmox
+PROXMOX_STORAGE_VM="local"       # storage pour les disques VM
+
+# VM IDs
+VM_ID_UBUNTU_TEMPLATE=9000       # template Ubuntu (Terraform)
+VM_ID_PFSENSE_TEMPLATE=9001      # template pfSense (Packer)
+VM_ID_PFSENSE=1001               # VM pfSense déployée
+VM_ID_SERVICES=1003              # VM services (Netbox, etc.)
+VM_ID_VAULT=1002                 # VM HashiCorp Vault
+```
+
+> Pour passer à Vault comme source de vérité à la place de `config.env` : remplacer le `source "$CONFIG_FILE"` dans les scripts par des appels `vault kv get`.
+
+---
+
+## Infrastructure réseau
+
+### PVE1 — On-premise
+
+| Élément | Valeur |
+|---|---|
+| Proxmox IP | `51.75.128.134` |
+| Proxmox node | `proxmox-site1` |
+| pfSense WAN | `vmbr0` (interface physique) |
+| pfSense LAN | `vmbr1` — `172.16.255.254/28` |
+| Réseau LAN | `172.16.255.240/28` |
+
+| VM | ID | IP | Bridge |
+|---|---|---|---|
+| ubuntu-template | 9000 | — | — |
+| pfsense-template | 9001 | — | — |
+| pfsense-fw-01 | 1001 | 172.16.255.254 (LAN) | vmbr0 + vmbr1 |
+| services-vm | 1003 | 172.16.255.242/28 | vmbr1 |
+| vault-vm | 1002 | 172.16.255.243/28 | vmbr1 |
+
+---
+
+## Structure du projet
+
+```
+infra/
+├── config.env              # Config locale — gitignored
+├── config.env.example      # Template à copier
+├── scripts/
+│   ├── deploy.sh           # Déploiement complet (Packer + Terraform)
+│   └── destroy.sh          # Suppression de toutes les VMs
+├── packer/
+│   └── pfsense-2.7/        # Build template pfSense
+├── terraform/
+│   ├── envs/onprem/        # Environnement on-prem
+│   └── modules/
+│       ├── ubuntu-template/
+│       ├── pfsense/
+│       ├── services-vm/
+│       └── vault-vm/
+├── ansible/
+│   ├── inventory/onprem.yml
+│   ├── playbooks/vault.yml
+│   └── roles/vault/
+└── docs/
+    └── runbooks/RUNBOOKS.md
+```
+
+---
+
+## Commandes utiles
+
+| Commande | Description |
+|---|---|
+| `npm run deploy` | Déploiement complet |
+| `npm run destroy` | Suppression de toutes les VMs |
+| `npm run tf:plan:onprem` | Voir les changements Terraform sans appliquer |
+| `npm run tf:fmt` | Formater les fichiers Terraform |
+| `npm run tf:check` | Valider les configs Terraform |

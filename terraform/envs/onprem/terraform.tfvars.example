@@ -1,0 +1,15 @@
+proxmox_api_token = "root@pam!packer-auto=XXXXXXXXXXXXXXXXXXXXXXXXXXX"
+proxmox_endpoint  = "https://XXXXXXXXXXXXXXXXXXXXX:8006"
+proxmox_node      = "pve"
+proxmox_node_address = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+# --- Templates ---
+template_vm_id       = 9001
+
+# --- Variables Réseau (Ubuntu) ---
+vm_ip_cidr           = "192.168.100.50/24"
+vm_gateway           = "192.168.100.1"
+vm_ssh_public_key    = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+# --- Vault ---
+vault_vm_id          = 201
+vault_vm_ip_cidr     = "192.168.100.51/24"
