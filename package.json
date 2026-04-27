@@ -18,7 +18,6 @@
     "tf:check": "npm run tf:fmt && npm run tf:validate:onprem && npm run tf:validate:remote",
 
     "deploy": "bash scripts/deploy.sh",
-    "deploy1": "bash scripts/deploy1.sh",
     "destroy": "bash scripts/destroy.sh"
   }
 }

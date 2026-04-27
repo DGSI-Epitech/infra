@@ -15,7 +15,6 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
-# shellcheck source=/dev/null
 source "$CONFIG_FILE"
 
 PROXMOX_API="https://${PROXMOX_HOST}:8006/api2/json"
@@ -46,7 +45,7 @@ CSRF=$(echo "$AUTH"   | python3 -c "import sys,json; print(json.load(sys.stdin)[
 
 if [[ -z "$TICKET" ]]; then
   echo "Erreur : authentification Proxmox échouée."
-  echo "  Vérifier TF_VAR_proxmox_password et l'URL ${PROXMOX_API}"
+  echo "  Vérifier PROXMOX_PASSWORD et l'URL ${PROXMOX_API}"
   echo "  Réponse complète : $AUTH"
   exit 1
 fi
@@ -54,8 +53,9 @@ echo "    Authentifié."
 
 # --- Nettoyage des VMs orphelines ---
 
-echo "==> Nettoyage des VMs (${VM_ID_PFSENSE}, ${VM_ID_SERVICES}, ${VM_ID_VAULT})..."
-for VMID in "${VM_ID_PFSENSE}" "${VM_ID_SERVICES}" "${VM_ID_VAULT}"; do
+echo ""
+echo "==> Nettoyage des VMs (${VM_ID_UBUNTU_TEMPLATE}, ${VM_ID_PFSENSE}, ${VM_ID_SERVICES}, ${VM_ID_VAULT})..."
+for VMID in "${VM_ID_UBUNTU_TEMPLATE}" "${VM_ID_PFSENSE}" "${VM_ID_SERVICES}" "${VM_ID_VAULT}"; do
   STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
     "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VMID}/status/current" 2>/dev/null | \
     python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
@@ -101,7 +101,59 @@ else
   echo "    Bridge vmbr1 déjà présent."
 fi
 
-# --- Packer : build template Ubuntu si absent ---
+# --- ÉTAPE 1 : Packer pfSense ---
+
+echo ""
+PFSENSE_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
+  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_PFSENSE_TEMPLATE}/status/current" 2>/dev/null | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
+
+if [[ "$PFSENSE_TEMPLATE_STATUS" == "notfound" ]]; then
+  echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) absent — build Packer..."
+  cd "$PACKER_DIR_PFSENSE"
+  export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
+  export PKR_VAR_proxmox_username="${PROXMOX_USER}"
+  export PKR_VAR_proxmox_password="${TF_VAR_proxmox_password}"
+  export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
+  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
+  export PKR_VAR_template_vm_id="${VM_ID_PFSENSE_TEMPLATE}"
+  packer init .
+  packer build pfsense-2.7.pkr.hcl
+  echo "    Template pfSense créé."
+else
+  echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) déjà présent, build Packer sauté."
+fi
+
+# --- ÉTAPE 2 : Terraform - déploiement pfSense uniquement ---
+# pfSense doit tourner avant le build Ubuntu pour router le trafic de vmbr1 vers internet
+
+echo ""
+echo "==> Déploiement pfSense (phase 1)..."
+cd "$ONPREM_DIR"
+terraform init -input=false -upgrade
+terraform apply -input=false -auto-approve \
+  -target=module.pfsense \
+  -var "proxmox_endpoint=https://${PROXMOX_HOST}:8006" \
+  -var "proxmox_username=${PROXMOX_USER}" \
+  -var "proxmox_node=${PROXMOX_NODE}" \
+  -var "proxmox_node_address=${PROXMOX_HOST}" \
+  -var "storage_vm=${PROXMOX_STORAGE_VM}" \
+  -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
+  -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
+  -var "services_vm_id=${VM_ID_SERVICES}" \
+  -var "vault_vm_id=${VM_ID_VAULT}" \
+  -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
+  -var "vm_ip_cidr=${VM_IP_SERVICES}" \
+  -var "vault_vm_ip_cidr=${VM_IP_VAULT}" \
+  -var "vm_gateway=${VM_GATEWAY}" \
+  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
+  -var "vm_password=${VM_PASSWORD}"
+
+echo "    pfSense déployé — attente 30s pour qu'il soit opérationnel..."
+sleep 30
+
+# --- ÉTAPE 3 : Packer Ubuntu ---
+# pfSense est maintenant actif et route le trafic de vmbr1 vers internet
 
 echo ""
 UBUNTU_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
@@ -119,71 +171,22 @@ if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
   export PKR_VAR_proxmox_storage_iso="local"
   export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
   export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
+  export PKR_VAR_build_username="${VM_USERNAME}"
   export PKR_VAR_build_password="${VM_PASSWORD}"
   export PKR_VAR_build_password_encrypted="${VM_PASSWORD_HASH}"
   packer init .
-  packer build ubuntu-22.04.pkr.hcl
-  echo "    Template Ubuntu créé."
+  packer build -on-error=abort ubuntu-22.04.pkr.hcl
+  echo "    Template Ubuntu créé — attente 30s pour déverrouillage Proxmox..."
+  sleep 30
 else
   echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) déjà présent, build Packer sauté."
 fi
 
-# --- Packer : build template pfSense si absent ---
+# --- ÉTAPE 4 : Terraform - déploiement VMs services + vault ---
 
 echo ""
-PFSENSE_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
-  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_PFSENSE_TEMPLATE}/status/current" 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
-
-if [[ "$PFSENSE_TEMPLATE_STATUS" == "notfound" ]]; then
-  echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) absent — build Packer..."
-  cd "$PACKER_DIR_PFSENSE"
-  export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
-  export PKR_VAR_proxmox_username="${PROXMOX_USER}"
-  export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
-  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
-  export PKR_VAR_template_vm_id="${VM_ID_PFSENSE_TEMPLATE}"
-  export PKR_VAR_proxmox_password="${TF_VAR_proxmox_password}"
-  packer init .
-  packer build pfsense-2.7.pkr.hcl
-  echo "    Template pfSense créé."
-else
-  echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) déjà présent, build Packer sauté."
-fi
-
-# --- Packer : build template Ubuntu si absent ---
-
-echo ""
-UBUNTU_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
-  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_UBUNTU_TEMPLATE}/status/current" 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
-
-if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
-  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) absent — build Packer..."
-  cd "$REPO_ROOT/packer/ubuntu-22.04"
-  export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
-  export PKR_VAR_proxmox_username="${PROXMOX_TOKEN_ID}"
-  export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
-  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
-  export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
-  export PKR_VAR_proxmox_password="${PROXMOX_PASSWORD}"
-  export PKR_VAR_build_password="${VM_PASSWORD}"                    
-  export PKR_VAR_build_password_encrypted="${VM_PASSWORD_HASH}"   
-  export PKR_VAR_iso_checksum="${UBUNTU_ISO_CHECKSUM}"               
-  export PKR_VAR_proxmox_storage_iso="${PROXMOX_STORAGE_ISO:-local}"   
-  packer init .
-  packer build ubuntu-22.04.pkr.hcl
-  echo "    Template Ubuntu créé."
-else
-  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) déjà présent, build Packer sauté."
-fi
-
-# --- Terraform ---
-
-echo ""
-echo "==> Déploiement onprem (VMs + pfSense)..."
+echo "==> Déploiement VMs services et vault (phase 2)..."
 cd "$ONPREM_DIR"
-terraform init -input=false -upgrade
 terraform apply -input=false -auto-approve \
   -var "proxmox_endpoint=https://${PROXMOX_HOST}:8006" \
   -var "proxmox_username=${PROXMOX_USER}" \
