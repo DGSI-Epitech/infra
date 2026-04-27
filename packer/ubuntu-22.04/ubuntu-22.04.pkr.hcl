@@ -144,7 +144,7 @@ build {
 
   # BLOC 1 : Mise à jour et Reboot
   provisioner "shell" {
-    expect_disconnect = true
+    expect_disconnect = true 
     inline = [
       "echo 'Attente de cloud-init...'",
       "sudo cloud-init status --wait",
@@ -155,7 +155,7 @@ build {
       "echo 'Mise à jour du système...'",
       "sudo apt-get update",
       "sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y",
-
+      
       "echo 'Redémarrage pour stabiliser le système...'",
       "sudo reboot"
     ]
@@ -168,7 +168,7 @@ build {
       "echo 'Installation des outils additionnels...'",
       "sudo apt-get install -y qemu-guest-agent curl wget git",
       "sudo systemctl enable qemu-guest-agent",
-
+      
       "echo 'Nettoyage final du template...'",
       "sudo apt-get clean",
       "sudo rm -rf /var/lib/apt/lists/*",
