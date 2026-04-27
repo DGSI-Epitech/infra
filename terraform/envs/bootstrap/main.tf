@@ -45,9 +45,18 @@ resource "proxmox_virtual_environment_network_linux_bridge" "vmbr0" {
 }
 
 # vmbr1 — LAN interne : Proxmox + VMs + pfSense LAN sur le même /24
+# vmbr1 — LAN interne : Proxmox + VMs + pfSense LAN sur le même /24
 resource "proxmox_virtual_environment_network_linux_bridge" "vmbr1" {
   node_name = var.proxmox_node
   name      = "vmbr1"
   address   = "172.16.0.1/24"
   comment   = "LAN — réseau interne 172.16.0.0/24"
+}
+
+# vmbr2 — Transit Proxmox→pfSense WAN (10.0.0.0/30)
+resource "proxmox_virtual_environment_network_linux_bridge" "vmbr2" {
+  node_name = var.proxmox_node
+  name      = "vmbr2"
+  address   = "10.0.0.1/30"
+  comment   = "Transit Proxmox→pfSense WAN"
 }
