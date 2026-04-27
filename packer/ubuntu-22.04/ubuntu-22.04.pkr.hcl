@@ -7,20 +7,19 @@ packer {
   }
 }
 
+# --- VARIABLES ---
 variable "proxmox_url" {
   type        = string
-  description = "Proxmox API URL (e.g. https://192.168.100.2:8006/api2/json)"
+  description = "Proxmox API URL"
 }
 
 variable "proxmox_username" {
   type        = string
-  description = "Proxmox username (ex: root@pam)"
 }
 
 variable "proxmox_password" {
-  type        = string
-  sensitive   = true
-  description = "Proxmox password"
+  type      = string
+  sensitive = true
 }
 
 variable "proxmox_node" {
@@ -29,21 +28,18 @@ variable "proxmox_node" {
 }
 
 variable "proxmox_storage_iso" {
-  type        = string
-  default     = "local"
-  description = "Storage pool for the downloaded ISO"
+  type    = string
+  default = "local"
 }
 
 variable "proxmox_storage_vm" {
-  type        = string
-  default     = "local-lvm"
-  description = "Storage pool for the VM disk"
+  type    = string
+  default = "local-lvm"
 }
 
 variable "template_vm_id" {
-  type        = number
-  default     = 100
-  description = "Proxmox VM ID for the resulting template"
+  type    = number
+  default = 100
 }
 
 variable "build_username" {
@@ -54,24 +50,11 @@ variable "build_username" {
 variable "build_password" {
   type      = string
   sensitive = true
-  description = "Plain-text build password — used by Packer SSH communicator"
 }
 
 variable "build_password_encrypted" {
   type      = string
   sensitive = true
-  description = "SHA-512 hashed password — generate with: echo 'password' | openssl passwd -6 -stdin"
-}
-
-variable "iso_url" {
-  type    = string
-  default = "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso"
-}
-
-variable "iso_checksum" {
-  type        = string
-  description = "SHA256 checksum of the ISO — from https://releases.ubuntu.com/22.04/SHA256SUMS"
-  default     = "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0"
 }
 
 variable "proxmox_host" {
@@ -79,6 +62,7 @@ variable "proxmox_host" {
   description = "IP réelle de Proxmox pour le bastion SSH"
 }
 
+# --- SOURCE ---
 source "proxmox-iso" "ubuntu-2204" {
   proxmox_url              = var.proxmox_url
   username                 = var.proxmox_username
@@ -90,11 +74,12 @@ source "proxmox-iso" "ubuntu-2204" {
   vm_name              = "ubuntu-22.04-template"
   template_description = "Ubuntu 22.04 LTS — built with Packer on ${formatdate("YYYY-MM-DD", timestamp())}"
 
-  #iso_url          = var.iso_url
-  #iso_checksum     = "sha256:${var.iso_checksum}"
-  iso_file      =  "local:iso/c968bbbeb22702b3f10a07276c8ca06720e80c4c.iso"
+  # Correction des warnings ISO
   iso_storage_pool = var.proxmox_storage_iso
-  unmount_iso      = true
+  boot_iso {
+    iso_file = "local:iso/c968bbbeb22702b3f10a07276c8ca06720e80c4c.iso"
+    unmount  = true
+  }
 
   cpu_type = "x86-64-v2-AES"
   cores    = 2
@@ -112,7 +97,9 @@ source "proxmox-iso" "ubuntu-2204" {
     bridge = "vmbr1"
   }
 
+  # Correction du warning additional_iso_files
   additional_iso_files {
+    cd_label         = "cidata"
     cd_content = {
       "/user-data" = templatefile("${path.root}/http/user-data.pkrtpl.hcl", {
         build_username           = var.build_username
@@ -121,29 +108,29 @@ source "proxmox-iso" "ubuntu-2204" {
       })
       "/meta-data" = ""
     }
-    cd_label         = "cidata"
     iso_storage_pool = var.proxmox_storage_iso
-    device           = "ide3"
+    type             = "ide"
+    index            = 3
   }
-
 
   boot_wait = "10s"
   boot_command = [
-    "c<wait3>",               # ← open GRUB terminal
+    "c<wait3>",
     "linux /casper/vmlinuz --- autoinstall ds=nocloud<enter><wait5>",
     "initrd /casper/initrd<enter><wait3>",
     "boot<enter>"
   ]
 
+  # Configuration SSH
   communicator              = "ssh"
   ssh_host                  = "172.16.0.100"
   ssh_username              = var.build_username
   ssh_password              = var.build_password
-  ssh_timeout               = "30m"
-  pause_before_connecting   = "3m"
-  ssh_handshake_attempts    = 200
-  
+  ssh_timeout               = "45m" # Augmenté pour plus de sécurité
+  pause_before_connecting   = "2m"
+  ssh_handshake_attempts    = 100
 
+  # Bastion pour passer par l'IP publique de Proxmox
   ssh_bastion_host     = var.proxmox_host
   ssh_bastion_username = "root"
   ssh_bastion_password = var.proxmox_password
@@ -151,23 +138,43 @@ source "proxmox-iso" "ubuntu-2204" {
   qemu_agent = true
 }
 
+# --- BUILD ---
 build {
   sources = ["source.proxmox-iso.ubuntu-2204"]
 
+  # BLOC 1 : Mise à jour et Reboot
   provisioner "shell" {
+    expect_disconnect = true 
     inline = [
-      "cloud-init status --wait",
+      "echo 'Attente de cloud-init...'",
+      "sudo cloud-init status --wait",
+
+      "echo 'Nettoyage forcé des verrous APT...'",
+      "sudo fuser -kk /var/lib/apt/lists/lock /var/lib/dpkg/lock-frontend /var/cache/apt/archives/lock || true",
+
+      "echo 'Mise à jour du système...'",
       "sudo apt-get update",
       "sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y",
+      
+      "echo 'Redémarrage pour stabiliser le système...'",
+      "sudo reboot"
+    ]
+  }
+
+  # BLOC 2 : Installation finale et Nettoyage (s'exécute après le reboot)
+  provisioner "shell" {
+    pause_before = "20s"
+    inline = [
+      "echo 'Installation des outils additionnels...'",
       "sudo apt-get install -y qemu-guest-agent curl wget git",
       "sudo systemctl enable qemu-guest-agent",
+      
+      "echo 'Nettoyage final du template...'",
       "sudo apt-get clean",
       "sudo rm -rf /var/lib/apt/lists/*",
-      # Reset cloud-init so the cloned VM gets a fresh first-boot
       "sudo cloud-init clean",
       "sudo rm -f /etc/machine-id",
-      "sudo truncate -s 0 /etc/machine-id",
-      "sudo rm -f /var/lib/systemd/random-seed",
+      "sudo touch /etc/machine-id",
       "sync"
     ]
   }
