@@ -44,9 +44,10 @@ resource "proxmox_virtual_environment_network_linux_bridge" "vmbr0" {
   comment   = "WAN — bridge physique Internet"
 }
 
-# vmbr1 — LAN interne (pas d'interface physique, routé par pfSense)
+# vmbr1 — LAN interne : Proxmox + VMs + pfSense LAN sur le même /24
 resource "proxmox_virtual_environment_network_linux_bridge" "vmbr1" {
   node_name = var.proxmox_node
   name      = "vmbr1"
-  comment   = "LAN — réseau interne 172.16.255.240/28"
+  address   = "172.16.0.1/24"
+  comment   = "LAN — réseau interne 172.16.0.0/24"
 }
