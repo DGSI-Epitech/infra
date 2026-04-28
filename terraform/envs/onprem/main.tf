@@ -32,6 +32,6 @@ module "pfsense" {
   vm_id          = var.pfsense_vm_id
   template_vm_id = var.pfsense_template_id
   lan_bridge     = "vmbr1"
-  wan_bridge     = "vmbr0"
+  wan_bridge     = "vmbr2"
   vm_name        = "pfsense-fw-01"
 }
