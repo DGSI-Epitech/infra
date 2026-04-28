@@ -3,3 +3,4 @@
   systemd:
     name: vault
     state: restarted
+  become: true

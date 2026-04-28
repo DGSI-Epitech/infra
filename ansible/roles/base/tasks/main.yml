@@ -83,3 +83,10 @@
   ufw:
     state: enabled
     policy: deny
+
+- name: Allow Vault port
+  ufw:
+    rule: allow
+    port: "8200"
+    proto: tcp
+  become: true

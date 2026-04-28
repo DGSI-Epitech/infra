@@ -6,13 +6,12 @@ vault_api_addr: "http://{{ ansible_host }}:8200"
 vault_cluster_addr: "http://{{ ansible_host }}:8201"
 vault_ui: true
 
-# Manquait :
 vault_install_dir: "/usr/local/bin"
-# → où le binaire vault sera copié sur la VM
+# where the binary will be copied
 
 vault_user: "vault"
 vault_group: "vault"
-# → utilisateur système dédié, vault ne doit pas tourner en root
+# dedicated user/ vault will not run with root privileges
 
 vault_tls_disable: true
-# → pour l'instant on désactive TLS, tu pourras l'activer plus tard
+# → for now we disable TLS
