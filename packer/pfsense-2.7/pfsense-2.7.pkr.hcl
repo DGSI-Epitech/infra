@@ -86,7 +86,7 @@ source "proxmox-iso" "pfsense" {
 
     model  = "virtio"
 
-    bridge = "vmbr0" # WAN (Interface 1 : vtnet0)
+    bridge = "vmbr2" # WAN (Interface 1 : vtnet0)
 
   }
 
@@ -105,67 +105,36 @@ source "proxmox-iso" "pfsense" {
     iso_storage_pool = "local"
     unmount          = true
   }
+additional_iso_files {
+    cd_files         = ["${path.root}/http/config.xml"]
+    cd_label         = "PFSENSE_CFG"
+    iso_storage_pool = "local"
+    device           = "ide3"
 
-  communicator = "none"
+  }
 
-  boot_key_interval = "100ms"
 
+  communicator      = "none"
+  boot_key_interval = "200ms"
   boot_wait         = "40s"
 
   boot_command = [
-
-    "<enter><wait1s>",           # 1. Accept Copyright
-
-    "<enter><wait1s>",           # 2. Install pfSense
-
-    "<down><wait1s>",            # 3. Select Auto (UFS)
-
-    "<enter><wait1s>",           # 4. Auto (UFS)
-
-    "<enter><wait1s>",           # 5. Entire Disk
-
-    "<enter><wait1s>",           # 6. MBR Partition Table
-
-    "<enter><wait1s>",           # 7. Finish
-
-    "<enter><wait25s>",          # 8. Commit
-
-    "<right><wait2s><enter><wait5s>", # 9. Open Shell
+    "<enter><wait1s>",
+    "<enter><wait1s>",
+    "<down><wait1s>",
+    "<enter><wait1s>",
+    "<enter><wait1s>",
+    "<enter><wait1s>",
+    "<enter><wait1s>",
+    "<enter><wait25s>",
+    "<right><wait2s><enter><wait5s>",
 
     "mount /dev/vtbd0s1a /mnt<enter><wait2s>",
-
-    #test
-
-    # Patch Réseau (Interfaces LAN/WAN)
-
-    "sed -i '' 's|em0|vtnet0|g' /mnt/cf/conf/config.xml<enter><wait2s>",
-
-    "sed -i '' 's|em1|vtnet1|g' /mnt/cf/conf/config.xml<enter><wait2s>",
-
-    # Set IP / Subnet (Délimiteur '|' utilisé pour ignorer les '/' des balises)
-
-    "sed -i '' 's|<ipaddr>192.168.1.1</ipaddr>|<ipaddr>172.16.0.254</ipaddr>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
-
-    "sed -i '' 's|<subnet>28</subnet>|<subnet>24</subnet>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
-
-    # Disable DHCP & Correction propre du range
-
-    "sed -i '' '/<dhcpd>/,/<.dhcpd>/ s|<enable/>||g' /mnt/cf/conf/config.xml<enter><wait2s>",
-
-    "sed -i '' 's|<from>192.168.1.100</from>|<from>172.16.0.241</from>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
-
-    "sed -i '' 's|<to>192.168.1.199</to>|<to>172.16.0.253</to>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
-
-    # INJECTION GLOBALE SYSTÈME
-
-    # Désactive le pare-feu + Bypass le wizard + Active le SSH + Configure les DNS
-
-    "sed -i '' 's|<system>|<system><setupwizardcomplete/><enablesshd>yes</enablesshd><dnsserver>1.1.1.1</dnsserver><dnsserver>8.8.8.8</dnsserver>|g' /mnt/cf/conf/config.xml<enter><wait2s>",
-
-    # Extinction propre pour finaliser le template
-
+    "mkdir -p /mnt/cdrom<enter><wait1s>",
+    "mount -t cd9660 /dev/cd1 /mnt/cdrom<enter><wait2s>",
+    "cp /mnt/cdrom/config.xml /mnt/cf/conf/config.xml<enter><wait2s>",
+    "sync && sync<enter><wait2s>",
     "/sbin/shutdown -p now<enter>"
-
   ]
 
 }
