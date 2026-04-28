@@ -47,9 +47,9 @@ Jour 1+ — Déploiement standard
     ├─► Clone → vault-vm (ID 201) + cloud-init IP/SSH
     └─► Clone template pfSense → pfsense-fw-01
 
-  Ansible
+  Ansible (lancé automatiquement par deploy.sh Phase 5)
     ├─► roles/base     → Docker, UFW, paquets de base (toutes les VMs)
-    └─► roles/vault    → HashiCorp Vault install + init + unseal
+    └─► roles/vault    → HashiCorp Vault install + init + unseal automatique
 ```
 
 ---
@@ -66,10 +66,10 @@ Environnement principal PVE1. Appelle quatre modules :
 
 | Module | Ressource créée | ID Proxmox |
 |---|---|---|
-| `ubuntu-template` | Télécharge l'image cloud + crée la template Ubuntu | 9001 |
-| `services-vm` | Clone la template, IP `172.16.255.242/28` | 200 |
-| `vault-vm` | Clone la template, IP `172.16.255.243/28` | 201 |
-| `pfsense` | Clone la template pfSense Packer | 300 |
+| `ubuntu-template` | Build Packer + crée la template Ubuntu | 9000 |
+| `pfsense` | Clone la template pfSense Packer | 1001 |
+| `services-vm` | Clone la template, IP `172.16.0.241/24` | 1100 |
+| `vault-vm` | Clone la template, IP `172.16.0.242/24` | 1200 |
 
 ### packer/pfsense-2.7/
 
@@ -77,12 +77,14 @@ Build automatisé du template pfSense via séquence de touches clavier simulées
 
 ### ansible/
 
-| Playbook | Rôles | Cible |
-|---|---|---|
-| `playbooks/services-vm.yml` | `base` | services-vm |
-| `playbooks/vault.yml` | `base`, `vault` | vault-vm |
+| Playbook | Rôles | Cible | Déclencheur |
+|---|---|---|---|
+| `playbooks/services-vm.yml` | `base` | services-vm | Manuel |
+| `playbooks/vault.yml` | `base`, `vault` | vault-vm | `npm run deploy` Phase 5 |
 
-Le rôle `vault` installe HashiCorp Vault, configure le stockage Raft, init + unseal automatique, sauvegarde les unseal keys dans `/root/vault-init.json`.
+Le rôle `vault` installe Vault via le dépôt HashiCorp, configure le stockage Raft, init + unseal automatique (5 shares / threshold 3), sauvegarde les unseal keys dans `/root/vault-init.json` sur la VM et les rapatrie dans `ansible/vault-init.json`.
+
+`ansible.cfg` configure le ProxyJump via `root@51.75.128.134` pour atteindre le LAN `172.16.0.0/24`. La clé SSH est injectée dans la VM via QEMU agent (API Proxmox) avant qu'Ansible se connecte — contournement du bug cloud-init + Ubuntu autoinstall.
 
 ---
 
@@ -92,19 +94,18 @@ Le rôle `vault` installe HashiCorp Vault, configure le stockage Raft, init + un
 
 | Élément | Valeur |
 |---|---|
-| Proxmox URL publique | `https://ns3050272.ip-51-255-76.eu:8006` |
-| Proxmox IP locale | `192.168.139.128` |
-| Domaine local | `op.local` |
-| WAN pfSense | `5.196.45.8` |
-| LAN réseau | `172.16.255.240/28` |
-| LAN gateway | `172.16.255.254` |
+| Proxmox IP publique | `51.75.128.134` |
+| Proxmox node | `proxmox-site1` |
+| LAN réseau | `172.16.0.0/24` |
+| LAN gateway | `172.16.0.254` |
 
 | VM | ID | IP | Rôle |
 |---|---|---|---|
-| ubuntu-template | 9001 | — | Base clone (ne pas démarrer) |
-| services-vm | 200 | `172.16.255.242` | Netbox, website |
-| vault-vm | 201 | `172.16.255.243` | HashiCorp Vault, Elastic |
-| pfsense-fw-01 | 300 | `172.16.255.254` | Pare-feu LAN/WAN |
+| ubuntu-22.04-template | 9000 | — | Base clone (stopped) |
+| pfsense-template | 9001 | — | Base clone pfSense (stopped) |
+| pfsense-fw-01 | 1001 | `172.16.0.254` | Pare-feu LAN/WAN |
+| vault-vm | 1200 | `172.16.0.242` | HashiCorp Vault |
+| services-vm | 1100 | `172.16.0.241` | Netbox, website |
 
 ### PVE2 — Cloud
 

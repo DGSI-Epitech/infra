@@ -54,8 +54,8 @@ echo "    Authentifié."
 # --- Nettoyage des VMs orphelines ---
 
 echo ""
-echo "==> Nettoyage des VMs (${VM_ID_UBUNTU_TEMPLATE}, ${VM_ID_PFSENSE}, ${VM_ID_SERVICES}, ${VM_ID_VAULT})..."
-for VMID in "${VM_ID_UBUNTU_TEMPLATE}" "${VM_ID_PFSENSE}" "${VM_ID_SERVICES}" "${VM_ID_VAULT}"; do
+echo "==> Nettoyage des VMs (${VM_ID_PFSENSE}, ${VM_ID_SERVICES}, ${VM_ID_VAULT})..."
+for VMID in "${VM_ID_PFSENSE}" "${VM_ID_SERVICES}" "${VM_ID_VAULT}"; do
   STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
     "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VMID}/status/current" 2>/dev/null | \
     python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
@@ -174,6 +174,7 @@ if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
   export PKR_VAR_build_username="${VM_USERNAME}"
   export PKR_VAR_build_password="${VM_PASSWORD}"
   export PKR_VAR_build_password_encrypted="${VM_PASSWORD_HASH}"
+  export PKR_VAR_ssh_public_key="${SSH_PUBLIC_KEY}"
   packer init .
   packer build -on-error=abort ubuntu-22.04.pkr.hcl
   echo "    Template Ubuntu créé — attente 30s pour déverrouillage Proxmox..."
@@ -205,6 +206,52 @@ terraform apply -input=false -auto-approve \
   -var "vm_password=${VM_PASSWORD}"
 
 echo ""
-echo "==> Déploiement terminé."
-echo "    Lancer Ansible quand les VMs sont prêtes :"
-echo "    cd ansible && ansible-playbook playbooks/vault.yml -i inventory/onprem.yml"
+echo "==> Injection clé SSH via QEMU agent (vault-vm)..."
+
+for i in $(seq 1 30); do
+  AGENT_OK=$(curl -s -k -X POST \
+    "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_VAULT}/agent/ping" \
+    -H "CSRFPreventionToken: ${CSRF}" -b "PVEAuthCookie=${TICKET}" 2>/dev/null | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); print('ok' if d.get('data') is not None else 'no')" 2>/dev/null || echo "no")
+  [[ "$AGENT_OK" == "ok" ]] && echo "    QEMU agent prêt." && break
+  [[ $i -eq 30 ]] && echo "    Avertissement: QEMU agent non disponible après 150s, poursuite..." && break
+  echo "    Attente QEMU agent ($i/30)..."
+  sleep 5
+done
+
+CMD_JSON=$(SSH_PUBLIC_KEY="$SSH_PUBLIC_KEY" python3 -c "
+import json, os
+key = os.environ['SSH_PUBLIC_KEY']
+cmd = ('mkdir -p /home/ubuntu/.ssh'
+  ' && echo ' + json.dumps(key) + ' >> /home/ubuntu/.ssh/authorized_keys'
+  ' && sort -u /home/ubuntu/.ssh/authorized_keys -o /home/ubuntu/.ssh/authorized_keys'
+  ' && chmod 700 /home/ubuntu/.ssh'
+  ' && chmod 600 /home/ubuntu/.ssh/authorized_keys'
+  ' && chown -R ubuntu:ubuntu /home/ubuntu/.ssh')
+print(json.dumps({'command': ['bash', '-c', cmd]}))
+")
+
+EXEC_RESP=$(curl -s -k -X POST \
+  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_VAULT}/agent/exec" \
+  -H "CSRFPreventionToken: ${CSRF}" -b "PVEAuthCookie=${TICKET}" \
+  -H "Content-Type: application/json" -d "$CMD_JSON")
+
+EXEC_PID=$(echo "$EXEC_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['pid'])" 2>/dev/null || echo "")
+[[ -n "$EXEC_PID" ]] && echo "    Clé SSH injectée (PID: $EXEC_PID)." || echo "    Avertissement: injection QEMU échouée: $EXEC_RESP"
+sleep 2
+
+echo ""
+echo "==> Phase 5 : Ansible — configuration Vault..."
+cd "$REPO_ROOT/ansible"
+
+VAULT_IP="${VM_IP_VAULT%%/*}"
+ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$VAULT_IP" 2>/dev/null || true
+
+ansible vault -m wait_for_connection -a "timeout=120" -o
+
+echo ""
+ansible-playbook playbooks/vault.yml
+
+echo ""
+echo "==> Infrastructure complète."
+echo "    Vault UI : http://${VAULT_IP}:8200/ui"

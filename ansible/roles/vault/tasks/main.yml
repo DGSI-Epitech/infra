@@ -34,6 +34,12 @@
     mode: "0640"
   notify: restart vault
 
+- name: Allow Vault API port (UFW)
+  ufw:
+    rule: allow
+    port: "8200"
+    proto: tcp
+
 - name: Enable and start Vault
   systemd:
     name: vault

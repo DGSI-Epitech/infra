@@ -62,6 +62,12 @@ variable "proxmox_host" {
   description = "IP réelle de Proxmox pour le bastion SSH"
 }
 
+variable "ssh_public_key" {
+  type        = string
+  description = "Clé SSH publique à injecter dans authorized_keys"
+  default     = ""
+}
+
 # --- SOURCE ---
 source "proxmox-iso" "ubuntu-2204" {
   proxmox_url              = var.proxmox_url
@@ -168,6 +174,13 @@ build {
       "echo 'Installation des outils additionnels...'",
       "sudo apt-get install -y qemu-guest-agent curl wget git",
       "sudo systemctl enable qemu-guest-agent",
+
+      "echo 'Injection clé SSH...'",
+      "mkdir -p /home/${var.build_username}/.ssh",
+      "echo '${var.ssh_public_key}' >> /home/${var.build_username}/.ssh/authorized_keys",
+      "chmod 700 /home/${var.build_username}/.ssh",
+      "chmod 600 /home/${var.build_username}/.ssh/authorized_keys",
+      "chown -R ${var.build_username}:${var.build_username} /home/${var.build_username}/.ssh",
 
       "echo 'Nettoyage final du template...'",
       "sudo apt-get clean",

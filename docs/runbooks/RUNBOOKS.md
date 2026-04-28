@@ -8,8 +8,9 @@ Procédures et résolution de problèmes pour l'infrastructure on-premise.
 
 1. [Premier déploiement](#1-premier-déploiement)
 2. [Déploiement courant](#2-déploiement-courant)
-3. [Configurer Vault avec Ansible](#3-configurer-vault-avec-ansible)
-4. [Résolution de problèmes](#4-résolution-de-problèmes)
+3. [Opérations Vault](#3-opérations-vault)
+4. [Relancer Ansible seul](#4-relancer-ansible-seul)
+5. [Résolution de problèmes](#5-résolution-de-problèmes)
 
 ---
 
@@ -112,29 +113,65 @@ npm run destroy
 
 ---
 
-## 3. Configurer Vault avec Ansible
+## 3. Opérations Vault
 
-Une fois les VMs démarrées (attendre ~2 min après deploy) :
+### Vault est automatiquement installé par `npm run deploy`
+
+`deploy.sh` lance Ansible en Phase 5 après le déploiement Terraform. Aucune action manuelle requise sur un premier déploiement.
+
+Le playbook :
+1. Installe Vault via le dépôt officiel HashiCorp
+2. Configure le stockage Raft dans `/opt/vault/data`
+3. Initialise Vault (5 key shares, threshold 3) si pas encore fait
+4. Unseal automatiquement avec les 3 premiers shares
+5. Sauvegarde les unseal keys dans `/root/vault-init.json` (VM) **et** `ansible/vault-init.json` (local)
+
+> `ansible/vault-init.json` contient le root token et les unseal keys — ne jamais committer.
+
+### Vérifier l'état de Vault
 
 ```bash
-cd ansible
-ansible-playbook playbooks/vault.yml -i inventory/onprem.yml
-```
-
-Le playbook installe Vault, configure le stockage Raft, init et unseal automatiquement.
-Les unseal keys sont sauvegardées dans `/root/vault-init.json` sur la vault-vm.
-
-Vérifier que Vault est opérationnel :
-
-```bash
-ssh ubuntu@172.16.255.243
+ssh -J root@51.75.128.134 ubuntu@172.16.0.242
 export VAULT_ADDR='http://127.0.0.1:8200'
 vault status
 ```
 
+### Unseal manuel (après redémarrage VM)
+
+```bash
+cat ansible/vault-init.json | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for k in d['keys_base64'][:3]: print(k)
+"
+# Sur la VM :
+export VAULT_ADDR='http://127.0.0.1:8200'
+vault operator unseal <key_1>
+vault operator unseal <key_2>
+vault operator unseal <key_3>
+```
+
+### Accès UI via tunnel SSH
+
+```bash
+ssh -J root@51.75.128.134 -L 8200:172.16.0.242:8200 ubuntu@172.16.0.242 -N
+```
+Puis ouvrir `http://localhost:8200/ui`.
+
 ---
 
-## 4. Résolution de problèmes
+## 4. Relancer Ansible seul
+
+```bash
+cd ansible
+ansible-playbook playbooks/vault.yml
+```
+
+Ansible est idempotent — si Vault est déjà initialisé, les étapes init et unseal sont sautées automatiquement.
+
+---
+
+## 5. Résolution de problèmes
 
 ### Le script s'arrête silencieusement après "Authentification Proxmox..."
 

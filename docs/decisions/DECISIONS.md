@@ -1,4 +1,55 @@
-# Decision on the project structure and organization
+# Décisions techniques (ADR)
+
+---
+
+## ADR-001 — Vault installé via Ansible (pas cloud-init, pas Packer)
+
+**Statut :** Accepté
+
+**Contexte :** Vault doit être installé sur une VM Ubuntu déjà provisionnée par Terraform. Trois approches possibles : cloud-init, template Packer "vault-ready", ou Ansible post-deploy.
+
+**Décision :** Ansible `roles/vault` lancé automatiquement par `deploy.sh` Phase 5.
+
+**Raisons :**
+- Cloud-init n'a pas de gestion d'état — ne peut pas conditionner l'unseal sur le premier run.
+- Un template Packer "vault-ready" lierait la version de Vault à l'image — mettre à jour Vault forcerait un rebuild template + redeploy VM.
+- Ansible est idempotent et gère les séquences conditionnelles (init uniquement si pas encore initialisé).
+
+**Conséquences :** Bump de version Vault = modifier `vault_version` dans `defaults/main.yml` + relancer Ansible. Aucun rebuild Packer.
+
+---
+
+## ADR-002 — Injection SSH via QEMU agent (pas cloud-init)
+
+**Statut :** Accepté
+
+**Contexte :** Cloud-init (bpg/proxmox provider) n'injecte pas la clé SSH dans `authorized_keys` quand l'user `ubuntu` a été créé par Ubuntu autoinstall (subiquity). Le réseau est configuré mais les clés sont ignorées silencieusement.
+
+**Décision :** `deploy.sh` utilise l'API Proxmox `POST /qemu/{id}/agent/exec` pour écrire la clé directement dans la VM via le QEMU agent (s'exécute en root, sans SSH).
+
+**Raisons :** QEMU agent est indépendant de cloud-init, s'exécute en root, disponible dès que la VM boote. Utilise le ticket Proxmox déjà authentifié dans le script.
+
+---
+
+## ADR-003 — Vault en mode Raft (stockage intégré)
+
+**Statut :** Accepté
+
+**Décision :** Backend Raft avec data dir `/opt/vault/data`.
+
+**Raisons :** Pas de dépendance externe (pas de Consul). Single-node suffisant pour un lab. Backend recommandé par HashiCorp depuis Vault 1.4.
+
+---
+
+## ADR-004 — ProxyJump Proxmox pour accès Ansible
+
+**Statut :** Accepté
+
+**Décision :** `ansible.cfg` configure `ProxyJump=root@51.75.128.134` pour atteindre les VMs LAN `172.16.0.0/24`.
+
+**Raisons :** Le Proxmox est la seule machine publiquement accessible. ProxyJump SSH est transparent pour Ansible — aucune modification des playbooks requise.
+
+---
 
 # 🛠️ Packer Build : pfSense Golden Image (Proxmox)
 
