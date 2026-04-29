@@ -9,5 +9,4 @@ listener "tcp" {
   tls_disable = {{ vault_tls_disable | lower }}
 }
 
-api_addr     = "{{ vault_api_addr }}"
-cluster_addr = "{{ vault_cluster_addr }}"
+api_addr = "{{ vault_api_addr }}"

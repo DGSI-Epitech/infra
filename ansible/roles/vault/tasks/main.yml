@@ -1,91 +1,75 @@
----
-- name: Install dependencies
-  apt:
-    name:
-      - unzip
-      - curl
-    state: present
-    update_cache: yes
-  become: true
-
-- name: Create vault group
-  group:
-    name: "{{ vault_group }}"
-    system: true
-    state: present
-  become: true
-
-- name: Create vault user
-  user:
-    name: "{{ vault_user }}"
-    group: "{{ vault_group }}"
-    system: true
-    shell: /bin/false
-    create_home: false
-    state: present
-  become: true
-
-- name: Create vault directories
+- name: Create Vault directories
   file:
     path: "{{ item.path }}"
     state: directory
-    owner: "{{ vault_user }}"
-    group: "{{ vault_group }}"
     mode: "{{ item.mode }}"
   loop:
-    - { path: "{{ vault_config_dir }}", mode: "0755" }
-    - { path: "{{ vault_data_dir }}",   mode: "0700" }
+    - { path: "{{ vault_config_dir }}", mode: '0755' }
+    - { path: "{{ vault_data_dir }}",   mode: '0755' }
   become: true
-
-
-- name: Download Vault
-  get_url:
-    url: "https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_linux_amd64.zip"
-    dest: "/tmp/vault.zip"
-  become: true
-
-- name: Unzip Vault
-  unarchive:
-    src: "/tmp/vault.zip"
-    dest: "/tmp/"
-    remote_src: true
-  become: true
-
-- name: Install Vault binary
-  copy:
-    src: "/tmp/vault"
-    dest: "{{ vault_install_dir }}/vault"
-    owner: root
-    group: root
-    mode: "0755"
-    remote_src: true
-  become: true
-  notify: restart vault
 
 - name: Deploy Vault config
   template:
     src: vault.hcl.j2
     dest: "{{ vault_config_dir }}/vault.hcl"
-    owner: "{{ vault_user }}"
-    group: "{{ vault_group }}"
-    mode: "0640"
+    mode: '0644'
   become: true
-  notify: restart vault
 
-- name: Deploy Vault systemd service
-  template:
-    src: vault.service.j2
-    dest: /etc/systemd/system/vault.service
-    owner: root
-    group: root
-    mode: "0644"
-  become: true
-  notify: restart vault
-
-- name: Enable and start Vault
-  systemd:
+- name: Run Vault container
+  community.docker.docker_container:
     name: vault
-    enabled: true
+    image: "hashicorp/vault:{{ vault_version }}"
     state: started
-    daemon_reload: true
+    restart_policy: unless-stopped
+    network_mode: host
+    volumes:
+      - "{{ vault_config_dir }}:/vault/config"
+      - "{{ vault_data_dir }}:/vault/data"
+    capabilities:
+      - IPC_LOCK
+    command: server -config=/vault/config/vault.hcl
   become: true
+
+- name: Wait for Vault to be ready
+  wait_for:
+    port: 8200
+    host: 127.0.0.1
+    delay: 5
+    timeout: 30
+
+- name: Check Vault init status
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/init"
+    method: GET
+  register: vault_init_status
+  retries: 10
+  delay: 3
+  until: vault_init_status.status == 200
+
+- name: Initialize Vault
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/init"
+    method: PUT
+    body_format: json
+    body:
+      secret_shares: "{{ vault_init_shares }}"
+      secret_threshold: "{{ vault_init_threshold }}"
+  register: vault_init_result
+  when: not vault_init_status.json.initialized
+
+- name: Save init output to /root/vault-init.json
+  copy:
+    content: "{{ vault_init_result.json | to_nice_json }}"
+    dest: /root/vault-init.json
+    mode: '0600'
+  when: not vault_init_status.json.initialized
+
+- name: Unseal Vault
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/unseal"
+    method: PUT
+    body_format: json
+    body:
+      key: "{{ item }}"
+  loop: "{{ vault_init_result.json.keys_base64[:vault_init_threshold] }}"
+  when: not vault_init_status.json.initialized
