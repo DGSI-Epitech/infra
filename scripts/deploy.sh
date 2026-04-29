@@ -54,8 +54,8 @@ echo "    Authentifié."
 # --- Nettoyage des VMs orphelines ---
 
 echo ""
-echo "==> Nettoyage des VMs (${VM_ID_UBUNTU_TEMPLATE}, ${VM_ID_PFSENSE}, ${VM_ID_SERVICES}, ${VM_ID_VAULT})..."
-for VMID in "${VM_ID_UBUNTU_TEMPLATE}" "${VM_ID_PFSENSE}" "${VM_ID_SERVICES}" "${VM_ID_VAULT}"; do
+echo "==> Nettoyage des VMs (${VM_ID_PFSENSE}, ${VM_ID_SERVICES}, ${VM_ID_VAULT})..."
+for VMID in "${VM_ID_PFSENSE}" "${VM_ID_SERVICES}" "${VM_ID_VAULT}"; do
   STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
     "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VMID}/status/current" 2>/dev/null | \
     python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")

@@ -1,14 +1,12 @@
 ui = {{ vault_ui | lower }}
 
-storage "raft" {
-  path    = "{{ vault_data_dir }}"
-  node_id = "{{ inventory_hostname }}"
+storage "file" {
+  path = "{{ vault_data_dir }}"
 }
 
 listener "tcp" {
   address     = "0.0.0.0:8200"
-  # TLS désactivé pour le lab — activer en production
-  tls_disable = true
+  tls_disable = {{ vault_tls_disable | lower }}
 }
 
 api_addr     = "{{ vault_api_addr }}"

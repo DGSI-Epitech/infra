@@ -1,7 +1,17 @@
 ---
-vault_version: "1.17.0"
+vault_version: "1.17.2"
 vault_config_dir: /etc/vault.d
 vault_data_dir: /opt/vault/data
 vault_api_addr: "http://{{ ansible_host }}:8200"
 vault_cluster_addr: "http://{{ ansible_host }}:8201"
 vault_ui: true
+
+vault_install_dir: "/usr/local/bin"
+# where the binary will be copied
+
+vault_user: "vault"
+vault_group: "vault"
+# dedicated user/ vault will not run with root privileges
+
+vault_tls_disable: true
+# → for now we disable TLS
