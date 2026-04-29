@@ -3,16 +3,6 @@ variable "proxmox_node" {
   type        = string
 }
 
-variable "vm_ip_cidr" {
-  description = "VM IP address in CIDR notation (e.g. 192.168.100.50/24)"
-  type        = string
-}
-
-variable "vm_gateway" {
-  description = "VM default gateway"
-  type        = string
-}
-
 variable "vm_ssh_public_key" {
   description = "SSH public key injected via cloud-init"
   type        = string
