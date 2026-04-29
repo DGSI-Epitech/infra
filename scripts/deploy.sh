@@ -25,6 +25,18 @@ if [[ -z "${TF_VAR_proxmox_password:-}" ]]; then
   exit 1
 fi
 
+if [[ -z "${SSH_PRIVATE_KEY_FILE:-}" ]]; then
+  echo "Erreur : SSH_PRIVATE_KEY_FILE manquant dans config.env."
+  echo "  Ajouter : SSH_PRIVATE_KEY_FILE=\"~/.ssh/id_ed25519\""
+  exit 1
+fi
+
+if [[ -z "${SSH_PUBLIC_KEY:-}" ]]; then
+  echo "Erreur : SSH_PUBLIC_KEY manquant dans config.env."
+  echo "  Ajouter : SSH_PUBLIC_KEY=\"\$(cat ~/.ssh/id_ed25519.pub)\""
+  exit 1
+fi
+
 if [[ ! -f "$ONPREM_DIR/terraform.tfvars" ]]; then
   echo "Erreur : $ONPREM_DIR/terraform.tfvars manquant."
   exit 1
@@ -117,6 +129,7 @@ if [[ "$PFSENSE_TEMPLATE_STATUS" == "notfound" ]]; then
   export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
   export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
   export PKR_VAR_template_vm_id="${VM_ID_PFSENSE_TEMPLATE}"
+  export PKR_VAR_pfsense_admin_ssh_public_key="${SSH_PUBLIC_KEY}"
   packer init .
   packer build pfsense-2.7.pkr.hcl
   echo "    Template pfSense créé."
@@ -147,7 +160,7 @@ terraform apply -input=false -auto-approve \
   -var "vault_vm_ip_cidr=${VM_IP_VAULT}" \
   -var "vm_gateway=${VM_GATEWAY}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
-  -var "vm_password=${VM_PASSWORD}"
+  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
 
 echo "    pfSense déployé — attente 30s pour qu'il soit opérationnel..."
 sleep 30
@@ -172,8 +185,13 @@ if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
   export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
   export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
   export PKR_VAR_build_username="${VM_USERNAME}"
-  export PKR_VAR_build_password="${VM_PASSWORD}"
-  export PKR_VAR_build_password_encrypted="${VM_PASSWORD_HASH}"
+  export PKR_VAR_ssh_public_key="${SSH_PUBLIC_KEY}"
+  export PKR_VAR_ssh_bastion_private_key_file="${SSH_PRIVATE_KEY_FILE}"
+  # Password éphémère généré à la volée — utilisé uniquement pour le communicator Packer, jamais stocké
+  _PACKER_PASS="$(openssl rand -base64 16 | tr -d '+/=' | head -c 20)"
+  export PKR_VAR_build_password="${_PACKER_PASS}"
+  export PKR_VAR_build_password_hash="$(echo "${_PACKER_PASS}" | openssl passwd -6 -stdin)"
+  unset _PACKER_PASS
   packer init .
   packer build -on-error=abort ubuntu-22.04.pkr.hcl
   echo "    Template Ubuntu créé — attente 30s pour déverrouillage Proxmox..."
@@ -202,9 +220,103 @@ terraform apply -input=false -auto-approve \
   -var "vault_vm_ip_cidr=${VM_IP_VAULT}" \
   -var "vm_gateway=${VM_GATEWAY}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
-  -var "vm_password=${VM_PASSWORD}"
+  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
+
+# --- ÉTAPE 5 : Injection clé SSH + Ansible ---
+
+# Extrait l'IP sans le masque (ex: 172.16.0.241/24 → 172.16.0.241)
+SERVICES_IP="${VM_IP_SERVICES%%/*}"
+VAULT_IP="${VM_IP_VAULT%%/*}"
+
+# Attend que le QEMU agent soit opérationnel dans la VM
+wait_for_agent() {
+  local vmid="$1"
+  local label="$2"
+  local timeout=180
+  local elapsed=0
+  echo ""
+  echo "==> Attente QEMU agent ${label} (VM ${vmid})..."
+  while true; do
+    local status
+    status=$(curl -s -k -X POST \
+      "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${vmid}/agent/ping" \
+      -H "CSRFPreventionToken: ${CSRF}" \
+      -b "PVEAuthCookie=${TICKET}" 2>/dev/null | \
+      python3 -c "import sys,json; d=json.load(sys.stdin); print('ok' if d.get('data') is not None else 'wait')" 2>/dev/null || echo "wait")
+    [[ "$status" == "ok" ]] && break
+    sleep 5
+    elapsed=$((elapsed + 5))
+    echo "    ${elapsed}s — QEMU agent ${label} pas encore prêt..."
+    if [[ $elapsed -ge $timeout ]]; then
+      echo "Erreur : QEMU agent ${label} inaccessible après ${timeout}s."
+      exit 1
+    fi
+  done
+  echo "    QEMU agent prêt sur ${label}."
+}
+
+# Injecte la clé SSH via l'API QEMU agent (contourne le bug cloud-init/autoinstall)
+inject_ssh_key() {
+  local vmid="$1"
+  local label="$2"
+  echo ""
+  echo "==> Injection clé SSH dans ${label} (VM ${vmid})..."
+
+  local tmpjson
+  tmpjson=$(mktemp)
+  # Le heredoc expande SSH_PUBLIC_KEY ; la clé ED25519 ne contient pas de ' ni de " ni de \
+  cat > "$tmpjson" << ENDJSON
+{"command":["bash","-c","mkdir -p /home/ubuntu/.ssh && echo '${SSH_PUBLIC_KEY}' > /home/ubuntu/.ssh/authorized_keys && chmod 700 /home/ubuntu/.ssh && chmod 600 /home/ubuntu/.ssh/authorized_keys && chown -R ubuntu:ubuntu /home/ubuntu/.ssh"]}
+ENDJSON
+
+  curl -s -k -X POST \
+    "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${vmid}/agent/exec" \
+    -H "CSRFPreventionToken: ${CSRF}" \
+    -b "PVEAuthCookie=${TICKET}" \
+    -H "Content-Type: application/json" \
+    -d "@${tmpjson}" > /dev/null
+
+  rm -f "$tmpjson"
+  sleep 5
+  echo "    Clé SSH injectée dans ${label}."
+}
+
+# Attend que SSH réponde via Proxmox comme ProxyJump
+wait_for_ssh() {
+  local host="$1"
+  local label="$2"
+  local timeout=120
+  local elapsed=0
+  echo ""
+  echo "==> Vérification SSH ${label} (${host})..."
+  while ! ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+              -o "ProxyJump=root@${PROXMOX_HOST}" \
+              -i "${SSH_PRIVATE_KEY_FILE}" \
+              ubuntu@"${host}" "exit" 2>/dev/null; do
+    sleep 5
+    elapsed=$((elapsed + 5))
+    echo "    ${elapsed}s — ${label} pas encore accessible..."
+    if [[ $elapsed -ge $timeout ]]; then
+      echo "Erreur : ${label} (${host}) inaccessible après ${timeout}s."
+      exit 1
+    fi
+  done
+  echo "    ${label} accessible en SSH."
+}
+
+wait_for_agent "${VM_ID_VAULT}"    "vault-vm"
+wait_for_agent "${VM_ID_SERVICES}" "services-vm"
+
+inject_ssh_key "${VM_ID_VAULT}"    "vault-vm"
+inject_ssh_key "${VM_ID_SERVICES}" "services-vm"
+
+wait_for_ssh "${VAULT_IP}"    "vault-vm"
+wait_for_ssh "${SERVICES_IP}" "services-vm"
 
 echo ""
-echo "==> Déploiement terminé."
-echo "    Lancer Ansible quand les VMs sont prêtes :"
-echo "    cd ansible && ansible-playbook playbooks/vault.yml -i inventory/onprem.yml"
+echo "==> Lancement Ansible..."
+cd "$REPO_ROOT/ansible"
+ansible-playbook playbooks/vault.yml -i inventory/onprem.py
+
+echo ""
+echo "==> Déploiement complet."

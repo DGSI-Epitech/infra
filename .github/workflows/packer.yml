@@ -30,12 +30,14 @@ jobs:
         run: packer validate -var-file=ubuntu-22.04.pkrvars.hcl .
         env:
           PKR_VAR_proxmox_token: ${{ secrets.PROXMOX_PACKER_TOKEN }}
-          PKR_VAR_build_password: ${{ secrets.PACKER_BUILD_PASSWORD }}
-          PKR_VAR_build_password_encrypted: ${{ secrets.PACKER_BUILD_PASSWORD_ENCRYPTED }}
+          PKR_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          PKR_VAR_ssh_private_key_file: ${{ secrets.SSH_PRIVATE_KEY_FILE }}
+          PKR_VAR_ssh_bastion_private_key_file: ${{ secrets.SSH_PRIVATE_KEY_FILE }}
 
       - name: Packer build
         run: packer build -var-file=ubuntu-22.04.pkrvars.hcl .
         env:
           PKR_VAR_proxmox_token: ${{ secrets.PROXMOX_PACKER_TOKEN }}
-          PKR_VAR_build_password: ${{ secrets.PACKER_BUILD_PASSWORD }}
-          PKR_VAR_build_password_encrypted: ${{ secrets.PACKER_BUILD_PASSWORD_ENCRYPTED }}
+          PKR_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          PKR_VAR_ssh_private_key_file: ${{ secrets.SSH_PRIVATE_KEY_FILE }}
+          PKR_VAR_ssh_bastion_private_key_file: ${{ secrets.SSH_PRIVATE_KEY_FILE }}

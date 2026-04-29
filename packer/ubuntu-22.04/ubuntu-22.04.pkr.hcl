@@ -14,7 +14,7 @@ variable "proxmox_url" {
 }
 
 variable "proxmox_username" {
-  type        = string
+  type = string
 }
 
 variable "proxmox_password" {
@@ -48,18 +48,31 @@ variable "build_username" {
 }
 
 variable "build_password" {
-  type      = string
-  sensitive = true
+  type        = string
+  sensitive   = true
+  description = "Mot de passe éphémère pour le communicator Packer — généré aléatoirement dans deploy.sh, jamais stocké"
 }
 
-variable "build_password_encrypted" {
-  type      = string
-  sensitive = true
+variable "build_password_hash" {
+  type        = string
+  sensitive   = true
+  description = "Hash SHA-512 du build_password, injecté dans l'autoinstall pour créer le user"
+}
+
+variable "ssh_public_key" {
+  type        = string
+  description = "Clé SSH publique à injecter dans le template (injectée par provisioner, supprimée en fin de build)"
+}
+
+variable "ssh_bastion_private_key_file" {
+  type        = string
+  sensitive   = true
+  description = "Chemin vers la clé privée SSH pour s'authentifier sur le bastion Proxmox"
 }
 
 variable "proxmox_host" {
   type        = string
-  description = "IP réelle de Proxmox pour le bastion SSH"
+  description = "IP de Proxmox, utilisée comme bastion SSH pour atteindre vmbr1"
 }
 
 # --- SOURCE ---
@@ -74,7 +87,6 @@ source "proxmox-iso" "ubuntu-2204" {
   vm_name              = "ubuntu-22.04-template"
   template_description = "Ubuntu 22.04 LTS — built with Packer on ${formatdate("YYYY-MM-DD", timestamp())}"
 
-  # Correction des warnings ISO
   iso_storage_pool = var.proxmox_storage_iso
   boot_iso {
     iso_file = "local:iso/c968bbbeb22702b3f10a07276c8ca06720e80c4c.iso"
@@ -97,14 +109,12 @@ source "proxmox-iso" "ubuntu-2204" {
     bridge = "vmbr1"
   }
 
-  # Correction du warning additional_iso_files
   additional_iso_files {
-    cd_label         = "cidata"
+    cd_label = "cidata"
     cd_content = {
       "/user-data" = templatefile("${path.root}/http/user-data.pkrtpl.hcl", {
-        build_username           = var.build_username
-        build_password_encrypted = var.build_password_encrypted
-        build_password           = var.build_password
+        build_username      = var.build_username
+        build_password_hash = var.build_password_hash
       })
       "/meta-data" = ""
     }
@@ -121,19 +131,19 @@ source "proxmox-iso" "ubuntu-2204" {
     "boot<enter>"
   ]
 
-  # Configuration SSH
-  communicator              = "ssh"
-  ssh_host                  = "172.16.0.100"
-  ssh_username              = var.build_username
-  ssh_password              = var.build_password
-  ssh_timeout               = "45m" # Augmenté pour plus de sécurité
-  pause_before_connecting   = "2m"
-  ssh_handshake_attempts    = 100
+  # Communicator : password éphémère généré dans deploy.sh, jamais stocké
+  communicator            = "ssh"
+  ssh_host                = "172.16.0.100"
+  ssh_username            = var.build_username
+  ssh_password            = var.build_password
+  ssh_timeout             = "45m"
+  pause_before_connecting = "2m"
+  ssh_handshake_attempts  = 100
 
-  # Bastion pour passer par l'IP publique de Proxmox
-  ssh_bastion_host     = var.proxmox_host
-  ssh_bastion_username = "root"
-  ssh_bastion_password = var.proxmox_password
+  # Bastion Proxmox pour atteindre le réseau LAN vmbr1
+  ssh_bastion_host             = var.proxmox_host
+  ssh_bastion_username         = "root"
+  ssh_bastion_private_key_file = var.ssh_bastion_private_key_file
 
   qemu_agent = true
 }
@@ -142,7 +152,7 @@ source "proxmox-iso" "ubuntu-2204" {
 build {
   sources = ["source.proxmox-iso.ubuntu-2204"]
 
-  # BLOC 1 : Mise à jour et Reboot
+  # BLOC 1 : Mise à jour et reboot
   provisioner "shell" {
     expect_disconnect = true
     inline = [
@@ -161,7 +171,7 @@ build {
     ]
   }
 
-  # BLOC 2 : Installation finale et Nettoyage (s'exécute après le reboot)
+  # BLOC 2 : Installation finale et nettoyage
   provisioner "shell" {
     pause_before = "20s"
     inline = [
@@ -176,6 +186,38 @@ build {
       "sudo rm -f /etc/machine-id",
       "sudo touch /etc/machine-id",
       "sync"
+    ]
+  }
+
+  # BLOC 3 : Injection de la clé SSH + désactivation du password SSH
+  # La clé est injectée ICI (connexion établie = on est sûr d'être dans la VM)
+  # Le password SSH est désactivé juste après via sshd_config
+  provisioner "shell" {
+    environment_vars = [
+      "SSH_PUB_KEY=${var.ssh_public_key}"
+    ]
+    inline = [
+      "echo 'Injection de la clé SSH publique...'",
+      "mkdir -p ~/.ssh",
+      "echo \"$SSH_PUB_KEY\" > ~/.ssh/authorized_keys",
+      "chmod 700 ~/.ssh",
+      "chmod 600 ~/.ssh/authorized_keys",
+
+      "echo 'Désactivation de l''authentification par password SSH...'",
+      "sudo sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config",
+      "sudo sed -i 's/^#*KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' /etc/ssh/sshd_config",
+      "sudo systemctl reload ssh"
+    ]
+  }
+
+  # BLOC 4 : Suppression de la clé Packer et verrouillage du compte
+  # cloud-init sur le clone peut ainsi injecter la clé SSH de prod proprement
+  provisioner "shell" {
+    inline = [
+      "echo 'Suppression de la clé Packer temporaire...'",
+      "sudo rm -rf /home/ubuntu/.ssh",
+      "sudo passwd -l ubuntu",
+      "echo 'Template prêt — aucun credential résiduel.'"
     ]
   }
 }

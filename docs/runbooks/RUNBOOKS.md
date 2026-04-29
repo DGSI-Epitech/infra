@@ -8,20 +8,31 @@ Procédures et résolution de problèmes pour l'infrastructure on-premise.
 
 1. [Premier déploiement](#1-premier-déploiement)
 2. [Déploiement courant](#2-déploiement-courant)
-3. [Configurer Vault avec Ansible](#3-configurer-vault-avec-ansible)
-4. [Résolution de problèmes](#4-résolution-de-problèmes)
+3. [Ansible manuellement](#3-ansible-manuellement)
+4. [Accéder à Vault](#4-accéder-à-vault)
+5. [Diagnostics SSH](#5-diagnostics-ssh)
+6. [Résolution de problèmes](#6-résolution-de-problèmes)
 
 ---
 
 ## 1. Premier déploiement
 
-### 1.1 Préparer l'accès SSH
+### 1.1 Préparer la paire de clés SSH
 
-Le provider Terraform `bpg/proxmox` a besoin d'un accès SSH root pour importer les disques.
+L'infrastructure n'utilise **aucun password** pour accéder aux VMs. Une unique paire de clés ED25519 couvre tous les accès : Packer bastion, Terraform provider bpg, injection QEMU agent, Ansible.
 
 ```bash
+# Générer la paire de clés si elle n'existe pas
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "lab-infra"
+
+# Copier la clé publique sur Proxmox (requis pour Packer bastion + Terraform bpg provider)
 ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<PROXMOX_HOST>
+
+# Ajouter la clé à l'agent SSH pour la session
 ssh-add ~/.ssh/id_ed25519
+
+# Vérifier la connexion
+ssh root@<PROXMOX_HOST> echo "OK"
 ```
 
 ### 1.2 Configurer config.env
@@ -35,58 +46,53 @@ Remplir toutes les valeurs :
 ```bash
 PROXMOX_HOST="51.75.128.134"
 PROXMOX_USER="root@pam"
-PROXMOX_PASSWORD="..."
+PROXMOX_PASSWORD="..."           # Mot de passe root Proxmox (API curl uniquement)
 PROXMOX_NODE="proxmox-site1"
 PROXMOX_STORAGE_VM="local"
 
-VM_ID_UBUNTU_TEMPLATE=9000
-VM_ID_PFSENSE_TEMPLATE=9001
-VM_ID_PFSENSE=1001
-VM_ID_SERVICES=1003
-VM_ID_VAULT=1002
+VM_ID_UBUNTU_TEMPLATE=1000
+VM_ID_PFSENSE_TEMPLATE=2000
+VM_ID_PFSENSE=2100
+VM_ID_SERVICES=1100
+VM_ID_VAULT=1200
+
+VM_IP_SERVICES="172.16.0.241/24"
+VM_IP_VAULT="172.16.0.242/24"
+VM_GATEWAY="172.16.0.254"
+
+# SSH
+SSH_PUBLIC_KEY="$(cat ~/.ssh/id_ed25519.pub)"
+SSH_PRIVATE_KEY_FILE="~/.ssh/id_ed25519"
+
+VM_USERNAME="ubuntu"
 ```
 
 Pour connaître le nom du nœud Proxmox :
 
 ```bash
 curl -s -k -X POST "https://<IP>:8006/api2/json/access/ticket" \
-  --data-urlencode "username=root@pam" \
-  --data-urlencode "password=<PASSWORD>" | python3 -c \
-  "import sys,json; t=json.load(sys.stdin)['data']['ticket']; print(t)" > /tmp/ticket
-curl -s -k -b "PVEAuthCookie=$(cat /tmp/ticket)" \
-  "https://<IP>:8006/api2/json/nodes" | python3 -m json.tool
+  -d "username=root@pam&password=<PASSWORD>" | python3 -m json.tool
 ```
 
-Pour connaître les storages disponibles :
-
-```bash
-ssh root@<PROXMOX_HOST> pvesm status
-```
-
-Utiliser un storage de type `dir` (ex: `local`) pour `PROXMOX_STORAGE_VM` afin que le cloud-init fonctionne.
-
-### 1.3 Configurer terraform.tfvars
-
-```bash
-cp terraform/envs/onprem/terraform.tfvars.example terraform/envs/onprem/terraform.tfvars
-```
-
-Remplir les valeurs spécifiques à l'environnement (IPs des VMs, clé SSH publique) :
-
-```hcl
-vm_ip_cidr        = "172.16.255.242/28"
-vm_gateway        = "172.16.255.254"
-vault_vm_ip_cidr  = "172.16.255.243/28"
-vm_ssh_public_key = "ssh-ed25519 AAAA..."   # cat ~/.ssh/id_ed25519.pub
-```
-
-### 1.4 Déployer
+### 1.3 Déployer
 
 ```bash
 npm run deploy
 ```
 
-Durée approximative : **10-15 minutes** (dont ~5 min pour le build Packer pfSense).
+Le script fait dans l'ordre :
+1. Auth API Proxmox
+2. Nettoyage des VMs existantes (pas les templates)
+3. Vérification/création du bridge `vmbr1`
+4. Build Packer pfSense si le template est absent (~3 min)
+5. Terraform pfSense + attente 30s
+6. Build Packer Ubuntu si le template est absent (~25 min)
+7. Terraform vault-vm + services-vm
+8. Attente QEMU agent + injection clé SSH via API
+9. Vérification SSH via ProxyJump Proxmox
+10. Ansible : install Vault, init, unseal
+
+Durée totale : **~35 min** (premiers builds) / **~10 min** (templates déjà présents)
 
 ---
 
@@ -97,14 +103,7 @@ ssh-add ~/.ssh/id_ed25519   # si nouvelle session terminal
 npm run deploy
 ```
 
-Le script :
-1. S'authentifie sur l'API Proxmox
-2. Supprime les VMs existantes (pfSense, services, vault) — **pas les templates**
-3. Vérifie/crée le bridge `vmbr1` (LAN pfSense)
-4. Vérifie si le template pfSense (9001) existe — le rebuilde avec Packer si absent
-5. Lance `terraform apply` avec toutes les valeurs de `config.env`
-
-Pour tout supprimer :
+Ansible se lance automatiquement à la fin. Pour tout supprimer :
 
 ```bash
 npm run destroy
@@ -112,48 +111,247 @@ npm run destroy
 
 ---
 
-## 3. Configurer Vault avec Ansible
+## 3. Ansible manuellement
 
-Une fois les VMs démarrées (attendre ~2 min après deploy) :
+L'inventaire est un script Python dynamique qui lit `config.env`. Les IPs et le ProxyJump SSH sont toujours cohérents avec la configuration courante.
 
 ```bash
 cd ansible
-ansible-playbook playbooks/vault.yml -i inventory/onprem.yml
+
+# Vérifier l'inventaire généré
+python3 inventory/onprem.py --list | python3 -m json.tool
+
+# Déployer Vault
+ansible-playbook playbooks/vault.yml -i inventory/onprem.py
+
+# Déployer services-vm
+ansible-playbook playbooks/services-vm.yml -i inventory/onprem.py
 ```
 
-Le playbook installe Vault, configure le stockage Raft, init et unseal automatiquement.
-Les unseal keys sont sauvegardées dans `/root/vault-init.json` sur la vault-vm.
+Les VMs étant sur `vmbr1` (réseau privé derrière pfSense), toutes les connexions Ansible passent automatiquement par Proxmox comme ProxyJump SSH.
 
 Vérifier que Vault est opérationnel :
 
 ```bash
-ssh ubuntu@172.16.255.243
-export VAULT_ADDR='http://127.0.0.1:8200'
-vault status
+# Via ProxyJump
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "export VAULT_ADDR=http://127.0.0.1:8200 && vault status"
 ```
 
 ---
 
-## 4. Résolution de problèmes
+## 4. Accéder à Vault
 
-### Le script s'arrête silencieusement après "Authentification Proxmox..."
+Vault tourne sur `vault-vm` (`172.16.0.242`) port `8200`, sur le réseau privé `vmbr1`. Inaccessible directement — il faut un tunnel SSH via Proxmox.
 
-`curl` échoue avec `set -euo pipefail` et tue le script sans message.
+### 4.1 Ouvrir le tunnel SSH
 
-Causes possibles :
-- Proxmox inaccessible : `ping $PROXMOX_HOST`
-- Mauvais mot de passe : vérifier `PROXMOX_PASSWORD` dans `config.env`
-- Mauvaise IP : vérifier `PROXMOX_HOST` dans `config.env`
+Dans un terminal dédié (à laisser ouvert) :
+
+```bash
+ssh -L 8200:172.16.0.242:8200 -N root@51.75.128.134
+```
+
+Puis ouvrir dans le navigateur :
+
+```
+http://localhost:8200
+```
+
+### 4.2 Vérifier l'état de Vault
+
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "export VAULT_ADDR=http://127.0.0.1:8200 && vault status"
+```
+
+Champs importants dans la réponse :
+
+| Champ | Valeur attendue | Signification |
+|---|---|---|
+| `Initialized` | `true` | Vault a été initialisé |
+| `Sealed` | `false` | Vault est opérationnel |
+| `HA Enabled` | `false` | Mode single-node (Raft) |
+
+### 4.3 Initialiser Vault (première fois uniquement)
+
+Si `Initialized: false` :
+
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "export VAULT_ADDR=http://127.0.0.1:8200 && vault operator init"
+```
+
+La commande retourne :
+
+```
+Unseal Key 1: xxxx
+Unseal Key 2: xxxx
+Unseal Key 3: xxxx
+Unseal Key 4: xxxx
+Unseal Key 5: xxxx
+
+Initial Root Token: hvs.xxxx
+```
+
+**Sauvegarder ces valeurs immédiatement.** Sans les unseal keys, les données Vault sont irrécupérables si la VM redémarre.
+
+Les unseal keys sont également sauvegardées automatiquement dans `/root/vault-init.json` sur `vault-vm` par le role Ansible.
+
+### 4.4 Unseal Vault
+
+Vault se scelle à chaque redémarrage. Il faut 3 des 5 unseal keys pour le déverrouiller :
+
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "export VAULT_ADDR=http://127.0.0.1:8200 && vault operator unseal <UNSEAL_KEY_1>"
+
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "export VAULT_ADDR=http://127.0.0.1:8200 && vault operator unseal <UNSEAL_KEY_2>"
+
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "export VAULT_ADDR=http://127.0.0.1:8200 && vault operator unseal <UNSEAL_KEY_3>"
+```
+
+Après la 3ème clé, `Sealed` passe à `false` — Vault est opérationnel.
+
+### 4.5 Se connecter à l'UI
+
+Ouvrir `http://localhost:8200` (tunnel ouvert) et se connecter avec le **root token** (`hvs.xxxx`).
+
+Pour les usages quotidiens, créer un token limité plutôt que d'utiliser le root token :
+
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 "
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=<ROOT_TOKEN>
+vault token create -policy=default -ttl=8h
+"
+```
+
+### 4.6 Lire les unseal keys sauvegardées
+
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "sudo cat /root/vault-init.json | python3 -m json.tool"
+```
+
+---
+
+## 5. Diagnostics SSH
+
+### Vérifier la clé SSH dans une VM via QEMU agent
+
+```bash
+source config.env
+AUTH=$(curl -s -k -X POST "https://${PROXMOX_HOST}:8006/api2/json/access/ticket" \
+  -d "username=root@pam&password=${PROXMOX_PASSWORD}")
+TICKET=$(echo "$AUTH" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['ticket'])")
+CSRF=$(echo "$AUTH"   | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['CSRFPreventionToken'])")
+
+# Remplacer 1200 par l'ID VM souhaité
+RES=$(curl -s -k -X POST "https://${PROXMOX_HOST}:8006/api2/json/nodes/${PROXMOX_NODE}/qemu/1200/agent/exec" \
+  -H "CSRFPreventionToken: ${CSRF}" -b "PVEAuthCookie=${TICKET}" \
+  -H "Content-Type: application/json" \
+  -d '{"command":["cat","/home/ubuntu/.ssh/authorized_keys"]}')
+PID=$(echo "$RES" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['pid'])")
+sleep 3
+curl -s -k "https://${PROXMOX_HOST}:8006/api2/json/nodes/${PROXMOX_NODE}/qemu/1200/agent/exec-status?pid=${PID}" \
+  -b "PVEAuthCookie=${TICKET}" | python3 -c \
+  "import sys,json; d=json.load(sys.stdin)['data']; print('EXIT:', d.get('exitcode')); print('KEY:', d.get('out-data','(vide)'))"
+```
+
+Ou utiliser le script de diagnostic dédié :
+
+```bash
+bash scripts/check-ssh-key.sh
+```
+
+### Tester SSH manuellement (via ProxyJump)
+
+```bash
+source config.env
+ssh -o StrictHostKeyChecking=no -o ProxyJump=root@${PROXMOX_HOST} \
+    -i ~/.ssh/id_ed25519 ubuntu@172.16.0.242 echo "OK"
+```
+
+### Ré-injecter la clé SSH manuellement
+
+Si la clé a disparu d'une VM après un redéploiement partiel :
+
+```bash
+source config.env
+AUTH=$(curl -s -k -X POST "https://${PROXMOX_HOST}:8006/api2/json/access/ticket" \
+  -d "username=root@pam&password=${PROXMOX_PASSWORD}")
+TICKET=$(echo "$AUTH" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['ticket'])")
+CSRF=$(echo "$AUTH"   | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['CSRFPreventionToken'])")
+
+# Remplacer 1200 et SSH_PUBLIC_KEY par les valeurs correctes
+curl -s -k -X POST "https://${PROXMOX_HOST}:8006/api2/json/nodes/${PROXMOX_NODE}/qemu/1200/agent/exec" \
+  -H "CSRFPreventionToken: ${CSRF}" -b "PVEAuthCookie=${TICKET}" \
+  -H "Content-Type: application/json" \
+  -d "{\"command\":[\"bash\",\"-c\",\"mkdir -p /home/ubuntu/.ssh && echo '${SSH_PUBLIC_KEY}' > /home/ubuntu/.ssh/authorized_keys && chmod 700 /home/ubuntu/.ssh && chmod 600 /home/ubuntu/.ssh/authorized_keys && chown -R ubuntu:ubuntu /home/ubuntu/.ssh\"]}"
+```
+
+---
+
+## 6. Résolution de problèmes
+
+### Packer Ubuntu — SSH auth failed (publickey)
+
+```
+ssh: handshake failed: ssh: unable to authenticate, attempted methods [none publickey]
+```
+
+Packer arrive à la VM via le bastion mais la clé est rejetée. Causes possibles :
+
+1. **Le bastion n'a pas la clé** : vérifier que `ssh-copy-id` a été fait sur Proxmox
+2. **`SSH_PRIVATE_KEY_FILE` ne correspond pas à `SSH_PUBLIC_KEY`** dans `config.env` : les deux doivent être la même paire
+3. **`SSH_PRIVATE_KEY_FILE` non défini** dans `config.env` : le script affiche une erreur de validation au démarrage
+
+### Permission denied (publickey) sur vault-vm ou services-vm
+
+La clé SSH n'est pas dans `authorized_keys`. Cloud-init ne l'injecte pas pour les users créés par autoinstall.
+
+Fix : ré-injecter via QEMU agent (voir section 4 ci-dessus), ou relancer `npm run deploy`.
+
+### SSH timeout vers 172.16.0.x
+
+Les VMs sont sur `vmbr1` (réseau privé). Connexion directe impossible depuis l'extérieur.
+
+Toujours passer par le ProxyJump :
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.x ...
+```
+
+### Ansible — provided hosts list is empty
+
+```
+[WARNING]: provided hosts list is empty, only localhost is available.
+```
+
+L'inventaire utilisé est l'ancien fichier YAML (`onprem.yml`) ou le script Python renvoie un mauvais format.
+
+Utiliser le script dynamique :
+```bash
+ansible-playbook ... -i inventory/onprem.py
+```
+
+Vérifier que le script retourne bien les hosts :
+```bash
+python3 inventory/onprem.py --list | python3 -m json.tool
+```
+
+### Script s'arrête après "Authentification Proxmox..."
+
+`curl` échoue silencieusement à cause de `set -euo pipefail`.
 
 Test manuel :
 ```bash
 source config.env
-curl -k -X POST "https://${PROXMOX_HOST}:8006/api2/json/access/ticket" \
-  --data-urlencode "username=${PROXMOX_USER}" \
-  --data-urlencode "password=${PROXMOX_PASSWORD}"
+curl -s -k -X POST "https://${PROXMOX_HOST}:8006/api2/json/access/ticket" \
+  -d "username=${PROXMOX_USER}&password=${PROXMOX_PASSWORD}" | python3 -m json.tool
 ```
-
----
 
 ### Packer — KVM virtualisation not available
 
@@ -161,106 +359,15 @@ curl -k -X POST "https://${PROXMOX_HOST}:8006/api2/json/access/ticket" \
 Error starting VM: KVM virtualisation configured, but not available.
 ```
 
-Proxmox tourne dans une VM VMware sans virtualisation imbriquée activée.
+Proxmox tourne dans une VM VMware sans virtualisation imbriquée. Fix appliqué : `disable_kvm = true` dans `pfsense-2.7.pkr.hcl`. Le build est plus lent (~15 min) mais fonctionne.
 
-Fix appliqué : `disable_kvm = true` dans `packer/pfsense-2.7/pfsense-2.7.pkr.hcl`.
-Le build est plus lent (~15 min) mais fonctionne.
-
-Fix permanent : activer "Virtualize Intel VT-x/EPT" dans les settings processeur de la VM VMware, puis retirer `disable_kvm`.
-
----
-
-### Packer — bridge 'vmbr1' does not exist
+### Terraform — timeout QEMU agent
 
 ```
-Error starting VM: bridge 'vmbr1' does not exist
+Warning: timeout while waiting for the QEMU agent on VM "1200" to publish the network interfaces
 ```
 
-Le bridge LAN n'existe pas encore sur Proxmox.
-
-Le script `deploy.sh` le crée automatiquement via l'API avant le build Packer. Si le problème persiste, vérifier que l'appel API de création de bridge a réussi.
-
----
-
-### Packer — hostname lookup 'proxmox-site1' failed
-
-```
-500 hostname lookup 'proxmox-site1' failed
-```
-
-Proxmox ne peut pas résoudre son propre hostname. L'erreur vient du serveur lui-même pendant l'upload de l'ISO.
-
-Fix : ajouter le hostname dans `/etc/hosts` sur le serveur Proxmox.
-
-```bash
-ssh root@$PROXMOX_HOST \
-  "grep -q proxmox-site1 /etc/hosts || echo '127.0.1.1 proxmox-site1' >> /etc/hosts"
-```
-
----
-
-### Packer — storage 'local-lvm' does not exist
-
-```
-500 storage 'local-lvm' does not exist
-```
-
-Le storage configuré dans `PROXMOX_STORAGE_VM` n'existe pas sur ce Proxmox.
-
-Lister les storages disponibles :
-```bash
-ssh root@$PROXMOX_HOST pvesm status
-```
-
-Mettre à jour `PROXMOX_STORAGE_VM` dans `config.env` avec le bon nom.
-
----
-
-### Terraform — storage 'local-lvm' does not exist (cloud-init)
-
-```
-Error: storage 'local-lvm' does not exist
-  with module.services_vm / module.vault_vm
-```
-
-Le `initialization.datastore_id` dans les modules services-vm et vault-vm pointait sur `local-lvm` (stockage bloc) au lieu de `local` (stockage fichier). Le cloud-init a besoin d'un storage de type `dir`.
-
-Fix appliqué : `storage_iso` passé aux modules et utilisé dans `initialization.datastore_id`.
-
----
-
-### Terraform — No value for required variable
-
-```
-Error: No value for required variable
-  variable "pfsense_vm_id"
-```
-
-Une variable sans `default` n'est pas passée via `-var` dans le `terraform apply` de `deploy.sh`.
-
-Vérifier que toutes les variables de `config.env` ont bien un `-var` correspondant dans `deploy.sh` :
-
-```bash
-grep "var \"" scripts/deploy.sh
-```
-
----
-
-### VMs Ubuntu — temporary failure resolving / Cloud-init Final Stage
-
-```
-Temporary failure resolving 'archive.ubuntu.com'
-Failed to start Cloud-init: Final Stage
-```
-
-Les VMs sont connectées à `vmbr0` (WAN) au lieu de `vmbr1` (LAN pfSense).
-La gateway `172.16.255.254` est sur pfSense LAN (vmbr1), donc inaccessible depuis vmbr0.
-
-Fix appliqué : `bridge = "vmbr1"` dans `services-vm/main.tf` et `vault-vm/main.tf`.
-
-Ces erreurs sont aussi normales si pfSense n'est pas encore démarré — cloud-init échoue mais la VM reste fonctionnelle.
-
----
+Warning non bloquant. Le QEMU agent se lance après le timeout Terraform, mais il est bien disponible quand `deploy.sh` l'attend dans l'étape suivante (`wait_for_agent`).
 
 ### State lock bloqué
 
@@ -269,26 +376,16 @@ Error: Error acquiring the state lock
 ```
 
 ```bash
-ps aux | grep terraform     # vérifier si un process tourne encore
+ps aux | grep terraform
 kill <PID>
 rm terraform/envs/onprem/terraform.tfstate.lock.info
 ```
 
----
-
-### VMs en statut io-error dans Proxmox
+### VMs en statut io-error
 
 Le pool de stockage est plein.
 
 ```bash
 ssh root@$PROXMOX_HOST pvesm status
+npm run destroy  # libère l'espace
 ```
-
-Supprimer les VMs bloquées via `npm run destroy`, libérer de l'espace, puis re-déployer.
-
----
-
-### Terraform reste bloqué sur "Still creating"
-
-La VM boote. Cloud-init peut prendre 2-3 minutes. Terraform attend que le QEMU agent réponde.
-Suivre la progression dans la console Proxmox (VM → Console).

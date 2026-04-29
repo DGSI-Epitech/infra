@@ -5,15 +5,15 @@
 ```
 Internet
     │
-    ├── PVE1 (On-premise)  WAN: 5.196.45.8
+    ├── PVE1 (On-premise)  IP publique: 51.75.128.134
     │       │
     │       └── pfSense S1 (op.local)
     │               │
-    │               └── LAN: 172.16.255.240/28
-    │                       ├── 172.16.255.242  services-vm  (Netbox, website)
-    │                       └── 172.16.255.243  vault-vm     (Vault, Elastic)
+    │               └── LAN: 172.16.0.0/24
+    │                       ├── 172.16.0.241  services-vm  (Netbox, website)
+    │                       └── 172.16.0.242  vault-vm     (HashiCorp Vault)
     │
-    └── PVE2 (Cloud)       WAN: 5.196.50.52
+    └── PVE2 (Cloud)       IP publique: 5.196.50.52
             │
             └── pfSense S2 (cloud.local)
                     ├── DMZ: 10.255.255.248/29
@@ -32,21 +32,19 @@ OpenVPN: 10.3.3.0/29 (tunnel inter-sites)
 
 | Champ | Valeur |
 |---|---|
-| URL publique | `https://ns3050272.ip-51-255-76.eu:8006` |
-| IP locale (VMware) | `192.168.139.128` |
-| Nœud | `pve` |
+| IP publique | `51.75.128.134` |
+| Nœud | `proxmox-site1` |
 
 ### pfSense S1
 
-| Interface | Réseau | Valeur |
-|---|---|---|
-| WAN | IP publique routable | `5.196.45.8` |
-| LAN | Réseau | `172.16.255.240/28` |
-| LAN | Gateway | `172.16.255.254` |
-| LAN | Broadcast | `172.16.255.255` |
-| LAN | Masque | `255.255.255.240` |
-| LAN | Adresses utilisables | 13 (`172.16.255.241` → `172.16.255.253`) |
-| DNS cible | Via VPN | `192.168.255.254` |
+| Interface | Valeur |
+|---|---|
+| WAN | `vmbr0` (IP publique Proxmox) |
+| LAN bridge | `vmbr1` |
+| LAN IP (gateway) | `172.16.0.254/24` |
+| LAN réseau | `172.16.0.0/24` |
+| DHCP range | `172.16.0.241` → `172.16.0.253` |
+| DNS | `1.1.1.1`, `8.8.8.8` |
 
 Domaine local : `op.local`
 
@@ -54,9 +52,13 @@ Domaine local : `op.local`
 
 | VM | ID Proxmox | IP | Gateway | Rôle |
 |---|---|---|---|---|
-| ubuntu-template | 9000 | — | — | Template de base (ne pas démarrer) |
-| services-vm | 200 | `172.16.255.242/28` | `172.16.255.254` | Netbox, website |
-| vault-vm | 201 | `172.16.255.243/28` | `172.16.255.254` | HashiCorp Vault, Elastic |
+| ubuntu-template | 1000 | — | — | Template de base (ne pas démarrer) |
+| pfsense-template | 2000 | — | — | Template pfSense (ne pas démarrer) |
+| pfsense-fw-01 | 2100 | `172.16.0.254` | — | Pare-feu LAN/WAN |
+| services-vm | 1100 | `172.16.0.241/24` | `172.16.0.254` | Netbox, website |
+| vault-vm | 1200 | `172.16.0.242/24` | `172.16.0.254` | HashiCorp Vault |
+
+> Les IDs Proxmox correspondent aux valeurs par défaut de `config.env.example`. Ils sont configurables via `config.env`.
 
 ---
 
@@ -77,8 +79,6 @@ Domaine local : `op.local`
 |---|---|
 | Réseau | `10.255.255.248/29` |
 | Gateway | `10.255.255.254` |
-| Broadcast | `10.255.255.255` |
-| Masque | `255.255.255.248` |
 | Adresses utilisables | 5 (`10.255.255.249` → `10.255.255.253`) |
 
 **LAN**
@@ -87,10 +87,7 @@ Domaine local : `op.local`
 |---|---|
 | Réseau | `192.168.255.240/28` |
 | Gateway | `192.168.255.254` |
-| Broadcast | `192.168.255.255` |
-| Masque | `255.255.255.240` |
 | Adresses utilisables | 13 (`192.168.255.241` → `192.168.255.253`) |
-| DNS cible | `172.16.255.254` (via VPN vers PVE1) |
 
 Domaine local : `cloud.local`
 
@@ -110,3 +107,16 @@ Domaine local : `cloud.local`
 | Réseau | `10.3.3.0/29` |
 | Protocole | OpenVPN |
 | Rôle | Liaison chiffrée entre PVE1 et PVE2 |
+| Côté PVE1 | pfSense S1 (`pfsense-fw-01`) |
+| Côté PVE2 | pfSense S2 |
+
+---
+
+## Accès SSH aux VMs PVE1
+
+Les VMs Ubuntu (`services-vm`, `vault-vm`) sont sur `vmbr1`, réseau privé inaccessible directement. Tout accès passe par Proxmox comme ProxyJump :
+
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.241   # services-vm
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242   # vault-vm
+```
