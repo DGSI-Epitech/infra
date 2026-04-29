@@ -1,6 +1,6 @@
 output "ip_address" {
-  description = "Services VM IP address"
-  value       = split("/", var.vm_ip_cidr)[0]
+  description = "Services VM IP address (assigned by DHCP)"
+  value       = proxmox_virtual_environment_vm.services_vm.ipv4_addresses
 }
 
 output "vm_id" {

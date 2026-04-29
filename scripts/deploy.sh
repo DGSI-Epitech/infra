@@ -156,9 +156,6 @@ terraform apply -input=false -auto-approve \
   -var "services_vm_id=${VM_ID_SERVICES}" \
   -var "vault_vm_id=${VM_ID_VAULT}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
-  -var "vm_ip_cidr=${VM_IP_SERVICES}" \
-  -var "vault_vm_ip_cidr=${VM_IP_VAULT}" \
-  -var "vm_gateway=${VM_GATEWAY}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
 
@@ -216,17 +213,10 @@ terraform apply -input=false -auto-approve \
   -var "services_vm_id=${VM_ID_SERVICES}" \
   -var "vault_vm_id=${VM_ID_VAULT}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
-  -var "vm_ip_cidr=${VM_IP_SERVICES}" \
-  -var "vault_vm_ip_cidr=${VM_IP_VAULT}" \
-  -var "vm_gateway=${VM_GATEWAY}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
 
 # --- ÉTAPE 5 : Injection clé SSH + Ansible ---
-
-# Extrait l'IP sans le masque (ex: 172.16.0.241/24 → 172.16.0.241)
-SERVICES_IP="${VM_IP_SERVICES%%/*}"
-VAULT_IP="${VM_IP_VAULT%%/*}"
 
 # Attend que le QEMU agent soit opérationnel dans la VM
 wait_for_agent() {
@@ -281,6 +271,48 @@ ENDJSON
   echo "    Clé SSH injectée dans ${label}."
 }
 
+# Récupère l'IP d'une VM via le QEMU agent (stdout = IP, stderr = progression)
+get_vm_ip() {
+  local vmid="$1"
+  local label="$2"
+  local timeout=60
+  local elapsed=0
+  echo "==> Récupération IP de ${label} (VM ${vmid}) via QEMU agent..." >&2
+  while true; do
+    local ip
+    ip=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
+      "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${vmid}/agent/network-get-interfaces" 2>/dev/null | \
+      python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin).get('data', {}).get('result', [])
+    for iface in data:
+        name = iface.get('name', '')
+        if name == 'lo' or name.startswith('docker') or name.startswith('br-'):
+            continue
+        for addr in iface.get('ip-addresses', []):
+            if addr.get('ip-address-type') == 'ipv4':
+                ip = addr['ip-address']
+                if not ip.startswith('127.') and not ip.startswith('169.254.'):
+                    print(ip)
+                    sys.exit(0)
+except: pass
+" 2>/dev/null || true)
+    if [[ -n "$ip" ]]; then
+      echo "    IP ${label} : ${ip}" >&2
+      echo "$ip"
+      return 0
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+    echo "    ${elapsed}s — IP ${label} pas encore disponible..." >&2
+    if [[ $elapsed -ge $timeout ]]; then
+      echo "Erreur : impossible d'obtenir l'IP de ${label} après ${timeout}s." >&2
+      exit 1
+    fi
+  done
+}
+
 # Attend que SSH réponde via Proxmox comme ProxyJump
 wait_for_ssh() {
   local host="$1"
@@ -309,6 +341,10 @@ wait_for_agent "${VM_ID_SERVICES}" "services-vm"
 
 inject_ssh_key "${VM_ID_VAULT}"    "vault-vm"
 inject_ssh_key "${VM_ID_SERVICES}" "services-vm"
+
+VAULT_IP=$(get_vm_ip "${VM_ID_VAULT}"    "vault-vm")
+SERVICES_IP=$(get_vm_ip "${VM_ID_SERVICES}" "services-vm")
+export VAULT_IP SERVICES_IP
 
 wait_for_ssh "${VAULT_IP}"    "vault-vm"
 wait_for_ssh "${SERVICES_IP}" "services-vm"

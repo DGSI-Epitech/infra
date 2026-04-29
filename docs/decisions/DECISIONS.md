@@ -57,6 +57,56 @@ L'inventaire YAML statique avait des IPs hardcodées qui divergeaient de config.
 
 Solution : `inventory/onprem.py` lit config.env à chaque exécution. IPs, ProxyJump et clé SSH sont toujours cohérents avec l'environnement déployé. Format JSON dynamique requis par Ansible (`--list` / `--host`).
 
+---
+
+## IPs des VMs PVE1 — passage de statique à DHCP
+
+**Date :** 2026-04-29
+**Branche :** `configure-vault`
+
+### Problème
+
+`config.env` exigeait de déclarer `VM_IP_SERVICES` et `VM_IP_VAULT` avant le déploiement. Ces IPs étaient passées à Terraform qui les injectait dans cloud-init. Problème : pfSense est déployé **avant** les VMs Ubuntu (phase 1 Terraform), et c'est son DHCP qui gouverne le LAN `172.16.0.0/24`. Il est impossible de garantir à l'avance quelle IP sera assignée — le pool DHCP peut avoir changé, la plage peut varier selon l'environnement, et forcer une IP statique crée des conflits si une autre VM a déjà obtenu cette adresse.
+
+### Décision
+
+Les VMs `vault-vm` et `services-vm` utilisent **DHCP** (`address = "dhcp"` dans cloud-init). L'IP réelle est découverte dynamiquement après le boot via l'API QEMU guest agent de Proxmox, sans aucune valeur hardcodée.
+
+### Implémentation
+
+| Composant | Avant | Après |
+|---|---|---|
+| `modules/vault-vm/main.tf` | `address = var.vm_ip_cidr` | `address = "dhcp"` |
+| `modules/services-vm/main.tf` | `address = var.vm_ip_cidr` | `address = "dhcp"` |
+| `modules/*/outputs.tf` | `split("/", var.vm_ip_cidr)[0]` | `proxmox_virtual_environment_vm.*.ipv4_addresses` |
+| `deploy.sh` | `VAULT_IP="${VM_IP_VAULT%%/*}"` | `get_vm_ip()` via `/agent/network-get-interfaces` |
+| `inventory/onprem.py` | `env.get("VM_IP_VAULT")` | `os.environ.get("VAULT_IP") or env.get("VM_IP_VAULT")` |
+| `config.env` | `VM_IP_SERVICES`, `VM_IP_VAULT` requis | supprimés |
+
+### Comment `get_vm_ip()` fonctionne
+
+Après `wait_for_agent`, `deploy.sh` appelle l'endpoint Proxmox `GET /nodes/{node}/qemu/{vmid}/agent/network-get-interfaces`. Le QEMU guest agent retourne toutes les interfaces réseau de la VM avec leurs IPs. La fonction filtre `lo`, les adresses loopback (`127.x`) et link-local (`169.254.x`), et retourne la première IPv4 valide trouvée.
+
+L'IP est exportée dans `$VAULT_IP` / `$SERVICES_IP` avant le lancement d'Ansible. `inventory/onprem.py` lit ces variables d'environnement en priorité.
+
+### Lancement Ansible manuel sans `deploy.sh`
+
+Si tu relances Ansible seul (hors deploy complet), exporte les IPs à la main d'abord :
+
+```bash
+export VAULT_IP=172.16.0.x
+export SERVICES_IP=172.16.0.y
+ansible-playbook playbooks/vault.yml -i inventory/onprem.py
+```
+
+Ou renseigne `VM_IP_VAULT` / `VM_IP_SERVICES` dans `config.env` comme fallback — `onprem.py` les lira si les variables d'env ne sont pas définies.
+
+### Variables supprimées de config.env
+
+- `VM_IP_SERVICES`
+- `VM_IP_VAULT`
+- `VM_GATEWAY` — conservé uniquement pour l'entrée pfSense dans l'inventaire Ansible (`pfsense-fw-01`), plus utilisé dans Terraform
+
 ### Pourquoi ProxyJump pour Ansible ?
 
 Les VMs Ubuntu (`vault-vm`, `services-vm`) sont sur `vmbr1`, un réseau LAN privé derrière pfSense. Inaccessibles directement depuis la machine de l'opérateur. Proxmox (IP publique) sert de saut SSH (`ProxyJump=root@PROXMOX_HOST`).

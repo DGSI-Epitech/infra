@@ -4,8 +4,6 @@ module "services_vm" {
   proxmox_node      = var.proxmox_node
   vm_id             = var.services_vm_id
   template_vm_id    = var.template_ubuntu_vm_id
-  vm_ip_cidr        = var.vm_ip_cidr
-  vm_gateway        = var.vm_gateway
   vm_ssh_public_key = var.vm_ssh_public_key
   storage_iso       = var.storage_iso
   storage_vm        = var.storage_vm
@@ -16,8 +14,6 @@ module "vault_vm" {
   proxmox_node      = var.proxmox_node
   template_vm_id    = var.template_ubuntu_vm_id
   vm_id             = var.vault_vm_id
-  vm_ip_cidr        = var.vault_vm_ip_cidr
-  vm_gateway        = var.vm_gateway
   vm_ssh_public_key = var.vm_ssh_public_key
   storage_iso       = var.storage_iso
   storage_vm        = var.storage_vm

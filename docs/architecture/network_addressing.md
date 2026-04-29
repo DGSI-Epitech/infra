@@ -55,10 +55,12 @@ Domaine local : `op.local`
 | ubuntu-template | 1000 | — | — | Template de base (ne pas démarrer) |
 | pfsense-template | 2000 | — | — | Template pfSense (ne pas démarrer) |
 | pfsense-fw-01 | 2100 | `172.16.0.254` | — | Pare-feu LAN/WAN |
-| services-vm | 1100 | `172.16.0.241/24` | `172.16.0.254` | Netbox, website |
-| vault-vm | 1200 | `172.16.0.242/24` | `172.16.0.254` | HashiCorp Vault |
+| services-vm | 1100 | DHCP (`172.16.0.241`–`172.16.0.253`) | `172.16.0.254` | Netbox, website |
+| vault-vm | 1200 | DHCP (`172.16.0.241`–`172.16.0.253`) | `172.16.0.254` | HashiCorp Vault |
 
 > Les IDs Proxmox correspondent aux valeurs par défaut de `config.env.example`. Ils sont configurables via `config.env`.
+
+> Les IPs de `services-vm` et `vault-vm` sont assignées dynamiquement par le DHCP de pfSense. `deploy.sh` les découvre automatiquement via le QEMU guest agent après le boot. Voir `docs/decisions/DECISIONS.md` — section *IPs des VMs PVE1 — passage de statique à DHCP*.
 
 ---
 
@@ -114,9 +116,17 @@ Domaine local : `cloud.local`
 
 ## Accès SSH aux VMs PVE1
 
-Les VMs Ubuntu (`services-vm`, `vault-vm`) sont sur `vmbr1`, réseau privé inaccessible directement. Tout accès passe par Proxmox comme ProxyJump :
+Les VMs Ubuntu (`services-vm`, `vault-vm`) sont sur `vmbr1`, réseau privé inaccessible directement. Tout accès passe par Proxmox comme ProxyJump.
+
+Les IPs étant assignées par DHCP, récupère l'IP courante via l'API Proxmox avant de te connecter :
 
 ```bash
-ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.241   # services-vm
-ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242   # vault-vm
+# Récupérer l'IP d'une VM (remplace VMID par 1100 ou 1200)
+curl -s -k -b "PVEAuthCookie=<ticket>" \
+  https://<PROXMOX_HOST>:8006/api2/json/nodes/<node>/qemu/<VMID>/agent/network-get-interfaces
+
+# Connexion SSH une fois l'IP connue
+ssh -o ProxyJump=root@<PROXMOX_HOST> ubuntu@<IP_VM>
 ```
+
+Lors d'un `./deploy.sh` complet, la découverte est automatique — les IPs sont passées à Ansible sans intervention manuelle.

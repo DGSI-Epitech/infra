@@ -38,8 +38,7 @@ resource "proxmox_virtual_environment_vm" "vault_vm" {
     datastore_id = var.storage_iso
     ip_config {
       ipv4 {
-        address = var.vm_ip_cidr
-        gateway = var.vm_gateway
+        address = "dhcp"
       }
     }
 

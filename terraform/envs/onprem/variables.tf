@@ -44,16 +44,6 @@ variable "storage_vm" {
   default     = "local-lvm"
 }
 
-variable "vm_ip_cidr" {
-  description = "Services VM IP address in CIDR notation"
-  type        = string
-}
-
-variable "vm_gateway" {
-  description = "Default gateway for the services VM"
-  type        = string
-}
-
 variable "vm_ssh_public_key" {
   description = "SSH public key injected via cloud-init"
   type        = string
@@ -67,11 +57,6 @@ variable "services_vm_id" {
 variable "vault_vm_id" {
   description = "Proxmox VM ID for Vault"
   type        = number
-}
-
-variable "vault_vm_ip_cidr" {
-  description = "Vault VM IP address in CIDR notation"
-  type        = string
 }
 
 variable "pfsense_template_id" {
