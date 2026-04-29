@@ -96,7 +96,7 @@ Une fois les VMs démarrées :
 
 ```bash
 cd ansible
-ansible-playbook playbooks/vault.yml -i inventory/onprem.yml
+ansible-playbook playbooks/vault.yml -i inventory/onprem.py
 ```
 
 ### 4. Tout supprimer
@@ -177,7 +177,7 @@ infra/
 │       ├── services-vm/
 │       └── vault-vm/
 ├── ansible/
-│   ├── inventory/onprem.yml
+│   ├── inventory/onprem.py
 │   ├── playbooks/vault.yml
 │   └── roles/vault/
 └── docs/

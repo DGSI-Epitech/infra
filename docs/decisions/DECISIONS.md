@@ -26,27 +26,44 @@ Trois endroits avaient des passwords en dur ou transmis en clair dans le code :
 
 **Vault intervient en Phase 2**, une fois PVE1 opérationnel : PKI pour les certs OpenVPN inter-sites, SSH secrets engine pour les accès VMs dynamiques, KV pour les secrets applicatifs.
 
-### Implémentation
+### Implémentation finale
 
 | Composant | Avant | Après |
 |---|---|---|
-| Packer Ubuntu communicator | `ssh_password = build_password` | `ssh_private_key_file = ssh_private_key_file` |
-| Packer Ubuntu bastion | `ssh_bastion_password = proxmox_password` | `ssh_bastion_private_key_file = ssh_private_key_file` |
-| Packer Ubuntu user-data | password hash + `allow-pw: true` | `password: "!"` + `allow-pw: false` + `authorized-keys` |
-| Packer Ubuntu (fin de build) | rien | `rm -rf /home/ubuntu/.ssh && passwd -l ubuntu` |
+| Packer Ubuntu communicator | `ssh_password = "ubuntu"` (stocké) | password éphémère généré dans deploy.sh, jamais stocké |
+| Packer Ubuntu bastion | `ssh_bastion_password = proxmox_password` | `ssh_bastion_private_key_file = ~/.ssh/id_ed25519` |
+| Packer Ubuntu user-data | `allow-pw: true` + hash stocké | `allow-pw: true` + hash éphémère + clé injectée en BLOC 3 |
+| Packer Ubuntu (fin de build) | rien | BLOC 4 : `rm -rf ~/.ssh + passwd -l ubuntu` |
 | Packer pfSense config.xml | pas de clé SSH | `<authorizedkeys>` base64 via templatefile |
-| Terraform cloud-init | `user_account.password = vm_password` | supprimé |
-| Ansible pfSense | `ansible_password: "pfsense"` | `ansible_ssh_private_key_file: ~/.ssh/id_ed25519` |
+| Terraform cloud-init | `user_account.password = vm_password` | supprimé — clé injectée par QEMU agent |
+| Ansible inventory | `ansible_password: "pfsense"` + IPs hardcodées | script Python dynamique depuis config.env + ProxyJump |
 | Terraform bpg/proxmox SSH | `password = proxmox_password` | `private_key = file(pathexpand(...))` |
 
-### Fix cloud-init (clé SSH non injectée sur clone)
+### Pourquoi un password éphémère pour le communicator Packer Ubuntu ?
 
-cloud-init n'injecte pas les clés SSH si `/home/ubuntu/.ssh/authorized_keys` existe déjà (user créé par autoinstall Packer). Le Bloc 3 du build Packer supprime ce répertoire avant de créer le template — cloud-init sur le clone trouve un répertoire absent et peut créer `authorized_keys` correctement.
+Première approche tentée : clé SSH injectée dans `ssh.authorized-keys` de l'autoinstall Ubuntu. Échec : race condition entre le montage des filesystems au reboot et la tentative de connexion Packer. Le serveur SSH est accessible mais `authorized_keys` n'est pas encore écrit ou a de mauvaises permissions.
+
+Solution retenue : password éphémère (`openssl rand`) généré dans deploy.sh, exporté en mémoire, utilisé comme `ssh_password` par Packer. Jamais écrit nulle part. Le provisioner BLOC 3 injecte la clé SSH et désactive le password SSH. BLOC 4 efface le tout avant la conversion en template.
+
+### Pourquoi QEMU agent pour l'injection de clé SSH sur les clones ?
+
+cloud-init (via provider bpg/proxmox) n'injecte pas les clés SSH dans `authorized_keys` pour un user créé par autoinstall Ubuntu (subiquity). Cloud-init considère le user comme "déjà existant" et saute l'étape d'injection de clé.
+
+Solution : après le `terraform apply`, deploy.sh utilise l'API Proxmox (`POST .../agent/exec`) pour écrire directement `authorized_keys` via le QEMU guest agent en cours d'exécution dans la VM.
+
+### Pourquoi un inventaire Ansible dynamique (script Python) ?
+
+L'inventaire YAML statique avait des IPs hardcodées qui divergeaient de config.env. Dès qu'une IP changeait dans config.env, l'inventaire devenait incorrect silencieusement.
+
+Solution : `inventory/onprem.py` lit config.env à chaque exécution. IPs, ProxyJump et clé SSH sont toujours cohérents avec l'environnement déployé. Format JSON dynamique requis par Ansible (`--list` / `--host`).
+
+### Pourquoi ProxyJump pour Ansible ?
+
+Les VMs Ubuntu (`vault-vm`, `services-vm`) sont sur `vmbr1`, un réseau LAN privé derrière pfSense. Inaccessibles directement depuis la machine de l'opérateur. Proxmox (IP publique) sert de saut SSH (`ProxyJump=root@PROXMOX_HOST`).
 
 ### Variables supprimées de config.env
 
-- `VM_PASSWORD` — plus utilisé nulle part
-- `VM_PASSWORD_HASH` — plus utilisé nulle part
+- `VM_PASSWORD`, `VM_PASSWORD_HASH` — plus utilisés nulle part
 
 ### Variables ajoutées à config.env
 
