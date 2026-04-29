@@ -1,12 +1,14 @@
 ui = {{ vault_ui | lower }}
 
+disable_mlock = true
+
 storage "file" {
-  path = "{{ vault_data_dir }}"
+  path = "/vault/data"
 }
 
 listener "tcp" {
   address     = "0.0.0.0:8200"
-  tls_disable = {{ vault_tls_disable | lower }}
+  tls_disable = 1
 }
 
 api_addr = "{{ vault_api_addr }}"

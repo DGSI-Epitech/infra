@@ -1,11 +1,31 @@
+- name: Configure Docker daemon DNS
+  copy:
+    content: |
+      {
+        "dns": ["8.8.8.8", "1.1.1.1"]
+      }
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+  become: true
+  register: docker_daemon_config
+
+- name: Restart Docker after DNS config change
+  systemd:
+    name: docker
+    state: restarted
+  become: true
+  when: docker_daemon_config.changed
+
 - name: Create Vault directories
   file:
     path: "{{ item.path }}"
     state: directory
     mode: "{{ item.mode }}"
+    owner: "100"
+    group: "1000"
   loop:
     - { path: "{{ vault_config_dir }}", mode: '0755' }
-    - { path: "{{ vault_data_dir }}",   mode: '0755' }
+    - { path: "{{ vault_data_dir }}",   mode: '0700' }
   become: true
 
 - name: Deploy Vault config
@@ -20,14 +40,21 @@
     name: vault
     image: "hashicorp/vault:{{ vault_version }}"
     state: started
+    recreate: true
     restart_policy: unless-stopped
-    network_mode: host
+    ports:
+      - "8200:8200"
     volumes:
       - "{{ vault_config_dir }}:/vault/config"
       - "{{ vault_data_dir }}:/vault/data"
     capabilities:
       - IPC_LOCK
-    command: server -config=/vault/config/vault.hcl
+    # Use environment variables instead of manual command flags if possible
+    env:
+      VAULT_CONFIG_DIR: "/vault/config"
+    # Try removing the 'command:' line entirely to let the entrypoint handle it
+    # or ensure it points EXACTLY to the right file:
+    command: "server" 
   become: true
 
 - name: Wait for Vault to be ready
@@ -35,7 +62,7 @@
     port: 8200
     host: 127.0.0.1
     delay: 5
-    timeout: 30
+    timeout: 60 
 
 - name: Check Vault init status
   uri:
@@ -52,17 +79,27 @@
     method: PUT
     body_format: json
     body:
-      secret_shares: "{{ vault_init_shares }}"
-      secret_threshold: "{{ vault_init_threshold }}"
-  register: vault_init_result
+      secret_shares: 5
+      secret_threshold: 3
+    status_code: 200
+  register: vault_init_output
   when: not vault_init_status.json.initialized
 
-- name: Save init output to /root/vault-init.json
+- name: Save Vault init output on the server
   copy:
-    content: "{{ vault_init_result.json | to_nice_json }}"
+    content: "{{ vault_init_output.json | to_nice_json }}"
     dest: /root/vault-init.json
-    mode: '0600'
-  when: not vault_init_status.json.initialized
+    owner: root
+    group: root
+    mode: "0600"
+  when: vault_init_output is changed
+
+- name: Fetch vault-init.json to Ansible controller
+  fetch:
+    src: /root/vault-init.json
+    dest: "{{ playbook_dir }}/../vault-init.json"
+    flat: true
+  when: vault_init_output is changed
 
 - name: Unseal Vault
   uri:
@@ -71,5 +108,7 @@
     body_format: json
     body:
       key: "{{ item }}"
-  loop: "{{ vault_init_result.json.keys_base64[:vault_init_threshold] }}"
-  when: not vault_init_status.json.initialized
+    status_code: 200
+  loop: "{{ vault_init_output.json.keys_base64[:3] }}"
+  when: vault_init_output is changed
+  no_log: true
