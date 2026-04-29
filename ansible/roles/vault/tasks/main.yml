@@ -49,11 +49,8 @@
       - "{{ vault_data_dir }}:/vault/data"
     capabilities:
       - IPC_LOCK
-    # Use environment variables instead of manual command flags if possible
     env:
       VAULT_CONFIG_DIR: "/vault/config"
-    # Try removing the 'command:' line entirely to let the entrypoint handle it
-    # or ensure it points EXACTLY to the right file:
     command: "server" 
   become: true
 
