@@ -30,12 +30,6 @@ variable "vm_ssh_public_key" {
   type        = string
 }
 
-variable "vm_password" {
-  description = "Password for the ubuntu user"
-  type        = string
-  sensitive   = true
-}
-
 variable "vm_cores" {
   description = "Number of vCPU cores"
   type        = number

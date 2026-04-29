@@ -26,12 +26,6 @@ variable "proxmox_node_address" {
   type        = string
 }
 
-variable "proxmox_ssh_private_key" {
-  description = "Path to the SSH private key for Proxmox root access"
-  type        = string
-  default     = "~/.ssh/id_ed25519"
-}
-
 variable "template_ubuntu_vm_id" {
   description = "Proxmox VM ID for the Ubuntu template"
   type        = number
@@ -90,8 +84,7 @@ variable "pfsense_vm_id" {
   type        = number
 }
 
-variable "vm_password" {
-  description = "Password for the ubuntu user on VMs"
+variable "proxmox_ssh_private_key" {
+  description = "Path to the SSH private key for Proxmox root SSH access (bpg provider disk import)"
   type        = string
-  sensitive   = true
 }

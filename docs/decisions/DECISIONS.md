@@ -1,3 +1,63 @@
+# Decisions
+
+---
+
+## Authentification SSH uniquement — suppression des passwords
+
+**Date :** 2026-04-29
+**Branche :** `remove-password-and-setup-ssh-key`
+
+### Problème
+
+Trois endroits avaient des passwords en dur ou transmis en clair dans le code :
+
+1. **Packer Ubuntu** — `build_password` (cleartext "ubuntu") utilisé comme `ssh_password` pour le communicator Packer + dans le `user-data` autoinstall. `proxmox_password` utilisé comme `ssh_bastion_password`.
+2. **Terraform cloud-init** — `vm_password` passé dans `user_account.password` sur toutes les VMs Ubuntu clonées.
+3. **Ansible inventory** — `ansible_password: "pfsense"` en clair dans `onprem.yml`.
+
+### Décision
+
+**SSH key-only** sur toute l'infrastructure bootstrap. Une seule paire de clés (`~/.ssh/id_ed25519`) couvre tous les accès machine.
+
+### Pourquoi pas Ansible Vault ou un gestionnaire de secrets tiers ?
+
+- **Ansible Vault** : cache le problème sans le résoudre. Un master password remplace les passwords — on reporte le problème.
+- **HashiCorp Vault dès le bootstrap** : problème de bootstrap circulaire. Pour lire un secret depuis Vault, Vault doit être déployé. Pour déployer Vault, on a besoin de credentials.
+
+**Vault intervient en Phase 2**, une fois PVE1 opérationnel : PKI pour les certs OpenVPN inter-sites, SSH secrets engine pour les accès VMs dynamiques, KV pour les secrets applicatifs.
+
+### Implémentation
+
+| Composant | Avant | Après |
+|---|---|---|
+| Packer Ubuntu communicator | `ssh_password = build_password` | `ssh_private_key_file = ssh_private_key_file` |
+| Packer Ubuntu bastion | `ssh_bastion_password = proxmox_password` | `ssh_bastion_private_key_file = ssh_private_key_file` |
+| Packer Ubuntu user-data | password hash + `allow-pw: true` | `password: "!"` + `allow-pw: false` + `authorized-keys` |
+| Packer Ubuntu (fin de build) | rien | `rm -rf /home/ubuntu/.ssh && passwd -l ubuntu` |
+| Packer pfSense config.xml | pas de clé SSH | `<authorizedkeys>` base64 via templatefile |
+| Terraform cloud-init | `user_account.password = vm_password` | supprimé |
+| Ansible pfSense | `ansible_password: "pfsense"` | `ansible_ssh_private_key_file: ~/.ssh/id_ed25519` |
+| Terraform bpg/proxmox SSH | `password = proxmox_password` | `private_key = file(pathexpand(...))` |
+
+### Fix cloud-init (clé SSH non injectée sur clone)
+
+cloud-init n'injecte pas les clés SSH si `/home/ubuntu/.ssh/authorized_keys` existe déjà (user créé par autoinstall Packer). Le Bloc 3 du build Packer supprime ce répertoire avant de créer le template — cloud-init sur le clone trouve un répertoire absent et peut créer `authorized_keys` correctement.
+
+### Variables supprimées de config.env
+
+- `VM_PASSWORD` — plus utilisé nulle part
+- `VM_PASSWORD_HASH` — plus utilisé nulle part
+
+### Variables ajoutées à config.env
+
+- `SSH_PRIVATE_KEY_FILE` — chemin vers la clé privée (ex: `~/.ssh/id_ed25519`)
+
+### Voir aussi
+
+- `docs/architecture/ssh-auth.md` — flux complet d'authentification SSH
+
+---
+
 # Decision on the project structure and organization
 
 # 🛠️ Packer Build : pfSense Golden Image (Proxmox)

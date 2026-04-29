@@ -17,6 +17,6 @@ all:
         pfsense-fw-01:
           ansible_host: 172.16.0.254
           ansible_user: admin
-          ansible_password: "pfsense" 
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
           ansible_connection: ssh
           ansible_python_interpreter: /usr/local/bin/python3.11

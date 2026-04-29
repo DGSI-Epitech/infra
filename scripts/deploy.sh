@@ -25,6 +25,18 @@ if [[ -z "${TF_VAR_proxmox_password:-}" ]]; then
   exit 1
 fi
 
+if [[ -z "${SSH_PRIVATE_KEY_FILE:-}" ]]; then
+  echo "Erreur : SSH_PRIVATE_KEY_FILE manquant dans config.env."
+  echo "  Ajouter : SSH_PRIVATE_KEY_FILE=\"~/.ssh/id_ed25519\""
+  exit 1
+fi
+
+if [[ -z "${SSH_PUBLIC_KEY:-}" ]]; then
+  echo "Erreur : SSH_PUBLIC_KEY manquant dans config.env."
+  echo "  Ajouter : SSH_PUBLIC_KEY=\"\$(cat ~/.ssh/id_ed25519.pub)\""
+  exit 1
+fi
+
 if [[ ! -f "$ONPREM_DIR/terraform.tfvars" ]]; then
   echo "Erreur : $ONPREM_DIR/terraform.tfvars manquant."
   exit 1
@@ -117,6 +129,7 @@ if [[ "$PFSENSE_TEMPLATE_STATUS" == "notfound" ]]; then
   export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
   export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
   export PKR_VAR_template_vm_id="${VM_ID_PFSENSE_TEMPLATE}"
+  export PKR_VAR_pfsense_admin_ssh_public_key="${SSH_PUBLIC_KEY}"
   packer init .
   packer build pfsense-2.7.pkr.hcl
   echo "    Template pfSense créé."
@@ -147,7 +160,7 @@ terraform apply -input=false -auto-approve \
   -var "vault_vm_ip_cidr=${VM_IP_VAULT}" \
   -var "vm_gateway=${VM_GATEWAY}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
-  -var "vm_password=${VM_PASSWORD}"
+  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
 
 echo "    pfSense déployé — attente 30s pour qu'il soit opérationnel..."
 sleep 30
@@ -172,8 +185,13 @@ if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
   export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
   export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
   export PKR_VAR_build_username="${VM_USERNAME}"
-  export PKR_VAR_build_password="${VM_PASSWORD}"
-  export PKR_VAR_build_password_encrypted="${VM_PASSWORD_HASH}"
+  export PKR_VAR_ssh_public_key="${SSH_PUBLIC_KEY}"
+  export PKR_VAR_ssh_bastion_private_key_file="${SSH_PRIVATE_KEY_FILE}"
+  # Password éphémère généré à la volée — utilisé uniquement pour le communicator Packer, jamais stocké
+  _PACKER_PASS="$(openssl rand -base64 16 | tr -d '+/=' | head -c 20)"
+  export PKR_VAR_build_password="${_PACKER_PASS}"
+  export PKR_VAR_build_password_hash="$(echo "${_PACKER_PASS}" | openssl passwd -6 -stdin)"
+  unset _PACKER_PASS
   packer init .
   packer build -on-error=abort ubuntu-22.04.pkr.hcl
   echo "    Template Ubuntu créé — attente 30s pour déverrouillage Proxmox..."
@@ -202,7 +220,7 @@ terraform apply -input=false -auto-approve \
   -var "vault_vm_ip_cidr=${VM_IP_VAULT}" \
   -var "vm_gateway=${VM_GATEWAY}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
-  -var "vm_password=${VM_PASSWORD}"
+  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
 
 echo ""
 echo "==> Déploiement terminé."

@@ -6,7 +6,7 @@ provider "proxmox" {
 
   ssh {
     username    = "root"
-    password = var.proxmox_password
+    private_key = file(pathexpand(var.proxmox_ssh_private_key))
 
     node {
       name    = var.proxmox_node

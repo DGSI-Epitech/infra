@@ -34,6 +34,11 @@ variable "proxmox_storage_vm" { type = string }
 
 variable "template_vm_id" { type = number }
 
+variable "pfsense_admin_ssh_public_key" {
+  type        = string
+  description = "SSH public key to inject into pfSense admin account (base64-encoded in config.xml)"
+}
+
 variable "iso_url" {
   type    = string
   default = "https://atxfiles.netgate.com/mirror/downloads/pfSense-CE-2.7.2-RELEASE-amd64.iso.gz"
@@ -106,7 +111,11 @@ source "proxmox-iso" "pfsense" {
     unmount          = true
   }
 additional_iso_files {
-    cd_files         = ["${path.root}/http/config.xml"]
+    cd_content = {
+      "/config.xml" = templatefile("${path.root}/http/config.xml.pkrtpl.hcl", {
+        admin_authorized_keys_b64 = base64encode(var.pfsense_admin_ssh_public_key)
+      })
+    }
     cd_label         = "PFSENSE_CFG"
     iso_storage_pool = "local"
     device           = "ide3"

@@ -7,7 +7,6 @@ module "services_vm" {
   vm_ip_cidr        = var.vm_ip_cidr
   vm_gateway        = var.vm_gateway
   vm_ssh_public_key = var.vm_ssh_public_key
-  vm_password       = var.vm_password
   storage_iso       = var.storage_iso
   storage_vm        = var.storage_vm
 }
@@ -20,7 +19,6 @@ module "vault_vm" {
   vm_ip_cidr        = var.vault_vm_ip_cidr
   vm_gateway        = var.vm_gateway
   vm_ssh_public_key = var.vm_ssh_public_key
-  vm_password       = var.vm_password
   storage_iso       = var.storage_iso
   storage_vm        = var.storage_vm
 }

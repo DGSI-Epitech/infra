@@ -15,12 +15,18 @@ Procédures et résolution de problèmes pour l'infrastructure on-premise.
 
 ## 1. Premier déploiement
 
-### 1.1 Préparer l'accès SSH
+### 1.1 Préparer la paire de clés SSH
 
-Le provider Terraform `bpg/proxmox` a besoin d'un accès SSH root pour importer les disques.
+L'infrastructure utilise une seule paire de clés ED25519 pour tous les accès (Packer communicator, bastion, cloud-init, Ansible). Aucun password n'est utilisé pour accéder aux VMs.
 
 ```bash
+# Générer la paire de clés si elle n'existe pas
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "lab-infra"
+
+# Copier la clé publique sur Proxmox (requis pour Packer bastion + Terraform bpg provider)
 ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<PROXMOX_HOST>
+
+# Ajouter la clé à l'agent SSH pour la session
 ssh-add ~/.ssh/id_ed25519
 ```
 
@@ -35,7 +41,7 @@ Remplir toutes les valeurs :
 ```bash
 PROXMOX_HOST="51.75.128.134"
 PROXMOX_USER="root@pam"
-PROXMOX_PASSWORD="..."
+PROXMOX_PASSWORD="..."          # Mot de passe root Proxmox (API uniquement)
 PROXMOX_NODE="proxmox-site1"
 PROXMOX_STORAGE_VM="local"
 
@@ -44,6 +50,10 @@ VM_ID_PFSENSE_TEMPLATE=9001
 VM_ID_PFSENSE=1001
 VM_ID_SERVICES=1003
 VM_ID_VAULT=1002
+
+# SSH — utiliser la clé générée ci-dessus
+SSH_PUBLIC_KEY="$(cat ~/.ssh/id_ed25519.pub)"
+SSH_PRIVATE_KEY_FILE="~/.ssh/id_ed25519"
 ```
 
 Pour connaître le nom du nœud Proxmox :
