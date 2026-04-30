@@ -1,3 +1,6 @@
+---
+## --- CONFIGURATION DOCKER & DIRECTORIES ---
+
 - name: Configure Docker daemon DNS
   copy:
     content: |
@@ -35,6 +38,8 @@
     mode: '0644'
   become: true
 
+## --- DEPLOYMENT & READINESS ---
+
 - name: Run Vault container
   community.docker.docker_container:
     name: vault
@@ -61,15 +66,49 @@
     delay: 5
     timeout: 60 
 
+## --- INITIALIZATION LOGIC ---
+
+# 1. On vérifie d'abord si le fichier de clés existe (indispensable pour la suite)
+- name: Check if vault-init.json exists on server
+  stat:
+    path: /root/vault-init.json
+  register: vault_init_file
+  become: true
+
+# 2. On vérifie le statut de Vault via l'API
 - name: Check Vault init status
   uri:
     url: "http://127.0.0.1:8200/v1/sys/init"
     method: GET
   register: vault_init_status
-  retries: 10
-  delay: 3
-  until: vault_init_status.status == 200
 
+# 3. Sécurité : Si Vault est initialisé mais qu'on n'a pas les clés, on reset tout
+- name: Force reset Vault data if keys are missing
+  shell: |
+    docker stop vault
+    rm -rf {{ vault_data_dir }}/*
+    docker start vault
+  become: true
+  when: 
+    - vault_init_status.json.initialized | default(false)
+    - not vault_init_file.stat.exists
+  register: vault_reset
+
+- name: Wait for Vault to be ready after reset
+  wait_for:
+    port: 8200
+    delay: 5
+  when: vault_reset is changed
+
+# 4. On rafraîchit le statut APRES le reset potentiel
+- name: Re-check Vault init status
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/init"
+    method: GET
+  register: vault_init_status
+  when: vault_reset is changed
+
+# 5. Initialisation réelle
 - name: Initialize Vault
   uri:
     url: "http://127.0.0.1:8200/v1/sys/init"
@@ -80,7 +119,8 @@
       secret_threshold: 3
     status_code: 200
   register: vault_init_output
-  when: not vault_init_status.json.initialized
+  when: not (vault_init_status.json.initialized | default(false))
+  changed_when: true
 
 - name: Save Vault init output on the server
   copy:
@@ -90,6 +130,7 @@
     group: root
     mode: "0600"
   when: vault_init_output is changed
+  become: true
 
 - name: Fetch vault-init.json to Ansible controller
   fetch:
@@ -97,6 +138,30 @@
     dest: "{{ playbook_dir }}/../vault-init.json"
     flat: true
   when: vault_init_output is changed
+  become: true
+
+## --- RECOVERY & UNSEAL LOGIC ---
+
+- name: Load existing Vault init output
+  slurp:
+    src: /root/vault-init.json
+  register: slurped_vault_init
+  # On charge si le fichier existe (soit déjà là, soit créé à l'instant)
+  when: vault_init_file.stat.exists or vault_init_output is changed
+  become: true
+
+- name: Set Vault keys fact
+  set_fact:
+    vault_keys: "{{ (vault_init_output.json.keys_base64) if vault_init_output is changed else (slurped_vault_init.content | b64decode | from_json).keys_base64 }}"
+  when: 
+    - vault_init_output is changed or (slurped_vault_init is not skipped)
+  no_log: true
+
+- name: Check Vault seal status
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/seal-status"
+    method: GET
+  register: vault_seal_status
 
 - name: Unseal Vault
   uri:
@@ -106,6 +171,8 @@
     body:
       key: "{{ item }}"
     status_code: 200
-  loop: "{{ vault_init_output.json.keys_base64[:3] }}"
-  when: vault_init_output is changed
+  loop: "{{ vault_keys[:3] }}"
+  when: 
+    - vault_keys is defined
+    - vault_seal_status.json.sealed | default(false)
   no_log: true
