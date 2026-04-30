@@ -1,0 +1,54 @@
+---
+- name: Create ELK directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ elk_config_dir }}"
+    - "{{ elk_config_dir }}/logstash"
+    - "{{ elk_config_dir }}/logstash/pipeline"
+    - "{{ elk_data_dir }}"
+    - "{{ elk_data_dir }}/elasticsearch"
+    - "{{ elk_data_dir }}/logstash"
+  become: true
+
+- name: Deploy Logstash pipeline config
+  template:
+    src: pipeline/logstash.conf.j2
+    dest: "{{ elk_config_dir }}/logstash/pipeline/logstash.conf"
+    mode: '0644'
+  become: true
+
+- name: Deploy Docker Compose file for ELK
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ elk_config_dir }}/docker-compose.yml"
+    mode: '0644'
+  become: true
+
+- name: Install Docker Compose if not present
+  apt:
+    name: docker-compose
+    state: present
+  become: true
+
+- name: Start ELK stack
+  command: docker-compose up -d
+  args:
+    chdir: "{{ elk_config_dir }}"
+  become: true
+
+- name: Wait for Elasticsearch to be ready
+  wait_for:
+    port: 9200
+    host: 127.0.0.1
+    delay: 10
+    timeout: 120
+
+- name: Wait for Kibana to be ready
+  wait_for:
+    port: 5601
+    host: 127.0.0.1
+    delay: 5
+    timeout: 60

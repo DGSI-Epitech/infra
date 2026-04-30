@@ -1,0 +1,7 @@
+---
+- name: Deploy ELK stack
+  hosts: vault
+  become: true
+  roles:
+    - base
+    - elk

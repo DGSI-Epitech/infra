@@ -1,0 +1,6 @@
+---
+elk_version: "8.11.0"
+elk_config_dir: /etc/elk
+elk_data_dir: /opt/elk/data
+elasticsearch_heap_size: 1g
+logstash_heap_size: 512m
