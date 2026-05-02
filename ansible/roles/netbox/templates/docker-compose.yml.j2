@@ -1,0 +1,68 @@
+version: '3.4'
+services:
+
+  # Base de données PostgreSQL — stocke toutes les données NetBox
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: netbox_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis — utilisé pour le cache et les tâches en arrière-plan
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  # Redis séparé pour les tâches longues (exports, webhooks...)
+  redis-cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  # Application NetBox principale
+  netbox:
+    image: netboxcommunity/netbox:{{ netbox_version }}
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - redis-cache
+    ports:
+      - "{{ netbox_port }}:8080"
+    environment:
+      SUPERUSER_NAME: "{{ netbox_superuser }}"
+      SUPERUSER_EMAIL: "{{ netbox_superuser_email }}"
+      SUPERUSER_PASSWORD: "netbox_admin"
+      DB_HOST: postgres
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: netbox_password
+      REDIS_HOST: redis
+      REDIS_CACHE_HOST: redis-cache
+      SECRET_KEY: "{{ netbox_secret_key }}"
+      ALLOWED_HOSTS: "*"
+    volumes:
+      - netbox_media:/opt/netbox/netbox/media
+
+  # Worker pour les tâches en arrière-plan (webhooks, scripts...)
+  netbox-worker:
+    image: netboxcommunity/netbox:{{ netbox_version }}
+    restart: unless-stopped
+    depends_on:
+      - netbox
+    command: /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqworker
+    environment:
+      DB_HOST: postgres
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: netbox_password
+      REDIS_HOST: redis
+      REDIS_CACHE_HOST: redis-cache
+      SECRET_KEY: "{{ netbox_secret_key }}"
+
+volumes:
+  postgres_data:
+  netbox_media:

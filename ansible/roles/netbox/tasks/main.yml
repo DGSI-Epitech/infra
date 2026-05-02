@@ -1,0 +1,38 @@
+- name: Create NetBox directory
+  file:
+    path: "{{ netbox_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Deploy NetBox docker-compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ netbox_dir }}/docker-compose.yml"
+    mode: '0644'
+  become: true
+
+- name: Start NetBox stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ netbox_dir }}"
+    state: present
+    pull: always
+  become: true
+
+- name: Wait for NetBox port to open
+  wait_for:
+    port: "{{ netbox_port }}"
+    host: 127.0.0.1
+    delay: 15
+    timeout: 600
+  become: true
+
+- name: Wait for NetBox API to respond
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/"
+    status_code: [200, 403]
+  register: netbox_health
+  until: netbox_health.status in [200, 403]
+  retries: 40
+  delay: 15
+  become: true
