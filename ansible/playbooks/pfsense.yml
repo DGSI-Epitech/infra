@@ -37,3 +37,29 @@
           - "1.1.1.1"
           - "8.8.8.8"
       become: true
+
+    - name: Créer l'Autorité de Certification (CAPfsense)
+          pfsensible.core.pfsense_ca:
+            name: "CAPfsense"
+            descr: "CA Interne pour Vault TLS"
+            method: "internal"
+            keytype: "RSA"
+            keylen: 4096
+            digest: "sha256"
+            lifetime: 3650
+            dn_country: "FR"
+            dn_state: "Ile-de-France"
+            dn_city: "Paris"
+            dn_organization: "Projet Cloud"
+            dn_commonname: "CAPfsense"
+            state: present
+          become: true
+          register: ca_result
+
+        - name: Sauvegarder le certificat public CA en local
+          ansible.builtin.copy:
+            content: "{{ ca_result.ca.crt }}"
+            dest: "./CAPfsense.crt"
+          delegate_to: localhost
+          become: false
+          when: ca_result.ca is defined

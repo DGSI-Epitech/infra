@@ -5,13 +5,13 @@ all:
         services-vm:
           ansible_host: 172.16.0.10
           ansible_user: ubuntu
-          ansible_ssh_private_key_file: ~/.ssh/id_rsa
+          ansible_password: ubuntu
     vault:
       hosts:
         vault-vm:
-          ansible_host: 172.16.0.243
+          ansible_host: 172.16.0.244
           ansible_user: ubuntu
-          ansible_ssh_private_key_file: ~/.ssh/id_rsa
+          ansible_password: ubuntu
     pfsense:
       hosts:
         pfsense-fw-01:

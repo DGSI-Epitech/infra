@@ -10,6 +10,7 @@ module "services_vm" {
   vm_password       = var.vm_password
   storage_iso       = var.storage_iso
   storage_vm        = var.storage_vm
+  depends_on = [module.vault_vm]      #attendre que Proxmox déverrouille le template 
 }
 
 module "vault_vm" {
