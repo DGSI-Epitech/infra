@@ -107,6 +107,16 @@
 
 # --- Fleet Server ---
 
+- name: Wait for Kibana to be ready
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/status"
+    method: GET
+    status_code: 200
+  register: kibana_status
+  retries: 30
+  delay: 10
+  until: kibana_status.status == 200
+
 - name: Wait for Fleet Server API to be ready
   uri:
     url: "http://127.0.0.1:{{ elk_fleet_port }}/api/status"

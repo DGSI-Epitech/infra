@@ -54,6 +54,12 @@ services:
       elasticsearch:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   fleet-server:
     image: docker.elastic.co/beats/elastic-agent:{{ elk_version }}
@@ -74,7 +80,7 @@ services:
       elasticsearch:
         condition: service_healthy
       kibana:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     user: root
 
