@@ -108,3 +108,53 @@ Le faire via **Ansible (Infrastructure as Code)** change totalement la donne :
 * **Reproductibilité totale :** Si un pfSense crashe ou si l'on doit recréer l'infrastructure (comme on le fait avec Terraform et nos scripts de déploiement), Ansible remonte le VPN en quelques secondes, sans aucune intervention manuelle.
 * **Documentation vivante :** Le code Ansible (`playbooks` et `roles`) sert de documentation exacte de l'état de notre réseau. Tout membre de l'équipe peut lire le code et comprendre le paramétrage du VPN (ports, algorithmes, sous-réseaux).
 * **Idempotence :** Ansible ne fait les modifications que si elles sont nécessaires. Si on relance le script, il vérifiera que le VPN est bien là et ne cassera rien.
+
+
+
+# 🔐 PKI Interne : Autorité de Certification (CA) pfSense & Ansible
+
+Ce document explique le rôle de notre Autorité de Certification (CA) interne hébergée sur pfSense, l'importance du chiffrement TLS (HTTPS) pour nos services, et l'intérêt de gérer cette infrastructure cryptographique par le code avec Ansible.
+
+---
+
+## 🏛️ 1. Qu'est-ce qu'une Autorité de Certification (CA) Interne ?
+
+Dans le monde du web public, on utilise des entités reconnues (comme Let's Encrypt ou DigiCert) pour certifier que "google.com" est bien le vrai site de Google. 
+
+Dans une infrastructure privée ou de laboratoire (comme notre réseau Proxmox/pfSense), nous n'avons pas de noms de domaine publics. Nous devons donc **créer notre propre "Préfecture" capable de délivrer des "Passeports" (les certificats) à nos propres serveurs**. 
+
+C'est exactement le rôle de notre **CA pfSense** :
+* Elle agit comme le tiers de confiance absolu pour tout notre réseau interne.
+* Elle forge et signe cryptographiquement les certificats de nos machines (comme notre serveur Vault).
+* Une fois que le certificat public de cette CA est installé sur nos postes de travail ou nos autres VMs, tous les services signés par elle sont automatiquement reconnus comme légitimes et sécurisés.
+
+---
+
+## 🛡️ 2. Pourquoi délivrer du TLS (HTTPS) pour nos services internes ?
+
+On pourrait se dire : *"C'est un réseau interne privé (LAN), pourquoi s'embêter à chiffrer en HTTPS ?"* 
+
+Dans les standards modernes (et particulièrement dans les architectures Cloud et Zero Trust), le réseau interne n'est plus considéré comme 100% sûr. Le TLS (Transport Layer Security) apporte trois garanties fondamentales :
+
+1. **Confidentialité (Chiffrement en transit) :** Quand on communique avec notre gestionnaire de secrets (Vault) ou une application web, les mots de passe et les tokens transitent sur le réseau. Sans TLS (en HTTP simple), n'importe quelle machine compromise sur le même réseau (via du *sniffing*) pourrait lire ces secrets en clair. Le TLS rend ces données totalement indéchiffrables.
+2. **Authentification (Anti-Usurpation) :** Le TLS garantit que la VM à l'adresse `172.16.0.244` est *réellement* notre serveur Vault, et non un pirate qui aurait usurpé l'adresse IP (attaque ARP Spoofing) pour voler nos identifiants.
+3. **Intégrité :** Le TLS s'assure qu'aucun paquet réseau n'a été altéré ou modifié en cours de route.
+
+---
+
+## 🧠 3. Pourquoi héberger la CA sur pfSense ?
+
+Héberger la clé maître de notre infrastructure sur le routeur est un choix stratégique :
+* **Outil natif robuste :** pfSense intègre un gestionnaire de PKI (Public Key Infrastructure) d'entreprise, extrêmement fiable, basé sur FreeBSD et OpenSSL.
+* **Séparation des rôles :** La CA ne doit pas se trouver sur le même serveur que les applications (comme Vault ou les web services). Si une VM applicative est compromise, la CA (et donc la confiance de tout le réseau) reste protégée derrière le pare-feu.
+* **Centralisation :** pfSense génère les certificats pour le VPN (OpenVPN), pour l'accès à sa propre interface web, et pour les VMs internes. Tout est géré au même endroit.
+
+---
+
+## 🤖 4. La plus-value d'Ansible pour la PKI (Infrastructure as Code)
+
+Gérer des certificats manuellement est souvent source d'erreurs, d'oublis de renouvellement, ou de problèmes de copier-coller. L'automatisation via Ansible transforme cette corvée en un processus fiable :
+
+* **Génération déterministe :** Le playbook Ansible définit exactement les caractéristiques de la CA (algorithme RSA 4096 bits, SHA-256, validité de 10 ans, informations de l'organisation). Il n'y a pas d'erreur humaine possible.
+* **Extraction et distribution dynamiques :** L'énorme avantage d'Ansible est sa capacité à parler à pfSense pour créer la CA, extraire instantanément le certificat public généré, et l'injecter directement dans nos futures machines (comme Vault) au sein du même pipeline de déploiement.
+* **Sécurité des manipulations :** Les certificats et les clés ne traînent pas sur les postes des développeurs, tout se fait de machine à machine (de Debian vers pfSense via SSH sécurisé).
