@@ -1,0 +1,5 @@
+---
+elastic_agent_version: "8.13.0"
+fleet_server_url: "http://{{ hostvars[groups['ops'][0]]['ansible_host'] }}:8220"
+vault_addr: "http://{{ hostvars[groups['ops'][0]]['ansible_host'] }}:8200"
+vault_fleet_token_path: "secret/data/elk/fleet-enrollment-token"

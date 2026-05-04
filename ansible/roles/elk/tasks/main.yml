@@ -104,3 +104,89 @@
     rule: allow
     port: "{{ elk_logstash_beats_port | string }}"
     proto: tcp
+
+# --- Fleet Server ---
+
+- name: Wait for Fleet Server API to be ready
+  uri:
+    url: "http://127.0.0.1:{{ elk_fleet_port }}/api/status"
+    method: GET
+    status_code: 200
+  register: fleet_status
+  retries: 30
+  delay: 10
+  until: fleet_status.status == 200
+
+- name: Trigger Kibana Fleet initialization
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/setup"
+    method: POST
+    headers:
+      kbn-xsrf: "true"
+    status_code: [200, 201]
+  register: fleet_setup
+  retries: 30
+  delay: 10
+  until: fleet_setup.status in [200, 201]
+
+- name: Get Fleet enrollment token from Kibana
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/enrollment_api_keys"
+    method: GET
+    headers:
+      kbn-xsrf: "true"
+    status_code: 200
+  register: fleet_keys
+  retries: 10
+  delay: 10
+  until: fleet_keys.status == 200 and (fleet_keys.json.items | default([]) | length) > 0
+
+- name: Set fleet enrollment token fact
+  set_fact:
+    fleet_enrollment_token: "{{ fleet_keys.json.items[0].api_key }}"
+  no_log: true
+
+# --- Écriture du token dans Vault ---
+
+- name: Read vault-init.json
+  slurp:
+    src: /root/vault-init.json
+  become: true
+  register: vault_init_raw
+
+- name: Set vault root token
+  set_fact:
+    vault_root_token: "{{ (vault_init_raw.content | b64decode | from_json).root_token }}"
+  no_log: true
+
+- name: Enable KV secrets engine in Vault (idempotent)
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/mounts/secret"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      type: kv
+      options:
+        version: "2"
+    status_code: [200, 204, 400]
+
+- name: Store Fleet enrollment token in Vault
+  uri:
+    url: "http://127.0.0.1:8200/v1/secret/data/elk/fleet-enrollment-token"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      data:
+        value: "{{ fleet_enrollment_token }}"
+    status_code: [200, 204]
+  no_log: true
+
+- name: Allow Fleet Server port
+  ufw:
+    rule: allow
+    port: "{{ elk_fleet_port | string }}"
+    proto: tcp

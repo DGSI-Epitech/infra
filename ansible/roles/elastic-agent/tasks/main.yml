@@ -1,0 +1,74 @@
+---
+# Lire le root token Vault depuis ops-vm
+- name: Slurp vault-init.json from ops-vm
+  slurp:
+    src: /root/vault-init.json
+  become: true
+  delegate_to: "{{ groups['ops'][0] }}"
+  register: vault_init_raw
+
+- name: Set vault root token
+  set_fact:
+    vault_root_token: "{{ (vault_init_raw.content | b64decode | from_json).root_token }}"
+  no_log: true
+
+# Lire le Fleet enrollment token depuis Vault
+- name: Read Fleet enrollment token from Vault
+  uri:
+    url: "{{ vault_addr }}/v1/{{ vault_fleet_token_path }}"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    status_code: 200
+  register: fleet_token_resp
+  delegate_to: "{{ groups['ops'][0] }}"
+  no_log: true
+
+- name: Set enrollment token
+  set_fact:
+    elastic_agent_enrollment_token: "{{ fleet_token_resp.json.data.data.value }}"
+  no_log: true
+
+# Installer elastic-agent via apt Elastic
+- name: Add Elastic GPG key
+  get_url:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    dest: /usr/share/keyrings/elastic-archive-keyring.gpg
+    mode: "0644"
+
+- name: Add Elastic apt repository
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/elastic-archive-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main"
+    state: present
+    filename: elastic-8.x
+
+- name: Install elastic-agent
+  apt:
+    name: "elastic-agent={{ elastic_agent_version }}"
+    state: present
+    update_cache: true
+
+# Vérifier si déjà enrôlé avant d'enrôler (la commande n'est pas idempotente)
+- name: Check elastic-agent enrollment status
+  command: elastic-agent status
+  register: agent_status
+  failed_when: false
+  changed_when: false
+
+- name: Enroll elastic-agent into Fleet
+  command: >
+    elastic-agent enroll
+    --url="{{ fleet_server_url }}"
+    --enrollment-token="{{ elastic_agent_enrollment_token }}"
+    --insecure
+    --non-interactive
+  register: enroll_result
+  changed_when: "'successfully enrolled' in enroll_result.stdout"
+  when: agent_status.rc != 0 or 'Healthy' not in (agent_status.stdout | default(''))
+  no_log: true
+
+- name: Enable and start elastic-agent
+  systemd:
+    name: elastic-agent
+    state: started
+    enabled: true

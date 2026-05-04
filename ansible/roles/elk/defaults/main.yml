@@ -10,3 +10,4 @@ elk_es_port: 9200
 elk_es_cluster_port: 9300
 elk_kibana_port: 5601
 elk_logstash_beats_port: 5044
+elk_fleet_port: 8220

@@ -81,8 +81,8 @@ jobs:
           ANSIBLE_PRIVATE_KEY_FILE: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY_PATH }}
           OPS_IP: ${{ needs.terraform.outputs.ops_ip }}
 
-      - name: Deploy Filebeat on services-vm
-        run: ansible-playbook playbooks/filebeat.yml -i inventory/onprem.py
+      - name: Deploy Elastic Agents
+        run: ansible-playbook playbooks/elastic-agent.yml -i inventory/onprem.py
         working-directory: ansible
         env:
           ANSIBLE_PRIVATE_KEY_FILE: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY_PATH }}
