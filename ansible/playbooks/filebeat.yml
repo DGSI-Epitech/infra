@@ -1,0 +1,11 @@
+- name: Gather ops-vm facts for logstash host resolution
+  hosts: ops
+  gather_facts: true
+
+- name: Deploy Filebeat
+  hosts: services
+  become: true
+  roles:
+    - filebeat
+  vars:
+    elk_logstash_host: "{{ hostvars[groups['ops'][0]]['ansible_host'] }}"

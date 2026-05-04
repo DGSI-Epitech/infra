@@ -27,11 +27,12 @@ proxmox_host      = env.get("PROXMOX_HOST", "")
 proxmox2_host     = env.get("PROXMOX2_HOST", "")
 ssh_key           = env.get("SSH_PRIVATE_KEY_FILE", "~/.ssh/id_ed25519")
 vm_user           = env.get("VM_USERNAME", "ubuntu")
-vault_ip          = os.environ.get("VAULT_IP") or env.get("VM_IP_VAULT", "").split("/")[0]
+ops_ip       = os.environ.get("OPS_IP") or env.get("VM_IP_OPS", "").split("/")[0]
 services_ip       = os.environ.get("SERVICES_IP") or env.get("VM_IP_SERVICES", "").split("/")[0]
 pfsense_op_wan    = env.get("PFSENSE_OP_WAN", "")    # 5.196.45.8  — accès direct WAN
 pfsense_cloud_wan = env.get("PFSENSE_CLOUD_WAN", "") # 5.196.50.52 — accès direct WAN
 pfsense_password  = env.get("PFSENSE_PASSWORD", "pfsense")
+gateway      = env.get("VM_GATEWAY", "")
 proxy_jump        = f"-o StrictHostKeyChecking=no -o ProxyJump=root@{proxmox_host}"
 
 pfsense_common = {
@@ -43,8 +44,8 @@ pfsense_common = {
 
 # Format JSON attendu par Ansible pour un script d'inventaire dynamique
 inventory = {
-    "vault": {
-        "hosts": ["vault-vm"]
+    "ops": {
+        "hosts": ["ops-vm"]
     },
     "services": {
         "hosts": ["services-vm"]
@@ -57,9 +58,9 @@ inventory = {
     },
     "_meta": {
         "hostvars": {
-            "vault-vm": {
-                "ansible_host":                vault_ip,
-                "ansible_user":                vm_user,
+            "ops-vm": {
+                "ansible_host":                ops_ip,
+                "ansible_user":                "ubuntu",
                 "ansible_ssh_private_key_file": ssh_key,
                 "ansible_ssh_common_args":      proxy_jump,
             },

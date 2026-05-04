@@ -1,0 +1,5 @@
+- name: Deploy ELK stack
+  hosts: ops
+  become: true
+  roles:
+    - elk

@@ -17,6 +17,11 @@
 
     "tf:check": "npm run tf:fmt && npm run tf:validate:onprem && npm run tf:validate:remote",
 
+    "ansible:vault":    "cd ansible && ansible-playbook playbooks/vault.yml",
+    "ansible:elk":      "cd ansible && ansible-playbook playbooks/elk.yml",
+    "ansible:filebeat": "cd ansible && ansible-playbook playbooks/filebeat.yml",
+    "ansible:all":      "npm run ansible:vault && npm run ansible:elk && npm run ansible:filebeat",
+
     "deploy": "bash scripts/deploy.sh",
     "destroy": "bash scripts/destroy.sh"
   }

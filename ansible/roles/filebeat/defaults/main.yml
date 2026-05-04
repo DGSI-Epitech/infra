@@ -1,0 +1,4 @@
+---
+filebeat_version: "8.13.0"
+elk_logstash_host: "127.0.0.1"
+elk_logstash_port: 5044

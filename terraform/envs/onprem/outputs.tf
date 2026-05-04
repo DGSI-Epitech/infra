@@ -8,12 +8,12 @@ output "services_vm_id" {
   value       = module.services_vm.vm_id
 }
 
-output "vault_vm_ip" {
-  description = "Vault VM IP address"
-  value       = module.vault_vm.ip_address
+output "ops_vm_ip" {
+  description = "Ops VM IP address"
+  value       = module.ops_vm.ip_address
 }
 
-output "vault_vm_id" {
-  description = "Vault VM Proxmox ID"
-  value       = module.vault_vm.vm_id
+output "ops_vm_id" {
+  description = "Ops VM Proxmox ID"
+  value       = module.ops_vm.vm_id
 }

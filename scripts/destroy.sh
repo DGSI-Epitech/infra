@@ -70,7 +70,7 @@ echo ""
 echo "==> Suppression des VMs..."
 destroy_vm "${VM_ID_PFSENSE}"
 destroy_vm "${VM_ID_SERVICES}"
-destroy_vm "${VM_ID_VAULT}"
+destroy_vm "${VM_ID_OPS}"
 
 echo ""
 echo "==> Suppression des templates..."

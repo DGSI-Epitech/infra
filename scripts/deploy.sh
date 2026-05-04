@@ -66,8 +66,8 @@ echo "    Authentifié."
 # --- Nettoyage des VMs orphelines ---
 
 echo ""
-echo "==> Nettoyage des VMs (${VM_ID_PFSENSE}, ${VM_ID_SERVICES}, ${VM_ID_VAULT})..."
-for VMID in "${VM_ID_PFSENSE}" "${VM_ID_SERVICES}" "${VM_ID_VAULT}"; do
+echo "==> Nettoyage des VMs (${VM_ID_PFSENSE}, ${VM_ID_SERVICES}, ${VM_ID_OPS})..."
+for VMID in "${VM_ID_PFSENSE}" "${VM_ID_SERVICES}" "${VM_ID_OPS}"; do
   STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
     "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VMID}/status/current" 2>/dev/null | \
     python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
@@ -154,7 +154,7 @@ terraform apply -input=false -auto-approve \
   -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
   -var "services_vm_id=${VM_ID_SERVICES}" \
-  -var "vault_vm_id=${VM_ID_VAULT}" \
+  -var "ops_vm_id=${VM_ID_OPS}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
@@ -211,7 +211,7 @@ terraform apply -input=false -auto-approve \
   -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
   -var "services_vm_id=${VM_ID_SERVICES}" \
-  -var "vault_vm_id=${VM_ID_VAULT}" \
+  -var "ops_vm_id=${VM_ID_OPS}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
@@ -336,23 +336,46 @@ wait_for_ssh() {
   echo "    ${label} accessible en SSH."
 }
 
-wait_for_agent "${VM_ID_VAULT}"    "vault-vm"
+wait_for_agent "${VM_ID_OPS}"      "ops-vm"
 wait_for_agent "${VM_ID_SERVICES}" "services-vm"
 
-inject_ssh_key "${VM_ID_VAULT}"    "vault-vm"
+inject_ssh_key "${VM_ID_OPS}"      "ops-vm"
 inject_ssh_key "${VM_ID_SERVICES}" "services-vm"
 
-VAULT_IP=$(get_vm_ip "${VM_ID_VAULT}"    "vault-vm")
+OPS_IP=$(get_vm_ip "${VM_ID_OPS}"       "ops-vm")
 SERVICES_IP=$(get_vm_ip "${VM_ID_SERVICES}" "services-vm")
-export VAULT_IP SERVICES_IP
+export OPS_IP SERVICES_IP
 
-wait_for_ssh "${VAULT_IP}"    "vault-vm"
+wait_for_ssh "${OPS_IP}"      "ops-vm"
 wait_for_ssh "${SERVICES_IP}" "services-vm"
+
+# Étend la partition + filesystem si le disque est plus grand que la partition
+extend_disk() {
+  local host="$1"
+  local label="$2"
+  echo ""
+  echo "==> Extension partition disque ${label} (${host})..."
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+      -o "ProxyJump=root@${PROXMOX_HOST}" \
+      -i "${SSH_PRIVATE_KEY_FILE}" \
+      ubuntu@"${host}" "
+    sudo growpart /dev/vda 3 2>/dev/null || true
+    sudo pvresize /dev/vda3 2>/dev/null || true
+    sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
+    sudo resize2fs /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
+  " 2>/dev/null || true
+  echo "    Partition ${label} étendue."
+}
+
+extend_disk "${OPS_IP}"      "ops-vm"
+extend_disk "${SERVICES_IP}" "services-vm"
 
 echo ""
 echo "==> Lancement Ansible..."
 cd "$REPO_ROOT/ansible"
-ansible-playbook playbooks/vault.yml -i inventory/onprem.py
+ansible-playbook playbooks/vault.yml    -i inventory/onprem.py
+ansible-playbook playbooks/elk.yml      -i inventory/onprem.py
+ansible-playbook playbooks/filebeat.yml -i inventory/onprem.py
 
 echo ""
 echo "==> Déploiement complet."

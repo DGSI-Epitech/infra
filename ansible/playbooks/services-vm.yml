@@ -1,4 +1,3 @@
----
 - name: Configure services VM
   hosts: services
   become: true

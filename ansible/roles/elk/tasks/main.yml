@@ -1,0 +1,106 @@
+---
+- name: Set vm.max_map_count for Elasticsearch
+  sysctl:
+    name: vm.max_map_count
+    value: "262144"
+    state: present
+    reload: true
+
+- name: Create ELK directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ elk_dir }}",                          mode: "0755" }
+    - { path: "{{ elk_dir }}/elasticsearch/config",     mode: "0755" }
+    - { path: "{{ elk_dir }}/elasticsearch/data",       mode: "0755" }
+    - { path: "{{ elk_dir }}/logstash/config",          mode: "0755" }
+    - { path: "{{ elk_dir }}/logstash/pipeline",        mode: "0755" }
+    - { path: "{{ elk_dir }}/kibana/config",            mode: "0755" }
+
+- name: Set Elasticsearch data directory ownership
+  file:
+    path: "{{ elk_dir }}/elasticsearch/data"
+    state: directory
+    owner: "1000"
+    group: "1000"
+
+- name: Deploy Elasticsearch config
+  template:
+    src: elasticsearch.yml.j2
+    dest: "{{ elk_dir }}/elasticsearch/config/elasticsearch.yml"
+    mode: "0644"
+  notify: restart elk
+
+- name: Deploy Logstash config
+  template:
+    src: logstash.yml.j2
+    dest: "{{ elk_dir }}/logstash/config/logstash.yml"
+    mode: "0644"
+  notify: restart elk
+
+- name: Deploy Logstash pipeline
+  template:
+    src: pipeline.conf.j2
+    dest: "{{ elk_dir }}/logstash/pipeline/main.conf"
+    mode: "0644"
+  notify: restart elk
+
+- name: Deploy Kibana config
+  template:
+    src: kibana.yml.j2
+    dest: "{{ elk_dir }}/kibana/config/kibana.yml"
+    mode: "0644"
+  notify: restart elk
+
+- name: Deploy docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ elk_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: restart elk
+
+- name: Start ELK stack
+  command: docker compose up -d
+  args:
+    chdir: "{{ elk_dir }}"
+  register: compose_up
+  changed_when: >
+    'Started' in compose_up.stdout or
+    'Created' in compose_up.stdout or
+    'Recreated' in compose_up.stdout
+
+- name: Wait for Elasticsearch to be ready
+  uri:
+    url: "http://127.0.0.1:{{ elk_es_port }}/_cluster/health"
+    method: GET
+    status_code: 200
+  register: es_health
+  retries: 20
+  delay: 10
+  until: es_health.status == 200
+
+- name: Allow Elasticsearch API
+  ufw:
+    rule: allow
+    port: "{{ elk_es_port | string }}"
+    proto: tcp
+
+- name: Allow Elasticsearch cluster
+  ufw:
+    rule: allow
+    port: "{{ elk_es_cluster_port | string }}"
+    proto: tcp
+
+- name: Allow Kibana
+  ufw:
+    rule: allow
+    port: "{{ elk_kibana_port | string }}"
+    proto: tcp
+
+- name: Allow Logstash Beats input
+  ufw:
+    rule: allow
+    port: "{{ elk_logstash_beats_port | string }}"
+    proto: tcp

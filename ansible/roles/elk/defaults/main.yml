@@ -1,0 +1,12 @@
+---
+elk_version: "8.13.0"
+elk_dir: /opt/elk
+elk_cluster_name: "lab-elk"
+
+elk_es_heap_size: "2g"
+elk_ls_heap_size: "1g"
+
+elk_es_port: 9200
+elk_es_cluster_port: 9300
+elk_kibana_port: 5601
+elk_logstash_beats_port: 5044
