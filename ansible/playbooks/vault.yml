@@ -1,6 +1,5 @@
----
 - name: Deploy and initialize Vault
-  hosts: vault
+  hosts: ops
   become: true
   roles:
     - base

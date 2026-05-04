@@ -16,7 +16,7 @@ jobs:
       run:
         working-directory: terraform/envs/onprem
     outputs:
-      vault_ip: ${{ steps.outputs.outputs.vault_ip }}
+      ops_ip: ${{ steps.outputs.outputs.ops_ip }}
 
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
 
       - name: Capture outputs
         id: outputs
-        run: echo "vault_ip=$(terraform output -raw vault_vm_ip)" >> "$GITHUB_OUTPUT"
+        run: echo "ops_ip=$(terraform output -raw ops_vm_ip)" >> "$GITHUB_OUTPUT"
         env:
           TF_VAR_proxmox_api_token: ${{ secrets.PROXMOX_API_TOKEN }}
 
@@ -73,6 +73,20 @@ jobs:
         working-directory: ansible
         env:
           ANSIBLE_PRIVATE_KEY_FILE: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY_PATH }}
+
+      - name: Deploy ELK stack
+        run: ansible-playbook playbooks/elk.yml -i inventory/onprem.py
+        working-directory: ansible
+        env:
+          ANSIBLE_PRIVATE_KEY_FILE: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY_PATH }}
+          OPS_IP: ${{ needs.terraform.outputs.ops_ip }}
+
+      - name: Deploy Filebeat on services-vm
+        run: ansible-playbook playbooks/filebeat.yml -i inventory/onprem.py
+        working-directory: ansible
+        env:
+          ANSIBLE_PRIVATE_KEY_FILE: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY_PATH }}
+          OPS_IP: ${{ needs.terraform.outputs.ops_ip }}
 
       - name: Upload vault-init.json as artifact
         uses: actions/upload-artifact@v4

@@ -17,7 +17,7 @@ Trois endroits avaient des passwords en dur ou transmis en clair dans le code :
 
 ### Décision
 
-**SSH key-only** sur toute l'infrastructure bootstrap. Une seule paire de clés (`~/.ssh/id_ed25519`) couvre tous les accès machine.
+**SSH key-only** sur toute l'infrastructure bootstrap. Une seule paire de clés (`~/.ssh/id_ed25519`) couvre tous les accès : Packer bastion, Terraform provider bpg, injection QEMU agent, Ansible.
 
 ### Pourquoi pas Ansible Vault ou un gestionnaire de secrets tiers ?
 
@@ -66,58 +66,40 @@ Solution : `inventory/onprem.py` lit config.env à chaque exécution. IPs, Proxy
 
 ### Problème
 
-`config.env` exigeait de déclarer `VM_IP_SERVICES` et `VM_IP_VAULT` avant le déploiement. Ces IPs étaient passées à Terraform qui les injectait dans cloud-init. Problème : pfSense est déployé **avant** les VMs Ubuntu (phase 1 Terraform), et c'est son DHCP qui gouverne le LAN `172.16.0.0/24`. Il est impossible de garantir à l'avance quelle IP sera assignée — le pool DHCP peut avoir changé, la plage peut varier selon l'environnement, et forcer une IP statique crée des conflits si une autre VM a déjà obtenu cette adresse.
+`config.env` exigeait de déclarer `VM_IP_SERVICES` et `VM_IP_OPS` avant le déploiement. Ces IPs étaient passées à Terraform qui les injectait dans cloud-init. Problème : pfSense est déployé **avant** les VMs Ubuntu (phase 1 Terraform), et c'est son DHCP qui gouverne le LAN `172.16.0.0/24`. Il est impossible de garantir à l'avance quelle IP sera assignée — le pool DHCP peut avoir changé, la plage peut varier selon l'environnement, et forcer une IP statique crée des conflits si une autre VM a déjà obtenu cette adresse.
 
 ### Décision
 
-Les VMs `vault-vm` et `services-vm` utilisent **DHCP** (`address = "dhcp"` dans cloud-init). L'IP réelle est découverte dynamiquement après le boot via l'API QEMU guest agent de Proxmox, sans aucune valeur hardcodée.
+Les VMs `ops-vm` et `services-vm` utilisent **DHCP** (`address = "dhcp"` dans cloud-init). L'IP réelle est découverte dynamiquement après le boot via l'API QEMU guest agent de Proxmox, sans aucune valeur hardcodée.
 
 ### Implémentation
 
 | Composant | Avant | Après |
 |---|---|---|
-| `modules/vault-vm/main.tf` | `address = var.vm_ip_cidr` | `address = "dhcp"` |
+| `modules/ops-vm/main.tf` | `address = var.vm_ip_cidr` | `address = "dhcp"` |
 | `modules/services-vm/main.tf` | `address = var.vm_ip_cidr` | `address = "dhcp"` |
 | `modules/*/outputs.tf` | `split("/", var.vm_ip_cidr)[0]` | `proxmox_virtual_environment_vm.*.ipv4_addresses` |
-| `deploy.sh` | `VAULT_IP="${VM_IP_VAULT%%/*}"` | `get_vm_ip()` via `/agent/network-get-interfaces` |
-| `inventory/onprem.py` | `env.get("VM_IP_VAULT")` | `os.environ.get("VAULT_IP") or env.get("VM_IP_VAULT")` |
-| `config.env` | `VM_IP_SERVICES`, `VM_IP_VAULT` requis | supprimés |
+| `deploy.sh` | `OPS_IP="${VM_IP_OPS%%/*}"` | `get_vm_ip()` via `/agent/network-get-interfaces` |
+| `inventory/onprem.py` | `env.get("VM_IP_OPS")` | `os.environ.get("OPS_IP") or env.get("VM_IP_OPS")` |
+| `config.env` | `VM_IP_SERVICES`, `VM_IP_OPS` requis | supprimés |
 
 ### Comment `get_vm_ip()` fonctionne
 
 Après `wait_for_agent`, `deploy.sh` appelle l'endpoint Proxmox `GET /nodes/{node}/qemu/{vmid}/agent/network-get-interfaces`. Le QEMU guest agent retourne toutes les interfaces réseau de la VM avec leurs IPs. La fonction filtre `lo`, les adresses loopback (`127.x`) et link-local (`169.254.x`), et retourne la première IPv4 valide trouvée.
 
-L'IP est exportée dans `$VAULT_IP` / `$SERVICES_IP` avant le lancement d'Ansible. `inventory/onprem.py` lit ces variables d'environnement en priorité.
+L'IP est exportée dans `$OPS_IP` / `$SERVICES_IP` avant le lancement d'Ansible. `inventory/onprem.py` lit ces variables d'environnement en priorité.
 
 ### Lancement Ansible manuel sans `deploy.sh`
 
 Si tu relances Ansible seul (hors deploy complet), exporte les IPs à la main d'abord :
 
 ```bash
-export VAULT_IP=172.16.0.x
+export OPS_IP=172.16.0.x
 export SERVICES_IP=172.16.0.y
 ansible-playbook playbooks/vault.yml -i inventory/onprem.py
 ```
 
-Ou renseigne `VM_IP_VAULT` / `VM_IP_SERVICES` dans `config.env` comme fallback — `onprem.py` les lira si les variables d'env ne sont pas définies.
-
-### Variables supprimées de config.env
-
-- `VM_IP_SERVICES`
-- `VM_IP_VAULT`
-- `VM_GATEWAY` — conservé uniquement pour l'entrée pfSense dans l'inventaire Ansible (`pfsense-fw-01`), plus utilisé dans Terraform
-
-### Pourquoi ProxyJump pour Ansible ?
-
-Les VMs Ubuntu (`vault-vm`, `services-vm`) sont sur `vmbr1`, un réseau LAN privé derrière pfSense. Inaccessibles directement depuis la machine de l'opérateur. Proxmox (IP publique) sert de saut SSH (`ProxyJump=root@PROXMOX_HOST`).
-
-### Variables supprimées de config.env
-
-- `VM_PASSWORD`, `VM_PASSWORD_HASH` — plus utilisés nulle part
-
-### Variables ajoutées à config.env
-
-- `SSH_PRIVATE_KEY_FILE` — chemin vers la clé privée (ex: `~/.ssh/id_ed25519`)
+Ou renseigne `VM_IP_OPS` / `VM_IP_SERVICES` dans `config.env` comme fallback — `onprem.py` les lira si les variables d'env ne sont pas définies.
 
 ### Voir aussi
 
@@ -155,3 +137,141 @@ pfSense n'a pas de mécanisme de cloud-init. L'installation manuelle est répét
 ### Pourquoi `communicator = "none"` pour pfSense ?
 
 pfSense (FreeBSD) n'a pas Python ni d'environnement compatible avec les provisioners Packer. Toute la configuration est faite via le CD virtuel. Aucune connexion SSH post-install n'est nécessaire.
+
+---
+
+## Stack ELK sur ops-vm — centralisation des logs
+
+**Date :** 2026-05-03
+**Branche :** `adding-stack-ELK`
+
+### Problème
+
+L'infrastructure n'avait aucune visibilité sur ce qui se passait sur les VMs : pas de logs centralisés, pas d'interface de recherche, pas d'alerting possible. Diagnostiquer un problème nécessitait de se connecter en SSH sur chaque VM et de lire les fichiers de logs manuellement.
+
+### Décision
+
+Déployer la stack ELK (Elasticsearch + Logstash + Kibana) en **Docker Compose sur ops-vm**, avec Filebeat sur `services-vm` pour l'envoi des logs.
+
+### Pourquoi ELK et pas une alternative ?
+
+- **ELK** (Elastic Stack) : standard de l'industrie pour la centralisation de logs. Kibana fournit une UI de recherche et visualisation complète. Large adoption = documentation abondante.
+- **Loki + Grafana** : alternative plus légère, mais Loki est un agrégateur de logs sans indexation full-text native — moins adapté pour rechercher dans des logs structurés.
+- **Graylog** : bonne alternative mais dépend de MongoDB + Elasticsearch, donc plus lourd que ELK seul.
+
+ELK couvre les besoins du lab : ingestion, indexation, recherche, visualisation.
+
+### Pourquoi Docker Compose pour ELK et non des packages système ?
+
+Les packages apt Elastic nécessitent des configurations système complexes (JVM, systemd units, certificats). Docker Compose permet de :
+
+- Versionner l'ensemble de la configuration dans un seul fichier `docker-compose.yml`
+- Démarrer/arrêter/mettre à jour les 3 services en une commande
+- Isoler les processus ELK du système hôte
+- Gérer les dépendances de démarrage (ES doit être `green` avant que Logstash et Kibana démarrent) via `healthcheck` + `depends_on: condition: service_healthy`
+
+### Pourquoi Vault et ELK sur la même VM (ops-vm) ?
+
+Le lab tourne sur un seul Proxmox avec des ressources limitées. Créer une VM dédiée pour ELK gaspillerait le budget RAM/CPU. Les deux stacks partagent le même socle Docker et la même VM avec 4 vCPUs et 8 Go de RAM.
+
+Vault tourne en **container Docker standalone** (pas dans le Compose ELK) pour rester indépendant — un `docker compose restart` ne touche pas Vault.
+
+### Pourquoi pas Docker-in-Docker (DinD) ?
+
+DinD (un container Docker qui contient d'autres containers) est un anti-pattern : problèmes de sécurité (privilèges étendus), complexité réseau, isolation incorrecte. La bonne approche est d'utiliser Docker Compose directement sur l'hôte pour les groupes de services liés.
+
+### Problème disque — partition non étendue sur clone Ubuntu
+
+**Symptôme** : `no space left on device` lors du `docker pull` des images ELK, alors que le disque Proxmox était bien configuré à 30 Go dans Terraform.
+
+**Cause** : Le template Ubuntu a une partition de 8 Go. Quand Terraform clone le template avec `size = 30`, Proxmox redimensionne le disque virtuel (le fichier `.qcow2` devient 30 Go), mais **les partitions et le filesystem à l'intérieur de la VM restent à 8 Go**. cloud-init avec le module `growpart` était censé gérer ça, mais ne s'est pas déclenché sur ce clone.
+
+**Solution** : `deploy.sh` exécute `growpart` + `pvresize` + `lvextend` + `resize2fs` via SSH immédiatement après `wait_for_ssh`, avant le lancement d'Ansible :
+
+```bash
+extend_disk() {
+  local host="$1"
+  ssh ... ubuntu@"${host}" "
+    sudo growpart /dev/vda 3 2>/dev/null || true
+    sudo pvresize /dev/vda3 2>/dev/null || true
+    sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
+    sudo resize2fs /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
+  "
+}
+```
+
+Cette séquence fonctionne sur le layout LVM standard d'Ubuntu 22.04 autoinstall (`/dev/vda3` → PV LVM → `ubuntu-vg/ubuntu-lv`).
+
+### Architecture des containers sur ops-vm
+
+```
+ops-vm (172.16.0.242)
+│
+├── vault (Docker standalone)
+│     hashicorp/vault:latest
+│     Port: 8200
+│     Volume: /opt/vault/data → /vault/file
+│
+└── elk-net (Docker network)
+      ├── elasticsearch (elasticsearch:8.13.0)
+      │     Port: 9200, 9300
+      │     Volume: /opt/elk/elasticsearch/data → /usr/share/elasticsearch/data
+      │     Healthcheck: GET /_cluster/health?wait_for_status=green
+      │
+      ├── logstash (logstash:8.13.0)   [démarre après ES green]
+      │     Port: 5044 (Beats input)
+      │     Pipeline: syslog tag → index logstash-YYYY.MM.dd
+      │
+      └── kibana (kibana:8.13.0)       [démarre après ES green]
+            Port: 5601
+```
+
+### Flux de logs
+
+```
+services-vm
+  └── Filebeat
+        ├── input: /var/log/syslog
+        └── input: /var/lib/docker/containers/**/*.log
+              │
+              │  TCP 5044 (Beats protocol)
+              ▼
+ops-vm — Logstash (port 5044)
+  └── pipeline.conf : beats input → elasticsearch output
+              │
+              ▼
+        Elasticsearch (port 9200)
+        index: logstash-YYYY.MM.dd
+              │
+              ▼
+        Kibana (port 5601)
+        Data view: logstash-*
+```
+
+### Résolution dynamique de l'IP ops-vm pour Filebeat
+
+Filebeat sur `services-vm` doit connaître l'IP de Logstash sur `ops-vm`. Cette IP est assignée par DHCP et peut changer à chaque déploiement. Le playbook `filebeat.yml` la résout dynamiquement :
+
+```yaml
+- name: Gather ops-vm facts for logstash host resolution
+  hosts: ops
+  gather_facts: true
+
+- name: Deploy Filebeat
+  hosts: services
+  vars:
+    elk_logstash_host: "{{ hostvars[groups['ops'][0]]['ansible_host'] }}"
+```
+
+`ansible_host` de ops-vm (lu depuis l'inventaire dynamique, lui-même lu depuis `$OPS_IP` ou `config.env`) est injecté dans `filebeat.yml.j2` comme destination Logstash. Aucune IP hardcodée nulle part.
+
+### Renommage vault-vm → ops-vm
+
+La VM s'appelait initialement `vault-vm` car elle n'hébergeait que Vault. Après l'ajout de la stack ELK, ce nom ne reflétait plus son contenu. Elle a été renommée `ops-vm` (operations VM) : terme générique qui couvre les services transverses (secrets management + observabilité) sans être lié à un outil spécifique.
+
+Fichiers modifiés lors du renommage :
+- `terraform/modules/vault-vm/` → `terraform/modules/ops-vm/`
+- Toutes les références `vault_vm` → `ops_vm` dans Terraform
+- Variable config.env `VM_ID_VAULT` → `VM_ID_OPS`
+- Groupe Ansible `vault` → `ops`, host `vault-vm` → `ops-vm`
+- Variable d'environnement `VAULT_IP` → `OPS_IP` dans deploy.sh et workflow CI

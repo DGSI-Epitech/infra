@@ -10,6 +10,5 @@ template_vm_id       = 9001
 vm_ip_cidr           = "192.168.100.50/24"
 vm_gateway           = "192.168.100.1"
 vm_ssh_public_key    = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-# --- Vault ---
-vault_vm_id          = 201
-vault_vm_ip_cidr     = "192.168.100.51/24"
+# --- Ops VM (Vault + ELK) ---
+ops_vm_id            = 201
