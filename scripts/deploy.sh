@@ -37,9 +37,26 @@ if [[ -z "${SSH_PUBLIC_KEY:-}" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$ONPREM_DIR/terraform.tfvars" ]]; then
-  echo "Erreur : $ONPREM_DIR/terraform.tfvars manquant."
-  exit 1
+# --- Injection clé SSH sur Proxmox (bootstrap automatique) ---
+
+echo ""
+echo "==> Vérification accès SSH Proxmox..."
+SSH_KEY_FILE="${SSH_PRIVATE_KEY_FILE/#\~/$HOME}"
+if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o PasswordAuthentication=no \
+       -o BatchMode=yes -i "${SSH_KEY_FILE}" root@"${PROXMOX_HOST}" exit 2>/dev/null; then
+  echo "    Clé SSH déjà présente sur Proxmox."
+else
+  echo "    Clé SSH absente — injection via sshpass..."
+  if ! command -v sshpass &>/dev/null; then
+    echo "Erreur : sshpass non installé."
+    echo "  sudo apt install sshpass"
+    exit 1
+  fi
+  sshpass -p "${PROXMOX_PASSWORD}" ssh-copy-id \
+    -o StrictHostKeyChecking=no \
+    -i "${SSH_KEY_FILE}.pub" \
+    root@"${PROXMOX_HOST}"
+  echo "    Clé SSH injectée sur Proxmox."
 fi
 
 # --- Auth Proxmox ---
@@ -373,9 +390,9 @@ extend_disk "${SERVICES_IP}" "services-vm"
 echo ""
 echo "==> Lancement Ansible..."
 cd "$REPO_ROOT/ansible"
-ansible-playbook playbooks/vault.yml    -i inventory/onprem.py
-ansible-playbook playbooks/elk.yml      -i inventory/onprem.py
-ansible-playbook playbooks/filebeat.yml -i inventory/onprem.py
+ansible-playbook playbooks/vault.yml         -i inventory/onprem.py
+ansible-playbook playbooks/elk.yml           -i inventory/onprem.py
+ansible-playbook playbooks/elastic-agent.yml -i inventory/onprem.py
 
 echo ""
 echo "==> Déploiement complet."

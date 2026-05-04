@@ -1,0 +1,5 @@
+---
+- name: restart elastic-agent
+  systemd:
+    name: elastic-agent
+    state: restarted

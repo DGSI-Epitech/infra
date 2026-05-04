@@ -13,6 +13,7 @@ Procédures et résolution de problèmes pour l'infrastructure on-premise.
 5. [Accéder à Kibana / ELK](#5-accéder-à-kibana--elk)
 6. [Diagnostics SSH](#6-diagnostics-ssh)
 7. [Résolution de problèmes](#7-résolution-de-problèmes)
+8. [Fleet Server et Elastic Agents](#8-fleet-server-et-elastic-agents)
 
 ---
 
@@ -126,11 +127,11 @@ python3 inventory/onprem.py --list | python3 -m json.tool
 # Déployer Vault uniquement
 ansible-playbook playbooks/vault.yml -i inventory/onprem.py
 
-# Déployer ELK uniquement
+# Déployer ELK + Fleet Server uniquement
 ansible-playbook playbooks/elk.yml -i inventory/onprem.py
 
-# Déployer Filebeat uniquement
-ansible-playbook playbooks/filebeat.yml -i inventory/onprem.py
+# Déployer Elastic Agents uniquement
+ansible-playbook playbooks/elastic-agent.yml -i inventory/onprem.py
 
 # Tout redéployer dans l'ordre
 npm run ansible:all
@@ -383,24 +384,24 @@ ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
   "docker logs kibana --tail 30"
 ```
 
-### Filebeat — pas de données dans Elasticsearch
+### Elastic Agent — pas de données dans Elasticsearch
 
-1. Vérifier que Filebeat tourne sur `services-vm` :
+1. Vérifier que elastic-agent tourne sur `services-vm` :
 ```bash
 ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.241 \
-  "sudo systemctl status filebeat"
+  "sudo elastic-agent status"
 ```
 
-2. Vérifier la connectivité vers Logstash (port 5044) :
+2. Vérifier la connectivité vers Fleet Server (port 8220) :
 ```bash
 ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.241 \
-  "nc -zv 172.16.0.242 5044"
+  "nc -zv 172.16.0.242 8220"
 ```
 
-3. Vérifier les logs Filebeat :
+3. Vérifier les logs Elastic Agent :
 ```bash
 ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.241 \
-  "sudo journalctl -u filebeat -n 50"
+  "sudo journalctl -u elastic-agent -n 50"
 ```
 
 ### Packer Ubuntu — SSH auth failed (publickey)
@@ -494,4 +495,73 @@ Le pool de stockage est plein.
 ```bash
 ssh root@$PROXMOX_HOST pvesm status
 npm run destroy  # libère l'espace
+```
+
+---
+
+## 8. Fleet Server et Elastic Agents
+
+### 8.1 Vérifier que Fleet Server tourne
+
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "docker compose -f /opt/elk/docker-compose.yml ps fleet-server"
+```
+
+Le container doit être `running`. S'il est en `restarting`, vérifier les logs :
+
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "docker logs fleet-server --tail 50"
+```
+
+### 8.2 Vérifier que le token est dans Vault
+
+```bash
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "VAULT_TOKEN=\$(sudo cat /root/vault-init.json | python3 -c \"import sys,json; print(json.load(sys.stdin)['root_token'])\") && \
+   curl -s -H \"X-Vault-Token: \$VAULT_TOKEN\" \
+   http://127.0.0.1:8200/v1/secret/data/elk/fleet-enrollment-token | python3 -m json.tool"
+```
+
+### 8.3 Vérifier les agents enrôlés
+
+Via tunnel SSH (voir section 5.1) puis ouvrir **http://localhost:5601** → Fleet → Agents.
+
+Les deux agents (ops-vm et services-vm) doivent apparaître en statut **Healthy**.
+
+### 8.4 Statut Elastic Agent sur une VM
+
+```bash
+# Sur ops-vm
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
+  "sudo elastic-agent status"
+
+# Sur services-vm
+ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.241 \
+  "sudo elastic-agent status"
+```
+
+### 8.5 Ré-enrôler un agent manuellement
+
+Si un agent est désynchronisé de Fleet, relancer le playbook :
+
+```bash
+cd ansible
+export OPS_IP=172.16.0.242
+export SERVICES_IP=172.16.0.241
+ansible-playbook playbooks/elastic-agent.yml -i inventory/onprem.py
+```
+
+Le playbook vérifie le statut avant d'enrôler — si l'agent est déjà `Healthy`, l'étape est sautée.
+
+### 8.6 Fleet Server — enrollment token vide au premier déploiement
+
+Si Kibana n'a pas fini d'initialiser Fleet quand le rôle ELK récupère le token, la liste retournée est vide. Le rôle retente avec `retries: 10` / `delay: 10`. Si ça persiste après le délai :
+
+```bash
+# Relancer uniquement le playbook ELK pour retenter la récupération du token
+cd ansible
+export OPS_IP=172.16.0.242
+ansible-playbook playbooks/elk.yml -i inventory/onprem.py
 ```

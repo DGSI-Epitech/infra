@@ -1,0 +1,9 @@
+- name: Gather ops-vm facts for Fleet and Vault URL resolution
+  hosts: ops
+  gather_facts: true
+
+- name: Deploy Elastic Agent
+  hosts: ops:services
+  become: true
+  roles:
+    - elastic-agent

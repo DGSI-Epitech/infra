@@ -265,6 +265,23 @@ Filebeat sur `services-vm` doit connaître l'IP de Logstash sur `ops-vm`. Cette 
 
 `ansible_host` de ops-vm (lu depuis l'inventaire dynamique, lui-même lu depuis `$OPS_IP` ou `config.env`) est injecté dans `filebeat.yml.j2` comme destination Logstash. Aucune IP hardcodée nulle part.
 
+### Résolution dynamique de l'IP ops-vm pour Filebeat
+
+Filebeat sur `services-vm` doit connaître l'IP de Logstash sur `ops-vm`. Cette IP est assignée par DHCP et peut changer à chaque déploiement. Le playbook `filebeat.yml` la résout dynamiquement :
+
+```yaml
+- name: Gather ops-vm facts for logstash host resolution
+  hosts: ops
+  gather_facts: true
+
+- name: Deploy Filebeat
+  hosts: services
+  vars:
+    elk_logstash_host: "{{ hostvars[groups['ops'][0]]['ansible_host'] }}"
+```
+
+`ansible_host` de ops-vm (lu depuis l'inventaire dynamique, lui-même lu depuis `$OPS_IP` ou `config.env`) est injecté dans `filebeat.yml.j2` comme destination Logstash. Aucune IP hardcodée nulle part.
+
 ### Renommage vault-vm → ops-vm
 
 La VM s'appelait initialement `vault-vm` car elle n'hébergeait que Vault. Après l'ajout de la stack ELK, ce nom ne reflétait plus son contenu. Elle a été renommée `ops-vm` (operations VM) : terme générique qui couvre les services transverses (secrets management + observabilité) sans être lié à un outil spécifique.
@@ -275,3 +292,63 @@ Fichiers modifiés lors du renommage :
 - Variable config.env `VM_ID_VAULT` → `VM_ID_OPS`
 - Groupe Ansible `vault` → `ops`, host `vault-vm` → `ops-vm`
 - Variable d'environnement `VAULT_IP` → `OPS_IP` dans deploy.sh et workflow CI
+
+---
+
+## Elastic Agent + Fleet Server — remplacement de Filebeat
+
+**Date :** 2026-05-04
+**Branche :** `adding-stack-ELK`
+
+### Problème
+
+Filebeat est limité aux logs fichiers. Il ne collecte pas les métriques système (CPU, RAM, réseau) ni les security events. Chaque agent Filebeat est configuré individuellement via Ansible — pas de supervision centralisée de l'état des agents.
+
+### Décision
+
+Remplacer Filebeat par **Elastic Agent** géré via **Kibana Fleet**. Le Fleet enrollment token est stocké dans HashiCorp Vault pour ne jamais circuler en clair.
+
+### Architecture
+
+| Composant | Rôle | Localisation |
+|---|---|---|
+| `fleet-server` | Gère les Elastic Agents | container Docker dans elk-net (ops-vm) |
+| `elastic-agent` | Collecte logs + métriques | apt sur ops-vm et services-vm |
+| Vault KV | Stocke le Fleet enrollment token | `secret/data/elk/fleet-enrollment-token` |
+
+### Pourquoi Fleet Server dans le Compose ELK et non en container séparé ?
+
+Fleet Server fait partie de la stack Elastic — même cycle de vie, même réseau Docker `elk-net`, même image (`elastic-agent`). L'intégrer dans le Compose évite un container standalone à gérer séparément.
+
+### Pourquoi Elastic Agent installé via apt (hôte) plutôt qu'en container Docker ?
+
+Un Elastic Agent en container ne peut pas facilement accéder aux logs des autres containers Docker du host (`/var/lib/docker/containers/**`) ni aux métriques système sans monter de nombreux volumes en lecture-only avec des permissions complexes. Installé via apt sur le host, l'agent accède nativement à tout le système.
+
+### Pourquoi le token passe par Vault et non par une variable d'env ou un fichier ?
+
+Le token Fleet est un secret qui permet d'enrôler n'importe quel agent dans la stack. Le stocker dans une variable d'env (config.env ou CI) l'expose dans les logs et l'historique shell. Le stocker dans Vault le rend accessible uniquement aux playbooks qui s'authentifient avec le root token — lui-même stocké dans `/root/vault-init.json` accessible uniquement à root sur ops-vm.
+
+### Séquence d'enrollment
+
+```
+elk.yml
+  └── Fleet Server démarre dans le Compose
+        └── Kibana Fleet s'initialise (POST /api/fleet/setup)
+              └── Token récupéré via GET /api/fleet/enrollment_api_keys
+                    └── Token écrit dans Vault KV
+
+elastic-agent.yml
+  └── Lit token depuis Vault (slurp vault-init.json → root token → GET /v1/secret/...)
+        └── elastic-agent enroll --url fleet-server --token ... --insecure
+              └── elastic-agent service démarré
+```
+
+### Pièges gérés
+
+| Piège | Fix |
+|---|---|
+| Fleet setup Kibana pas encore prêt | `retries: 30` / `delay: 10` sur POST /api/fleet/setup |
+| Token vide si Fleet pas initialisé | `until: items | length > 0` sur GET enrollment_api_keys |
+| `elastic-agent enroll` non idempotent | Vérification de `elastic-agent status` avant enrollment — skip si `Healthy` |
+| Vault non unsealed au moment du rôle elk | Vault est initialisé et unsealed par vault.yml avant que elk.yml tourne |
+| KV engine déjà monté dans Vault | `status_code: [200, 204, 400]` — 400 = déjà monté, ignoré |

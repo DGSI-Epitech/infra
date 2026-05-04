@@ -90,8 +90,8 @@ Build automatisé du template Ubuntu 22.04 via autoinstall. Utilise un password 
 | Playbook | Rôles | Cible | Port(s) |
 |---|---|---|---|
 | `playbooks/vault.yml` | `base`, `vault` | ops-vm | 8200 |
-| `playbooks/elk.yml` | `elk` | ops-vm | 9200, 9300, 5601, 5044 |
-| `playbooks/filebeat.yml` | `filebeat` | services-vm | — |
+| `playbooks/elk.yml` | `elk` | ops-vm | 9200, 9300, 5601, 5044, 8220 |
+| `playbooks/elastic-agent.yml` | `elastic-agent` | ops-vm + services-vm | — |
 
 L'inventaire `inventory/onprem.py` est un script Python dynamique qui lit `config.env`. Les IPs, la clé SSH et le ProxyJump SSH (via Proxmox) sont toujours cohérents avec l'environnement déployé.
 
@@ -101,19 +101,22 @@ Installe HashiCorp Vault en **container Docker standalone** (`hashicorp/vault:la
 
 #### Rôle `elk`
 
-Déploie la stack ELK via **Docker Compose** dans `/opt/elk`. Trois containers :
+Déploie la stack ELK + Fleet Server via **Docker Compose** dans `/opt/elk`. Quatre containers :
 
 | Container | Image | Port |
 |---|---|---|
 | `elasticsearch` | `elasticsearch:8.13.0` | 9200 (API), 9300 (cluster) |
 | `logstash` | `logstash:8.13.0` | 5044 (Beats input) |
 | `kibana` | `kibana:8.13.0` | 5601 (UI web) |
+| `fleet-server` | `elastic-agent:8.13.0` | 8220 (enrollment Elastic Agents) |
 
-Elasticsearch et Logstash partagent un réseau Docker `elk-net`. Kibana et Logstash démarrent uniquement après le healthcheck Elasticsearch (`/_cluster/health?status=green`). `vm.max_map_count` est fixé à `262144` via `sysctl` (requis par Elasticsearch).
+Tous les containers partagent le réseau Docker `elk-net`. Logstash, Kibana et Fleet Server démarrent uniquement après le healthcheck Elasticsearch. `vm.max_map_count` est fixé à `262144` via `sysctl` (requis par Elasticsearch).
 
-#### Rôle `filebeat`
+Après le démarrage, le rôle récupère le Fleet enrollment token via l'API Kibana et le stocke dans Vault à `secret/data/elk/fleet-enrollment-token`. Ce token est lu par le rôle `elastic-agent` lors de l'enrollment des agents.
 
-Installe Filebeat via le dépôt apt Elastic sur `services-vm`. Collecte les logs système (`/var/log/syslog`) et les logs des containers Docker (`/var/lib/docker/containers/**/*.log`). Les envoie à Logstash (port 5044) sur ops-vm, dont l'IP est résolue dynamiquement via `hostvars`.
+#### Rôle `elastic-agent`
+
+Installe Elastic Agent via le dépôt apt Elastic sur **ops-vm et services-vm**. L'agent lit le Fleet enrollment token depuis Vault (via l'API KV), s'enrôle dans Fleet Server en mode insecure (`--insecure`), puis démarre le service `elastic-agent`. L'enrollment est idempotent : si l'agent est déjà `Healthy`, l'étape est sautée.
 
 ---
 
@@ -134,8 +137,8 @@ Installe Filebeat via le dépôt apt Elastic sur `services-vm`. Collecte les log
 | ubuntu-template | 1000 | — | Template Ubuntu (ne pas démarrer) |
 | pfsense-template | 2000 | — | Template pfSense (ne pas démarrer) |
 | pfsense-fw-01 | 2100 | `172.16.0.254` | Pare-feu LAN/WAN, DHCP |
-| services-vm | 2300 | DHCP `172.16.0.241` | Netbox, website, Filebeat |
-| ops-vm | 2200 | DHCP `172.16.0.242` | Vault + ELK (ES + Logstash + Kibana) |
+| services-vm | 2300 | DHCP `172.16.0.241` | Netbox, website, Elastic Agent |
+| ops-vm | 2200 | DHCP `172.16.0.242` | Vault + ELK + Fleet Server + Elastic Agent |
 
 ### Ports exposés sur ops-vm (UFW)
 
@@ -145,7 +148,8 @@ Installe Filebeat via le dépôt apt Elastic sur `services-vm`. Collecte les log
 | 9200 | Elasticsearch API | LAN interne |
 | 9300 | Elasticsearch cluster | LAN interne |
 | 5601 | Kibana UI | LAN + tunnel SSH |
-| 5044 | Logstash Beats input | services-vm |
+| 5044 | Logstash Beats input | LAN interne |
+| 8220 | Fleet Server | ops-vm + services-vm (enrollment agents) |
 
 ### PVE2 — Cloud
 
@@ -171,9 +175,9 @@ push main
                          ├── injection clé SSH via QEMU agent
                          ├── attente SSH (ProxyJump via Proxmox)
                          └── ansible-playbook -i inventory/onprem.py
-                               ├── vault.yml   → ops-vm
-                               ├── elk.yml     → ops-vm
-                               └── filebeat.yml → services-vm
+                               ├── vault.yml          → ops-vm
+                               ├── elk.yml            → ops-vm (ELK + Fleet Server + token → Vault)
+                               └── elastic-agent.yml  → ops-vm + services-vm
 ```
 
 Les deux workflows tournent sur un **self-hosted runner** installé sur le réseau Proxmox (accès direct aux IPs `172.16.0.x`).
@@ -196,3 +200,6 @@ Les deux workflows tournent sur un **self-hosted runner** installé sur le rése
 | QEMU agent pour injection clé SSH | cloud-init ne met pas à jour authorized_keys pour un user créé par autoinstall |
 | ProxyJump Proxmox pour Ansible | VMs sur vmbr1 (réseau privé), inaccessibles directement depuis l'extérieur |
 | growpart dans deploy.sh | cloud-init ne redimensionne pas automatiquement la partition sur un clone Ubuntu LVM |
+| Fleet Server dans le Compose ELK | Même cycle de vie que la stack, même réseau Docker `elk-net`, pas de container séparé à gérer |
+| Elastic Agent via apt (pas Docker) | L'agent doit surveiller les containers Docker du host — plus simple depuis le host que depuis un container |
+| Enrollment token dans Vault | Le token ne transite jamais en clair dans le code ou les variables d'env CI — lu depuis Vault au moment de l'enrollment |
