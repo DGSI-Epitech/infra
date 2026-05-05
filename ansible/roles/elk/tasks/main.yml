@@ -75,6 +75,9 @@
   uri:
     url: "http://127.0.0.1:{{ elk_es_port }}/_cluster/health"
     method: GET
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
     status_code: 200
   register: es_health
   retries: 20
@@ -117,15 +120,37 @@
   delay: 10
   until: kibana_status.status == 200
 
-- name: Wait for Fleet Server API to be ready
-  uri:
-    url: "http://127.0.0.1:{{ elk_fleet_port }}/api/status"
-    method: GET
-    status_code: 200
-  register: fleet_status
-  retries: 30
+- name: Wait for fleet-server container to be running
+  shell: docker ps --filter "name=^fleet-server$" --filter "status=running" -q
+  register: fleet_container_running
+  retries: 40
   delay: 10
-  until: fleet_status.status == 200
+  until: fleet_container_running.stdout | trim != ''
+  changed_when: false
+
+- block:
+    - name: Wait for Fleet Server API to be ready
+      uri:
+        url: "http://127.0.0.1:{{ elk_fleet_port }}/api/status"
+        method: GET
+        status_code: 200
+      register: fleet_status
+      retries: 40
+      delay: 10
+      until: fleet_status.status == 200
+  rescue:
+    - name: Get fleet-server logs on failure
+      command: docker logs fleet-server --tail 60
+      register: fleet_logs
+      changed_when: false
+
+    - name: Show fleet-server logs
+      debug:
+        var: fleet_logs.stdout_lines
+
+    - name: Fail with context
+      fail:
+        msg: "Fleet Server API unreachable after retries. See logs above."
 
 - name: Trigger Kibana Fleet initialization
   uri:
