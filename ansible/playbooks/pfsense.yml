@@ -1,14 +1,16 @@
-- name: Configure pfSense
+---
+- name: Configure pfSense S1 (OnPrem)
   hosts: pfsense
   gather_facts: false
   collections:
     - pfsensible.core
 
   tasks:
-    # Règle LAN → WAN
+    # --- RÈGLES DE PARE-FEU ---
+    
     - name: Autoriser tout le trafic LAN vers WAN
       pfsensible.core.pfsense_rule:
-        name: "Allow LAN to WAN"
+        descr: "Allow LAN to WAN"
         action: pass
         interface: lan
         protocol: any
@@ -17,49 +19,61 @@
         state: present
       become: true
 
-    # Règle SSH depuis OVH
-    - name: Autoriser SSH depuis OVH
+    - name: Autoriser SSH depuis Bastion/Runner OVH
       pfsensible.core.pfsense_rule:
-        name: "Allow SSH from OVH"
+        descr: "Allow SSH from OVH"
         action: pass
         interface: wan
         protocol: tcp
-        source: "51.75.128.134"
-        destination: "172.16.0.254"
+        source: "51.75.128.134"  # Ton IP source OVH actuelle
+        destination: any         # Remplacé '172.16.0.254' par 'any' pour que la règle WAN fonctionne
         destination_port: "22"
         state: present
       become: true
 
-    # DNS
-    - name: Configurer DNS
+    # --- CONFIGURATION DNS ---
+    
+    - name: Configurer les serveurs DNS cibles (Forwarders)
       pfsensible.core.pfsense_setup:
         dnsserver:
           - "1.1.1.1"
           - "8.8.8.8"
       become: true
 
-    - name: Créer l'Autorité de Certification (CAPfsense)
-          pfsensible.core.pfsense_ca:
-            name: "CAPfsense"
-            descr: "CA Interne pour Vault TLS"
-            method: "internal"
-            keytype: "RSA"
-            keylen: 4096
-            digest: "sha256"
-            lifetime: 3650
-            dn_country: "FR"
-            dn_state: "Ile-de-France"
-            dn_city: "Paris"
-            dn_organization: "Projet Cloud"
-            dn_commonname: "CAPfsense"
-            state: present
-          become: true
-          register: ca_result
+    - name: Activer le serveur DNS (Resolver) en mode Forwarder
+      pfsensible.core.pfsense_dnsresolver:
+        enable: true
+        forwarding: true
+        active_interface: 
+          - "lan"                # S1 n'a que le LAN (VMBR1) à écouter
+        outgoing_interface: 
+          - "wan"                # Sortie vers VMBR0
+        state: present
+      become: true
 
-        - name: Sauvegarder le certificat public CA en local
-          ansible.builtin.copy:
-            content: "{{ ca_result.ca.crt }}"
-            dest: "./CAPfsense.crt"
-          delegate_to: localhost
-          become: false
-          when: ca_result.ca is defined
+    # --- AUTORITÉ DE CERTIFICATION ---
+    
+    - name: Créer l'Autorité de Certification (CAPfsense)
+      pfsensible.core.pfsense_ca:
+        descr: "CA Interne pour Vault TLS"
+        method: "internal"
+        keytype: "RSA"
+        keylen: 4096
+        digest: "sha256"
+        lifetime: 3650
+        dn_country: "FR"
+        dn_state: "Ile-de-France"
+        dn_city: "Paris"
+        dn_organization: "Projet Cloud"
+        dn_commonname: "CAPfsense"
+        state: present
+      become: true
+      register: ca_result
+
+    - name: Sauvegarder le certificat public CA en local
+      ansible.builtin.copy:
+        content: "{{ ca_result.ca.crt }}"
+        dest: "./CAPfsense.crt"
+      delegate_to: localhost
+      become: false
+      when: ca_result.ca is defined

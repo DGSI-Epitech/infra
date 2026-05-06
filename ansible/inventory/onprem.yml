@@ -3,19 +3,19 @@ all:
     services:
       hosts:
         services-vm:
-          ansible_host: 172.16.0.10
+          ansible_host: 172.16.255.252 #currentlydown
           ansible_user: ubuntu
           ansible_password: ubuntu
     vault:
       hosts:
         vault-vm:
-          ansible_host: 172.16.0.244
+          ansible_host: 172.16.255.253
           ansible_user: ubuntu
           ansible_password: ubuntu
     pfsense:
       hosts:
         pfsense-fw-01:
-          ansible_host: 172.16.0.254
+          ansible_host: 172.16.255.254
           ansible_user: admin
           ansible_password: "pfsense" 
           ansible_connection: ssh
