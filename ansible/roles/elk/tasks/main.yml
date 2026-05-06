@@ -93,6 +93,38 @@
     status_code: 200
   no_log: true
 
+- name: Delete existing fleet-server service token (idempotent)
+  uri:
+    url: "http://127.0.0.1:{{ elk_es_port }}/_security/service/elastic/fleet-server/credential/token/fleet-ansible"
+    method: DELETE
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  no_log: true
+
+- name: Create fleet-server service token
+  uri:
+    url: "http://127.0.0.1:{{ elk_es_port }}/_security/service/elastic/fleet-server/credential/token/fleet-ansible"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    status_code: [200, 201]
+  register: fleet_token_result
+  no_log: true
+
+- name: Set fleet service token fact
+  set_fact:
+    fleet_server_service_token: "{{ fleet_token_result.json.token.value }}"
+  no_log: true
+
+- name: Re-deploy docker-compose.yml with service token
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ elk_dir }}/docker-compose.yml"
+    mode: "0644"
+
 - block:
     - name: Start remaining ELK services
       command: docker compose up -d
@@ -164,6 +196,21 @@
   delay: 10
   until: kibana_status.status == 200
 
+- name: Trigger Kibana Fleet initialization
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/setup"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    status_code: [200, 201]
+  register: fleet_setup
+  retries: 30
+  delay: 10
+  until: fleet_setup.status in [200, 201]
+
 - name: Wait for fleet-server container to be running
   shell: docker ps --filter "name=^fleet-server$" --filter "status=running" -q
   register: fleet_container_running
@@ -172,19 +219,24 @@
   until: fleet_container_running.stdout | trim != ''
   changed_when: false
 
+- name: Show fleet-server startup logs
+  command: docker logs fleet-server --tail 40
+  changed_when: false
+  ignore_errors: true
+
 - block:
     - name: Wait for Fleet Server API to be ready
-      uri:
-        url: "http://127.0.0.1:{{ elk_fleet_port }}/api/status"
-        method: GET
-        status_code: 200
-      register: fleet_status
-      retries: 40
-      delay: 10
-      until: fleet_status.status == 200
+      shell: >
+        curl -sf http://127.0.0.1:{{ elk_fleet_port }}/api/status 2>/dev/null ||
+        curl -sfk https://127.0.0.1:{{ elk_fleet_port }}/api/status 2>/dev/null
+      register: fleet_api_check
+      retries: 60
+      delay: 15
+      until: fleet_api_check.rc == 0
+      changed_when: false
   rescue:
     - name: Get fleet-server logs on failure
-      command: docker logs fleet-server --tail 60
+      command: docker logs fleet-server --tail 80
       register: fleet_logs
       changed_when: false
 
@@ -195,18 +247,6 @@
     - name: Fail with context
       fail:
         msg: "Fleet Server API unreachable after retries. See logs above."
-
-- name: Trigger Kibana Fleet initialization
-  uri:
-    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/setup"
-    method: POST
-    headers:
-      kbn-xsrf: "true"
-    status_code: [200, 201]
-  register: fleet_setup
-  retries: 30
-  delay: 10
-  until: fleet_setup.status in [200, 201]
 
 - name: Get Fleet enrollment token from Kibana
   uri:
