@@ -33,7 +33,7 @@ pfsense_op_wan    = env.get("PFSENSE_OP_WAN", "")    # 5.196.45.8  — accès di
 pfsense_cloud_wan = env.get("PFSENSE_CLOUD_WAN", "") # 5.196.50.52 — accès direct WAN
 pfsense_password  = env.get("PFSENSE_PASSWORD", "pfsense")
 gateway      = env.get("VM_GATEWAY", "")
-proxy_jump        = f"-o StrictHostKeyChecking=no -o ProxyJump=root@{proxmox_host}"
+proxy_jump   = f"-o StrictHostKeyChecking=no -o ProxyJump=root@{proxmox_host} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
 pfsense_common = {
     "ansible_user":               "admin",

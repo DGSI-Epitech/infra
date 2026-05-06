@@ -47,12 +47,11 @@ services:
     container_name: kibana
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_USERNAME=elastic
-      - ELASTICSEARCH_PASSWORD={{ elk_elastic_password }}
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD={{ elk_kibana_system_password }}
       - XPACK_SECURITY_ENCRYPTIONKEY=lab_infra_security_encryption_key_min_32chars
       - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=lab_infra_saved_objects_encryption_key_32
-    volumes:
-      - {{ elk_dir }}/kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - XPACK_REPORTING_ENCRYPTIONKEY=lab_infra_reporting_encryption_key_32chars
     ports:
       - "{{ elk_kibana_port }}:5601"
     networks:
@@ -73,6 +72,8 @@ services:
     container_name: fleet-server
     environment:
       - FLEET_SERVER_ENABLE=1
+      - FLEET_SERVER_HOST=0.0.0.0
+      - FLEET_SERVER_PORT=8220
       - FLEET_SERVER_ELASTICSEARCH_HOST=http://elasticsearch:{{ elk_es_port }}
       - FLEET_SERVER_ELASTICSEARCH_USERNAME=elastic
       - FLEET_SERVER_ELASTICSEARCH_PASSWORD={{ elk_elastic_password }}
