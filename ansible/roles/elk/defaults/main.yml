@@ -13,3 +13,4 @@ elk_logstash_beats_port: 5044
 elk_fleet_port: 8220
 
 elk_elastic_password: "changeme"
+elk_kibana_system_password: "changeme"

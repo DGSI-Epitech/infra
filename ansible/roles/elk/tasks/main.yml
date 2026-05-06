@@ -61,15 +61,11 @@
     mode: "0644"
   notify: restart elk
 
-- name: Start ELK stack
-  command: docker compose up -d
+- name: Start Elasticsearch
+  command: docker compose up -d elasticsearch
   args:
     chdir: "{{ elk_dir }}"
-  register: compose_up
-  changed_when: >
-    'Started' in compose_up.stdout or
-    'Created' in compose_up.stdout or
-    'Recreated' in compose_up.stdout
+  changed_when: false
 
 - name: Wait for Elasticsearch to be ready
   uri:
@@ -83,6 +79,54 @@
   retries: 20
   delay: 10
   until: es_health.status == 200
+
+- name: Set kibana_system password in Elasticsearch
+  uri:
+    url: "http://127.0.0.1:{{ elk_es_port }}/_security/user/kibana_system/_password"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      password: "{{ elk_kibana_system_password }}"
+    status_code: 200
+  no_log: true
+
+- block:
+    - name: Start remaining ELK services
+      command: docker compose up -d
+      args:
+        chdir: "{{ elk_dir }}"
+      register: compose_up
+      changed_when: >
+        'Started' in compose_up.stdout or
+        'Created' in compose_up.stdout or
+        'Recreated' in compose_up.stdout
+  rescue:
+    - name: Get kibana logs on failure
+      command: docker logs kibana --tail 80
+      register: kibana_logs
+      changed_when: false
+      ignore_errors: true
+
+    - name: Show kibana logs
+      debug:
+        var: kibana_logs.stdout_lines
+
+    - name: Get elasticsearch logs on failure
+      command: docker logs elasticsearch --tail 20
+      register: es_logs
+      changed_when: false
+      ignore_errors: true
+
+    - name: Show elasticsearch logs
+      debug:
+        var: es_logs.stdout_lines
+
+    - name: Fail with context
+      fail:
+        msg: "ELK stack failed to start. See logs above."
 
 - name: Allow Elasticsearch API
   ufw:

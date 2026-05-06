@@ -28,7 +28,7 @@ ssh_key      = env.get("SSH_PRIVATE_KEY_FILE", "~/.ssh/id_ed25519")
 ops_ip       = os.environ.get("OPS_IP") or env.get("VM_IP_OPS", "").split("/")[0]
 services_ip  = os.environ.get("SERVICES_IP") or env.get("VM_IP_SERVICES", "").split("/")[0]
 gateway      = env.get("VM_GATEWAY", "")
-proxy_jump   = f"-o StrictHostKeyChecking=no -o ProxyJump=root@{proxmox_host}"
+proxy_jump   = f"-o StrictHostKeyChecking=no -o ProxyJump=root@{proxmox_host} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
 # Format JSON attendu par Ansible pour un script d'inventaire dynamique
 inventory = {
