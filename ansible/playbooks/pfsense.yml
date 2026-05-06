@@ -1,13 +1,11 @@
 ---
-- name: Configure pfSense S1 (OnPrem)
-  hosts: pfsense
+- name: Configure pfSense OP (Site Local)
+  hosts: Pfsense-OP
   gather_facts: false
   collections:
     - pfsensible.core
 
   tasks:
-    # --- RÈGLES DE PARE-FEU ---
-    
     - name: Autoriser tout le trafic LAN vers WAN
       pfsensible.core.pfsense_rule:
         descr: "Allow LAN to WAN"
@@ -19,20 +17,18 @@
         state: present
       become: true
 
-    - name: Autoriser SSH depuis Bastion/Runner OVH
+    - name: Autoriser SSH entrant sur WAN
       pfsensible.core.pfsense_rule:
-        descr: "Allow SSH from OVH"
+        descr: "Allow SSH WAN"
         action: pass
         interface: wan
         protocol: tcp
-        source: "51.75.128.134"  # Ton IP source OVH actuelle
-        destination: any         # Remplacé '172.16.0.254' par 'any' pour que la règle WAN fonctionne
+        source: any
+        destination: any
         destination_port: "22"
         state: present
       become: true
 
-    # --- CONFIGURATION DNS ---
-    
     - name: Configurer les serveurs DNS cibles (Forwarders)
       pfsensible.core.pfsense_setup:
         dnsserver:
@@ -45,14 +41,12 @@
         enable: true
         forwarding: true
         active_interface: 
-          - "lan"                # S1 n'a que le LAN (VMBR1) à écouter
+          - "lan"
         outgoing_interface: 
-          - "wan"                # Sortie vers VMBR0
+          - "wan"
         state: present
       become: true
 
-    # --- AUTORITÉ DE CERTIFICATION ---
-    
     - name: Créer l'Autorité de Certification (CAPfsense)
       pfsensible.core.pfsense_ca:
         descr: "CA Interne pour Vault TLS"
@@ -77,3 +71,64 @@
       delegate_to: localhost
       become: false
       when: ca_result.ca is defined
+
+
+- name: Configure pfSense Cloud
+  hosts: Pfsense-Cloud
+  gather_facts: false
+  collections:
+    - pfsensible.core
+
+  tasks:
+    - name: Autoriser tout le trafic DMZ vers ANY
+      pfsensible.core.pfsense_rule:
+        descr: "Allow DMZ to ANY"
+        action: pass
+        interface: opt1
+        protocol: any
+        source: any
+        destination: any
+        state: present
+      become: true
+
+    - name: Autoriser tout le trafic LAN vers ANY
+      pfsensible.core.pfsense_rule:
+        descr: "Allow LAN to ANY"
+        action: pass
+        interface: lan
+        protocol: any
+        source: any
+        destination: any
+        state: present
+      become: true
+
+    - name: Autoriser SSH entrant sur WAN
+      pfsensible.core.pfsense_rule:
+        descr: "Allow SSH WAN"
+        action: pass
+        interface: wan
+        protocol: tcp
+        source: any
+        destination: any
+        destination_port: "22"
+        state: present
+      become: true
+
+    - name: Configurer les DNS cibles (VPN en prio, 8.8.8.8 en secours)
+      pfsensible.core.pfsense_setup:
+        dnsserver:
+          - "172.16.255.254"
+          - "8.8.8.8"
+      become: true
+
+    - name: Activer le serveur DNS en mode Forwarder (DMZ + LAN)
+      pfsensible.core.pfsense_dnsresolver:
+        enable: true
+        forwarding: true
+        active_interface: 
+          - "lan"
+          - "opt1"
+        outgoing_interface: 
+          - "wan"
+        state: present
+      become: true

@@ -1,20 +1,14 @@
 all:
   children:
-    services:
+    vault_servers:
       hosts:
-        services-vm:
-          ansible_host: 172.16.255.252 #currentlydown
-          ansible_user: ubuntu
-          ansible_password: ubuntu
-    vault:
-      hosts:
-        vault-vm:
+        vault:
           ansible_host: 172.16.255.253
-          ansible_user: ubuntu
-          ansible_password: ubuntu
-    pfsense:
+          ansible_user: dgsi-cloud
+          ansible_password: 01Admin
+    pfsense_onprem:
       hosts:
-        pfsense-fw-01:
+        Pfsense-OP:
           ansible_host: 172.16.255.254
           ansible_user: admin
           ansible_password: "pfsense" 

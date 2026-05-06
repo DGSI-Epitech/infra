@@ -1,0 +1,20 @@
+all:
+  children:
+    services:
+      hosts:
+        bastion:
+          ansible_host: 10.255.255.253
+          ansible_user: dgsi-cloud
+          ansible_password: 01Admin
+        website:
+          ansible_host: 192.168.255.253
+          ansible_user: dgsi-cloud
+          ansible_password: 01Admin
+    pfsense_cloud:
+      hosts:
+        Pfsense-Cloud:
+          ansible_host: 192.168.255.254
+          ansible_user: admin
+          ansible_password: "pfsense"
+          ansible_connection: ssh
+          ansible_python_interpreter: /usr/local/bin/python3.11
