@@ -36,3 +36,60 @@
   retries: 40
   delay: 15
   become: true
+
+- name: Bootstrap NetBox - create site
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/dcim/sites/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: onprem
+      slug: onprem
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create cluster type
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/cluster-types/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: proxmox
+      slug: proxmox
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create cluster
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/clusters/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: On-Prem Proxmox
+      type:
+        slug: proxmox
+      site:
+        slug: onprem
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create LAN prefix
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/ipam/prefixes/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      prefix: "172.16.0.0/24"
+      description: "LAN pfSense"
+      site:
+        slug: onprem
+    status_code: [201, 400]

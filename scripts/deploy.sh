@@ -162,6 +162,8 @@ terraform apply -input=false -auto-approve \
 echo "    pfSense déployé — attente 30s pour qu'il soit opérationnel..."
 sleep 30
 
+
+
 # --- ÉTAPE 3 : Packer Ubuntu ---
 # pfSense est maintenant actif et route le trafic de vmbr1 vers internet
 
@@ -352,7 +354,11 @@ wait_for_ssh "${SERVICES_IP}" "services-vm"
 echo ""
 echo "==> Lancement Ansible..."
 cd "$REPO_ROOT/ansible"
+ansible-playbook playbooks/services-vm.yml -i inventory/onprem.py
 ansible-playbook playbooks/vault.yml -i inventory/onprem.py
-
+ansible-playbook playbooks/netbox-register.yml \
+  -i inventory/onprem.py \
+  -e "services_ip=${SERVICES_IP}" \
+  -e "vault_ip=${VAULT_IP}"
 echo ""
 echo "==> Déploiement complet."

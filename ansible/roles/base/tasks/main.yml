@@ -1,9 +1,13 @@
 ---
-- name: Update and upgrade apt packages
+- name: Update apt cache
   apt:
     update_cache: true
-    upgrade: dist
     cache_valid_time: 3600
+
+- name: Upgrade packages
+  command: apt-get -y -o Dpkg::Options::="--force-confnew" dist-upgrade --fix-missing
+  environment:
+    DEBIAN_FRONTEND: noninteractive
 
 - name: Install base packages
   apt:

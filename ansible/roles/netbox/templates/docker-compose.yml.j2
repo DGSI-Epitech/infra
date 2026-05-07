@@ -36,6 +36,7 @@ services:
       SUPERUSER_NAME: "{{ netbox_superuser }}"
       SUPERUSER_EMAIL: "{{ netbox_superuser_email }}"
       SUPERUSER_PASSWORD: "netbox_admin"
+      SUPERUSER_API_TOKEN: "{{ netbox_api_token }}"
       DB_HOST: postgres
       DB_NAME: netbox
       DB_USER: netbox

@@ -3,4 +3,5 @@ netbox_dir: /opt/netbox
 netbox_port: 8080
 netbox_superuser: admin
 netbox_superuser_email: admin@netbox.local
+netbox_api_token: "0123456789abcdef0123456789abcdef01234567"
 netbox_secret_key: KcBiGa54ukQEia6PrYW2700KkwPg23YohziX1Fh4mZfVtb-rUPeHwhk74CoOneZHeEhrF5YYfla5oK0r
