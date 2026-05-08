@@ -9,7 +9,7 @@ all:
     pfsense_onprem:
       hosts:
         Pfsense-OP:
-          ansible_host: 172.16.255.254
+          ansible_host: 5.196.45.8
           ansible_user: admin
           ansible_password: "pfsense" 
           ansible_connection: ssh
