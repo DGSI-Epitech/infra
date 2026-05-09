@@ -1,14 +1,18 @@
-- name: Configure pfSense
-  hosts: pfsense
+## aller sur les deux pfsenses aller dans les shell puis >
+## cp /conf/config.xml /conf/configavantansible.xml
+## Ca permet de faire une snapshot manuel
+
+---
+- name: Configure pfSense OP (Site Local)
+  hosts: Pfsense-OP
   gather_facts: false
   collections:
     - pfsensible.core
 
   tasks:
-    # Règle LAN → WAN
     - name: Autoriser tout le trafic LAN vers WAN
       pfsensible.core.pfsense_rule:
-        name: "Allow LAN to WAN"
+        descr: "Allow LAN to WAN"
         action: pass
         interface: lan
         protocol: any
@@ -17,23 +21,151 @@
         state: present
       become: true
 
-    # Règle SSH depuis OVH
-    - name: Autoriser SSH depuis OVH
+    - name: Autoriser SSH entrant sur WAN
       pfsensible.core.pfsense_rule:
-        name: "Allow SSH from OVH"
+        descr: "Allow SSH WAN"
         action: pass
         interface: wan
         protocol: tcp
-        source: "51.75.128.134"
-        destination: "172.16.0.254"
+        source: any
+        destination: any
         destination_port: "22"
         state: present
       become: true
 
-    # DNS
-    - name: Configurer DNS
+    - name: Autoriser tout le trafic dans le tunnel OpenVPN
+      pfsensible.core.pfsense_rule:
+        descr: "Allow ALL OpenVPN"
+        action: pass
+        interface: openvpn
+        protocol: any
+        source: any
+        destination: any
+        state: present
+      become: true
+
+    - name: Configurer les serveurs DNS cibles (Forwarders)
       pfsensible.core.pfsense_setup:
         dnsserver:
           - "1.1.1.1"
           - "8.8.8.8"
+      become: true
+
+    - name: Activer le serveur DNS (Resolver) en mode Forwarder
+      pfsensible.core.pfsense_dnsresolver:
+        enable: true
+        forwarding: true
+        active_interface: 
+          - "lan"
+        outgoing_interface: 
+          - "wan"
+        state: present
+      become: true
+
+    - name: Créer l'Autorité de Certification (CAPfsense)
+      pfsensible.core.pfsense_ca:
+        descr: "CA Interne pour Vault TLS"
+        method: "internal"
+        keytype: "RSA"
+        keylen: 4096
+        digest: "sha256"
+        lifetime: 3650
+        dn_country: "FR"
+        dn_state: "Ile-de-France"
+        dn_city: "Paris"
+        dn_organization: "Projet Cloud"
+        dn_commonname: "CAPfsense"
+        state: present
+      become: true
+      register: ca_result
+
+    - name: Sauvegarder le certificat public CA en local
+      ansible.builtin.copy:
+        content: "{{ ca_result.ca.crt }}"
+        dest: "./CAPfsense.crt"
+      delegate_to: localhost
+      become: false
+      when: ca_result.ca is defined
+
+- name: Configure pfSense Cloud
+  hosts: Pfsense-Cloud
+  gather_facts: false
+  collections:
+    - pfsensible.core
+
+  tasks:
+    - name: Autoriser tout le trafic DMZ vers ANY
+      pfsensible.core.pfsense_rule:
+        descr: "Allow DMZ to ANY"
+        action: pass
+        interface: opt1
+        protocol: any
+        source: any
+        destination: any
+        state: present
+      become: true
+
+    - name: Autoriser tout le trafic LAN vers ANY
+      pfsensible.core.pfsense_rule:
+        descr: "Allow LAN to ANY"
+        action: pass
+        interface: lan
+        protocol: any
+        source: any
+        destination: any
+        state: present
+      become: true
+
+    - name: Autoriser SSH entrant sur WAN
+      pfsensible.core.pfsense_rule:
+        descr: "Allow SSH WAN"
+        action: pass
+        interface: wan
+        protocol: tcp
+        source: any
+        destination: any
+        destination_port: "22"
+        state: present
+      become: true
+
+    - name: Autoriser port OpenVPN entrant (1194 UDP)
+      pfsensible.core.pfsense_rule:
+        descr: "Allow OpenVPN 1194"
+        action: pass
+        interface: wan
+        protocol: udp
+        source: any
+        destination: any
+        destination_port: "1194"
+        state: present
+      become: true
+
+    - name: Autoriser tout le trafic dans le tunnel OpenVPN
+      pfsensible.core.pfsense_rule:
+        descr: "Allow ALL OpenVPN"
+        action: pass
+        interface: openvpn
+        protocol: any
+        source: any
+        destination: any
+        state: present
+      become: true
+
+    - name: Configurer les DNS cibles (VPN en prio, 8.8.8.8 en secours)
+      pfsensible.core.pfsense_setup:
+        dnsserver:
+          - "172.16.255.254"
+          - "8.8.8.8"
+      become: true
+
+    - name: Activer le serveur DNS en mode Forwarder (DMZ + LAN)
+      pfsensible.core.pfsense_dnsresolver:
+        enable: true
+        forwarding: true
+        active_interface: 
+          - "lan"
+          - "opt1"
+        outgoing_interface: 
+          - "wan"
+        state: present
       become: true

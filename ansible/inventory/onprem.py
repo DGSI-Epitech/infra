@@ -45,13 +45,13 @@ inventory = {
         "hostvars": {
             "vault-vm": {
                 "ansible_host":                vault_ip,
-                "ansible_user":                "ubuntu",
+                "ansible_user":                "dgsi-cloud",
                 "ansible_ssh_private_key_file": ssh_key,
                 "ansible_ssh_common_args":      proxy_jump,
             },
             "services-vm": {
                 "ansible_host":                services_ip,
-                "ansible_user":                "ubuntu",
+                "ansible_user":                "dgsi-cloud",
                 "ansible_ssh_private_key_file": ssh_key,
                 "ansible_ssh_common_args":      proxy_jump,
             },
