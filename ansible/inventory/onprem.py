@@ -30,13 +30,14 @@ vault_ip          = os.environ.get("VAULT_IP") or env.get("VM_IP_VAULT", "").spl
 services_ip       = os.environ.get("SERVICES_IP") or env.get("VM_IP_SERVICES", "").split("/")[0]
 pfsense_op_wan    = env.get("PFSENSE_OP_WAN", "")    # 5.196.45.8  — accès direct WAN
 pfsense_cloud_wan = env.get("PFSENSE_CLOUD_WAN", "") # 5.196.50.52 — accès direct WAN
+pfsense_password  = env.get("PFSENSE_PASSWORD", "pfsense")
 proxy_jump        = f"-o StrictHostKeyChecking=no -o ProxyJump=root@{proxmox_host}"
 
 pfsense_common = {
-    "ansible_user":                "admin",
-    "ansible_ssh_private_key_file": ssh_key,
-    "ansible_connection":           "ssh",
-    "ansible_python_interpreter":   "/usr/local/bin/python3.11",
+    "ansible_user":               "admin",
+    "ansible_password":           pfsense_password,
+    "ansible_connection":         "ssh",
+    "ansible_python_interpreter": "/usr/local/bin/python3.11",
 }
 
 # Format JSON attendu par Ansible pour un script d'inventaire dynamique
