@@ -49,6 +49,12 @@
     state: present
     update_cache: true
 
+- name: Enable and start elastic-agent
+  systemd:
+    name: elastic-agent
+    state: started
+    enabled: true
+
 # Vérifier si déjà enrôlé avant d'enrôler (la commande n'est pas idempotente)
 - name: Check elastic-agent enrollment status
   command: elastic-agent status
@@ -67,9 +73,3 @@
   changed_when: enroll_result.rc == 0
   when: agent_status.rc != 0 or 'Healthy' not in (agent_status.stdout | default(''))
   no_log: true
-
-- name: Enable and start elastic-agent
-  systemd:
-    name: elastic-agent
-    state: started
-    enabled: true
