@@ -30,11 +30,12 @@
   no_log: true
 
 # Installer elastic-agent via apt Elastic
-- name: Add Elastic GPG key
-  get_url:
-    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
-    dest: /usr/share/keyrings/elastic-archive-keyring.gpg
-    mode: "0644"
+- name: Add Elastic GPG key (dearmored for apt signed-by)
+  shell: |
+    curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch \
+      | gpg --dearmor -o /usr/share/keyrings/elastic-archive-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/elastic-archive-keyring.gpg
 
 - name: Add Elastic apt repository
   apt_repository:
@@ -62,8 +63,9 @@
     --enrollment-token="{{ elastic_agent_enrollment_token }}"
     --insecure
     --non-interactive
+    --force
   register: enroll_result
-  changed_when: "'successfully enrolled' in enroll_result.stdout"
+  changed_when: enroll_result.rc == 0
   when: agent_status.rc != 0 or 'Healthy' not in (agent_status.stdout | default(''))
   no_log: true
 

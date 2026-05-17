@@ -79,10 +79,6 @@ services:
       - FLEET_SERVER_ELASTICSEARCH_INSECURE=1
       - FLEET_SERVER_INSECURE_HTTP=1
       - FLEET_URL=http://{{ ansible_host }}:{{ elk_fleet_port }}
-      - KIBANA_FLEET_HOST=http://kibana:{{ elk_kibana_port }}
-      - KIBANA_FLEET_SETUP=1
-      - KIBANA_FLEET_USERNAME=elastic
-      - KIBANA_FLEET_PASSWORD={{ elk_elastic_password }}
     ports:
       - "{{ elk_fleet_port }}:8220"
     networks:

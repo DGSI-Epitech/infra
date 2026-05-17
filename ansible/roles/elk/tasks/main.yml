@@ -195,6 +195,7 @@
   retries: 30
   delay: 10
   until: kibana_status.status == 200
+  become: false
 
 - name: Trigger Kibana Fleet initialization
   uri:
@@ -227,13 +228,16 @@
 - block:
     - name: Wait for Fleet Server API to be ready
       shell: >
-        curl -sf http://127.0.0.1:{{ elk_fleet_port }}/api/status 2>/dev/null ||
-        curl -sfk https://127.0.0.1:{{ elk_fleet_port }}/api/status 2>/dev/null
+        curl -sf --connect-timeout 5 --max-time 10
+        http://127.0.0.1:{{ elk_fleet_port }}/api/status 2>/dev/null ||
+        curl -sfk --connect-timeout 5 --max-time 10
+        https://127.0.0.1:{{ elk_fleet_port }}/api/status 2>/dev/null
       register: fleet_api_check
       retries: 60
       delay: 15
       until: fleet_api_check.rc == 0
       changed_when: false
+      become: false
   rescue:
     - name: Get fleet-server logs on failure
       command: docker logs fleet-server --tail 80
@@ -252,6 +256,9 @@
   uri:
     url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/enrollment_api_keys"
     method: GET
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
     headers:
       kbn-xsrf: "true"
     status_code: 200
@@ -259,6 +266,7 @@
   retries: 10
   delay: 10
   until: fleet_keys.status == 200 and (fleet_keys.json.items | default([]) | length) > 0
+  become: false
 
 - name: Set fleet enrollment token fact
   set_fact:
