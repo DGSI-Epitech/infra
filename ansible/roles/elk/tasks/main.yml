@@ -212,6 +212,74 @@
   delay: 10
   until: fleet_setup.status in [200, 201]
 
+- name: Configure Fleet Server URL in Kibana
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/fleet_server_hosts"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "default"
+      host_urls: ["http://{{ ansible_host }}:{{ elk_fleet_port }}"]
+      is_default: true
+    status_code: [200, 201]
+  become: false
+
+- name: Create default Fleet Server agent policy
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/agent_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "Default Fleet Server Policy"
+      namespace: "default"
+      is_default_fleet_server: true
+      monitoring_enabled: []
+    status_code: [200, 201]
+  register: fleet_server_policy
+  become: false
+
+- name: Get fleet_server package version
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/epm/packages/fleet_server"
+    method: GET
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    status_code: 200
+  register: fleet_server_pkg
+  become: false
+
+- name: Add fleet_server integration to Fleet Server policy
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/package_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "fleet_server-1"
+      namespace: "default"
+      policy_id: "{{ fleet_server_policy.json.item.id }}"
+      package:
+        name: "fleet_server"
+        version: "{{ fleet_server_pkg.json.item.version }}"
+      inputs: {}
+    status_code: [200, 201]
+  become: false
+
 - name: Start fleet-server (after Kibana Fleet is ready)
   command: docker compose up -d fleet-server
   args:
@@ -236,7 +304,7 @@
       uri:
         url: "http://127.0.0.1:{{ elk_fleet_port }}/api/status"
         method: GET
-        status_code: 200
+        status_code: [200, 503]
         return_content: true
       register: fleet_api_check
       retries: 60
@@ -247,9 +315,10 @@
       become: false
   rescue:
     - name: Get fleet-server logs on failure
-      command: docker logs fleet-server --tail 80
+      shell: docker logs fleet-server --tail 80 2>&1
       register: fleet_logs
       changed_when: false
+      ignore_errors: true
 
     - name: Show fleet-server logs
       debug:
