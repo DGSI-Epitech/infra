@@ -59,8 +59,7 @@
         server_addr: "5.196.50.52"
         server_port: "1194"
         tunnel_network: "10.3.3.0/30"
-        remote_network:
-          - "192.168.255.240/28"
+        remote_network: "192.168.255.240/28"
         shared_key: "{{ openvpn_shared_key }}"
         data_ciphers: []
         state: present
@@ -175,8 +174,7 @@
         interface: wan
         local_port: "1194"
         tunnel_network: "10.3.3.0/30"
-        remote_network:
-          - "172.16.255.240/28"
+        remote_network: "172.16.255.240/28"
         shared_key: "{{ openvpn_shared_key }}"
         data_ciphers: []
         state: present
