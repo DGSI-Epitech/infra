@@ -341,12 +341,12 @@
   register: fleet_keys
   retries: 10
   delay: 10
-  until: fleet_keys.status == 200 and (fleet_keys.json.items | default([]) | length) > 0
+  until: fleet_keys.status == 200 and (fleet_keys.json['items'] | default([]) | length) > 0
   become: false
 
 - name: Set fleet enrollment token fact
   set_fact:
-    fleet_enrollment_token: "{{ fleet_keys.json.items[0].api_key }}"
+    fleet_enrollment_token: "{{ fleet_keys.json['items'][0].api_key }}"
   no_log: true
 
 # --- Écriture du token dans Vault ---
