@@ -9,9 +9,10 @@ Procédures et résolution de problèmes pour l'infrastructure on-premise.
 1. [Premier déploiement](#1-premier-déploiement)
 2. [Déploiement courant](#2-déploiement-courant)
 3. [Ansible manuellement](#3-ansible-manuellement)
-4. [Accéder à Vault](#4-accéder-à-vault)
-5. [Diagnostics SSH](#5-diagnostics-ssh)
-6. [Résolution de problèmes](#6-résolution-de-problèmes)
+4. [Accéder au webGUI pfSense](#4-accéder-au-webgui-pfsense)
+5. [Accéder à Vault](#5-accéder-à-vault)
+6. [Diagnostics SSH](#6-diagnostics-ssh)
+7. [Résolution de problèmes](#7-résolution-de-problèmes)
 
 ---
 
@@ -140,11 +141,40 @@ ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
 
 ---
 
-## 4. Accéder à Vault
+## 4. Accéder au webGUI pfSense
+
+Le webGUI pfSense est accessible directement depuis un navigateur. La règle firewall HTTPS (443) sur WAN est configurée par le playbook Ansible.
+
+| pfSense | URL | Login |
+|---|---|---|
+| OP (on-premise) | https://5.196.45.8 | `admin` / `PFSENSE_PASSWORD` (config.env) |
+| Cloud | https://5.196.50.52 | `admin` / `PFSENSE_PASSWORD` (config.env) |
+
+Accepter le certificat auto-signé lors de la première connexion.
+
+### Ce qu'on peut vérifier dans le GUI
+
+- **Règles firewall** : Firewall > Rules > WAN — SSH (22), HTTPS (443), OpenVPN (1194) doivent être présentes
+- **DNS** : Services > DNS Forwarder ou DNS Resolver — vérifier les forwarders configurés par Ansible
+- **CA** : System > Cert. Manager > CAs — la CA `CAPfsense` doit être présente
+
+### Si SSH pfSense est désactivé (Ansible timeout)
+
+Ansible se connecte via SSH au WAN de chaque pfSense. Si la connexion timeout, SSH est probablement désactivé.
+
+Réactiver via la console Proxmox :
+1. Ouvrir `https://ns3050272.ip-51-255-76.eu:8006` (OP) ou `https://ns3183326.ip-146-59-253.eu:8006` (Cloud)
+2. Sélectionner la VM pfSense (VMID 125 pour OP, 106 pour Cloud) → **Console**
+3. Choisir l'**option 14** (Enable Secure Shell) — toggle SSH on/off
+4. Relancer le playbook : `ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml`
+
+---
+
+## 5. Accéder à Vault
 
 Vault tourne sur `vault-vm` (`172.16.0.242`) port `8200`, sur le réseau privé `vmbr1`. Inaccessible directement — il faut un tunnel SSH via Proxmox.
 
-### 4.1 Ouvrir le tunnel SSH
+### 5.1 Ouvrir le tunnel SSH
 
 Dans un terminal dédié (à laisser ouvert) :
 
@@ -158,7 +188,7 @@ Puis ouvrir dans le navigateur :
 http://localhost:8200
 ```
 
-### 4.2 Vérifier l'état de Vault
+### 5.2 Vérifier l'état de Vault
 
 ```bash
 ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
@@ -173,7 +203,7 @@ Champs importants dans la réponse :
 | `Sealed` | `false` | Vault est opérationnel |
 | `HA Enabled` | `false` | Mode single-node (Raft) |
 
-### 4.3 Initialiser Vault (première fois uniquement)
+### 5.3 Initialiser Vault (première fois uniquement)
 
 Si `Initialized: false` :
 
@@ -198,7 +228,7 @@ Initial Root Token: hvs.xxxx
 
 Les unseal keys sont également sauvegardées automatiquement dans `/root/vault-init.json` sur `vault-vm` par le role Ansible.
 
-### 4.4 Unseal Vault
+### 5.4 Unseal Vault
 
 Vault se scelle à chaque redémarrage. Il faut 3 des 5 unseal keys pour le déverrouiller :
 
@@ -215,7 +245,7 @@ ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
 
 Après la 3ème clé, `Sealed` passe à `false` — Vault est opérationnel.
 
-### 4.5 Se connecter à l'UI
+### 5.5 Se connecter à l'UI
 
 Ouvrir `http://localhost:8200` (tunnel ouvert) et se connecter avec le **root token** (`hvs.xxxx`).
 
@@ -229,7 +259,7 @@ vault token create -policy=default -ttl=8h
 "
 ```
 
-### 4.6 Lire les unseal keys sauvegardées
+### 5.6 Lire les unseal keys sauvegardées
 
 ```bash
 ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
@@ -238,7 +268,7 @@ ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
 
 ---
 
-## 5. Diagnostics SSH
+## 6. Diagnostics SSH
 
 ### Vérifier la clé SSH dans une VM via QEMU agent
 
@@ -295,7 +325,7 @@ curl -s -k -X POST "https://${PROXMOX_HOST}:8006/api2/json/nodes/${PROXMOX_NODE}
 
 ---
 
-## 6. Résolution de problèmes
+## 7. Résolution de problèmes
 
 ### Packer Ubuntu — SSH auth failed (publickey)
 

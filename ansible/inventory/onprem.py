@@ -48,10 +48,10 @@ inventory = {
     "services": {
         "hosts": ["services-vm"]
     },
-    "Pfsense-OP": {
+    "Pfsense_OP": {
         "hosts": ["pfsense-op"]
     },
-    "Pfsense-Cloud": {
+    "Pfsense_Cloud": {
         "hosts": ["pfsense-cloud"]
     },
     "_meta": {
