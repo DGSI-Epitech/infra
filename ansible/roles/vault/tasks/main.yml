@@ -89,14 +89,14 @@
     owner: root
     group: root
     mode: "0600"
-  when: vault_init_output is changed
+  when: vault_init_output is not skipped
 
 - name: Fetch vault-init.json to Ansible controller
   fetch:
     src: /root/vault-init.json
     dest: "{{ playbook_dir }}/../vault-init.json"
     flat: true
-  when: vault_init_output is changed
+  when: vault_init_output is not skipped
 
 - name: Unseal Vault
   uri:
@@ -107,5 +107,5 @@
       key: "{{ item }}"
     status_code: 200
   loop: "{{ vault_init_output.json.keys_base64[:3] }}"
-  when: vault_init_output is changed
+  when: vault_init_output is not skipped
   no_log: true
