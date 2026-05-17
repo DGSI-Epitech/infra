@@ -32,4 +32,7 @@ vault-init.json
 # Config locale (IP, IDs VMs)
 config.env
 
+# Secrets Ansible (clé OpenVPN, etc.)
+ansible/vars/openvpn_secrets.yml
+
 CLAUDE.md

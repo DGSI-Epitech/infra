@@ -4,6 +4,8 @@
   gather_facts: false
   collections:
     - pfsensible.core
+  vars_files:
+    - ../vars/openvpn_secrets.yml
 
   tasks:
     - name: Autoriser tout le trafic LAN vers WAN
@@ -36,6 +38,41 @@
         source: any
         destination: any
         destination_port: "443"
+        state: present
+
+    - name: Autoriser port OpenVPN sortant sur WAN
+      pfsensible.core.pfsense_rule:
+        name: "Allow OpenVPN 1194"
+        action: pass
+        interface: wan
+        protocol: udp
+        source: any
+        destination: any
+        destination_port: "1194"
+        state: present
+
+    - name: Configurer client OpenVPN (connexion vers Cloud)
+      pfsensible.core.pfsense_openvpn_client:
+        name: "VPN_vers_Cloud"
+        mode: p2p_shared_key
+        protocol: UDP4
+        server_addr: "5.196.50.52"
+        server_port: "1194"
+        tunnel_network: "10.3.3.0/30"
+        remote_network:
+          - "192.168.255.240/28"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: []
+        state: present
+
+    - name: Autoriser trafic inter-sites sur interface OpenVPN (OP)
+      pfsensible.core.pfsense_rule:
+        name: "Allow OpenVPN inter-sites"
+        action: pass
+        interface: openvpn
+        protocol: any
+        source: any
+        destination: any
         state: present
 
     - name: Configurer les serveurs DNS cibles (Forwarders)
@@ -73,6 +110,8 @@
   gather_facts: false
   collections:
     - pfsensible.core
+  vars_files:
+    - ../vars/openvpn_secrets.yml
 
   tasks:
     - name: Autoriser tout le trafic DMZ vers ANY
@@ -126,6 +165,30 @@
         source: any
         destination: any
         destination_port: "1194"
+        state: present
+
+    - name: Configurer serveur OpenVPN (site-to-site vers OP)
+      pfsensible.core.pfsense_openvpn_server:
+        name: "VPN_vers_OP"
+        mode: p2p_shared_key
+        protocol: UDP4
+        interface: wan
+        local_port: "1194"
+        tunnel_network: "10.3.3.0/30"
+        remote_network:
+          - "172.16.255.240/28"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: []
+        state: present
+
+    - name: Autoriser trafic inter-sites sur interface OpenVPN (Cloud)
+      pfsensible.core.pfsense_rule:
+        name: "Allow OpenVPN inter-sites"
+        action: pass
+        interface: openvpn
+        protocol: any
+        source: any
+        destination: any
         state: present
 
     - name: Configurer les DNS cibles
