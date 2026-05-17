@@ -126,8 +126,8 @@
     mode: "0644"
 
 - block:
-    - name: Start remaining ELK services
-      command: docker compose up -d
+    - name: Start logstash and kibana
+      command: docker compose up -d logstash kibana
       args:
         chdir: "{{ elk_dir }}"
       register: compose_up
@@ -211,6 +211,12 @@
   retries: 30
   delay: 10
   until: fleet_setup.status in [200, 201]
+
+- name: Start fleet-server (after Kibana Fleet is ready)
+  command: docker compose up -d fleet-server
+  args:
+    chdir: "{{ elk_dir }}"
+  changed_when: true
 
 - name: Wait for fleet-server container to be running
   shell: docker ps --filter "name=^fleet-server$" --filter "status=running" -q
