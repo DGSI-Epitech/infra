@@ -348,7 +348,7 @@
   set_fact:
     fleet_enrollment_token: >-
       {{ (fleet_keys.json['items']
-        | selectattr('policy_id', '!=', fleet_server_policy.json.item.id)
+        | rejectattr('policy_id', 'equalto', fleet_server_policy.json.item.id)
         | selectattr('active', 'equalto', true)
         | list)[0].api_key }}
   no_log: true
