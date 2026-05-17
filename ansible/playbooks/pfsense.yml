@@ -62,6 +62,7 @@
         remote_network: "192.168.255.240/28"
         shared_key: "{{ openvpn_shared_key }}"
         data_ciphers: []
+        compression: ""
         state: present
 
     - name: Autoriser trafic inter-sites sur interface OpenVPN (OP)
@@ -78,6 +79,7 @@
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
       with_items:
+        - "192.168.255.254"
         - "1.1.1.1"
         - "8.8.8.8"
 
@@ -177,6 +179,7 @@
         remote_network: "172.16.255.240/28"
         shared_key: "{{ openvpn_shared_key }}"
         data_ciphers: []
+        compression: ""
         state: present
 
     - name: Autoriser trafic inter-sites sur interface OpenVPN (Cloud)
