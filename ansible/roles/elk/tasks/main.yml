@@ -212,6 +212,24 @@
   delay: 10
   until: fleet_setup.status in [200, 201]
 
+- name: Create default regular agent policy
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/agent_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "Default policy"
+      namespace: "default"
+      is_default: true
+      monitoring_enabled: ["logs", "metrics"]
+    status_code: [200, 201]
+  become: false
+
 - name: Configure Fleet Server URL in Kibana
   uri:
     url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/fleet_server_hosts"
