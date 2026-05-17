@@ -1,0 +1,82 @@
+---
+# Restauration du tunnel OpenVPN après un kill-switch.
+# Supprime les règles KILLSWITCH firewall et recrée le client/serveur OpenVPN.
+# Kill-switch : ansible-playbook playbooks/pfsense-killswitch.yml
+
+- name: Restore VPN — pfSense Cloud (serveur)
+  hosts: Pfsense_Cloud
+  gather_facts: false
+  collections:
+    - pfsensible.core
+  vars_files:
+    - ../vars/openvpn_secrets.yml
+
+  tasks:
+    - name: Supprimer la règle KILLSWITCH OpenVPN
+      pfsensible.core.pfsense_rule:
+        name: "KILLSWITCH_OpenVPN_1194"
+        interface: wan
+        state: absent
+
+    - name: Supprimer le serveur OpenVPN (forcer recréation)
+      pfsensible.core.pfsense_openvpn_server:
+        name: "VPN_vers_OP"
+        state: absent
+
+    - name: Recréer le serveur OpenVPN
+      pfsensible.core.pfsense_openvpn_server:
+        name: "VPN_vers_OP"
+        mode: p2p_shared_key
+        protocol: UDP4
+        interface: wan
+        local_port: "1194"
+        tunnel_network: "10.3.3.0/30"
+        remote_network: "172.16.255.240/28"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: []
+        compression: ""
+        disable: false
+        state: present
+
+- name: Restore VPN — pfSense OP (client)
+  hosts: Pfsense_OP
+  gather_facts: false
+  collections:
+    - pfsensible.core
+  vars_files:
+    - ../vars/openvpn_secrets.yml
+
+  tasks:
+    - name: Supprimer la règle KILLSWITCH OpenVPN
+      pfsensible.core.pfsense_rule:
+        name: "KILLSWITCH_OpenVPN_1194"
+        interface: wan
+        state: absent
+
+    - name: Supprimer le client OpenVPN (forcer recréation)
+      pfsensible.core.pfsense_openvpn_client:
+        name: "VPN_vers_Cloud"
+        mode: p2p_shared_key
+        server_addr: "5.196.50.52"
+        server_port: "1194"
+        tunnel_network: "10.3.3.0/30"
+        remote_network: "192.168.255.240/28"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: []
+        compression: ""
+        state: absent
+
+    - name: Recréer le client OpenVPN
+      pfsensible.core.pfsense_openvpn_client:
+        name: "VPN_vers_Cloud"
+        mode: p2p_shared_key
+        protocol: UDP4
+        server_addr: "5.196.50.52"
+        server_port: "1194"
+        tunnel_network: "10.3.3.0/30"
+        remote_network: "192.168.255.240/28"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: []
+        compression: ""
+        disable: false
+        state: present
