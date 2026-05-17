@@ -62,7 +62,6 @@
     --url="{{ fleet_server_url }}"
     --enrollment-token="{{ elastic_agent_enrollment_token }}"
     --insecure
-    --non-interactive
     --force
   register: enroll_result
   changed_when: enroll_result.rc == 0
