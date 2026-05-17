@@ -122,11 +122,20 @@ cd ansible
 # Vérifier l'inventaire généré
 python3 inventory/onprem.py --list | python3 -m json.tool
 
+# Configurer les pfSenses (firewall, VPN, DNS, CA)
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml
+
+# Couper le VPN en urgence
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml --tags killswitch
+
+# Rétablir le VPN
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml --tags restore
+
 # Déployer Vault
-ansible-playbook playbooks/vault.yml -i inventory/onprem.py
+ansible-playbook -i inventory/onprem.py playbooks/vault.yml
 
 # Déployer services-vm
-ansible-playbook playbooks/services-vm.yml -i inventory/onprem.py
+ansible-playbook -i inventory/onprem.py playbooks/services-vm.yml
 ```
 
 Les VMs étant sur `vmbr1` (réseau privé derrière pfSense), toutes les connexions Ansible passent automatiquement par Proxmox comme ProxyJump SSH.
@@ -167,6 +176,23 @@ Réactiver via la console Proxmox :
 2. Sélectionner la VM pfSense (VMID 125 pour OP, 106 pour Cloud) → **Console**
 3. Choisir l'**option 14** (Enable Secure Shell) — toggle SSH on/off
 4. Relancer le playbook : `ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml`
+
+### Couper le VPN en urgence (kill-switch)
+
+```bash
+cd ansible
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml --tags killswitch
+```
+
+Le SSH reste accessible sur `5.196.45.8` et `5.196.50.52` pour récupération.
+
+### Rétablir le VPN
+
+```bash
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml --tags restore
+```
+
+Le tunnel remonte en ~20 secondes.
 
 ---
 

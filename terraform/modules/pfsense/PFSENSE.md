@@ -42,10 +42,20 @@ Les variables suivantes doivent être renseignées dans `config.env` :
 
 ```bash
 cd ansible
-ansible-playbook playbooks/pfsense.yml -i inventory/onprem.py
+
+# Configuration complète (firewall, VPN, DNS, CA)
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml
+
+# Couper le VPN en urgence (kill-switch)
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml --tags killswitch
+
+# Rétablir le VPN après un kill-switch
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml --tags restore
 ```
 
-Ansible se connecte directement sur les IPs WAN (pas de ProxyJump) avec le compte `admin` en authentification par mot de passe.
+Ansible se connecte directement sur les IPs WAN avec le compte `admin` en authentification par mot de passe.
+
+> La clé OpenVPN partagée est dans `ansible/vars/openvpn_secrets.yml` (gitignored — ne pas committer).
 
 ---
 
@@ -58,9 +68,10 @@ Ansible se connecte directement sur les IPs WAN (pas de ProxyJump) avec le compt
 | Règle LAN → WAN | Autorise tout le trafic sortant depuis le LAN |
 | Règle SSH WAN | Autorise SSH entrant sur le WAN (port 22) |
 | Règle HTTPS WAN | Autorise HTTPS entrant sur le WAN (port 443) — accès webGUI |
-| Règle OpenVPN | Autorise tout le trafic dans le tunnel OpenVPN |
-| DNS Forwarders | `1.1.1.1` + `8.8.8.8` |
-| DNS Resolver | Activé en mode Forwarder — écoute sur LAN, sort par WAN |
+| Règle OpenVPN 1194 | Autorise UDP 1194 sur WAN |
+| Règle OpenVPN interface | Autorise tout le trafic inter-sites sur l'interface OpenVPN |
+| Client OpenVPN | Connexion vers pfSense Cloud (`5.196.50.52:1194`) — tunnel `10.3.3.0/30` |
+| DNS Forwarders | `192.168.255.254` (Cloud via VPN) + `1.1.1.1` + `8.8.8.8` |
 | CA interne | Crée `CAPfsense` (RSA 4096, SHA-256, 10 ans) si absente |
 | Export CA | Sauvegarde `CAPfsense.crt` en local (uniquement à la création) |
 
@@ -73,9 +84,9 @@ Ansible se connecte directement sur les IPs WAN (pas de ProxyJump) avec le compt
 | Règle SSH WAN | Autorise SSH entrant sur le WAN (port 22) |
 | Règle HTTPS WAN | Autorise HTTPS entrant sur le WAN (port 443) — accès webGUI |
 | Règle OpenVPN 1194 | Autorise UDP 1194 entrant sur le WAN |
-| Règle OpenVPN | Autorise tout le trafic dans le tunnel OpenVPN |
-| DNS Forwarders | `172.16.255.254` (via VPN) + `8.8.8.8` (secours) |
-| DNS Resolver | Activé en mode Forwarder — écoute sur LAN + DMZ (`opt1`), sort par WAN |
+| Règle OpenVPN interface | Autorise tout le trafic inter-sites sur l'interface OpenVPN |
+| Serveur OpenVPN | Écoute sur `1194/UDP` — tunnel `10.3.3.0/30`, route vers OP LAN `172.16.255.240/28` |
+| DNS Forwarders | `172.16.255.254` (OP via VPN) + `8.8.8.8` (secours) |
 
 ---
 
@@ -98,9 +109,9 @@ Internet
                     └── LAN  vmbr133  192.168.255.240/28  GW 192.168.255.254
                                 └── web  192.168.255.253
 
-Tunnel OpenVPN inter-sites : 10.3.3.0/29
-DNS OP  → 192.168.255.254 via VPN
-DNS Cloud → 172.16.255.254 via VPN
+Tunnel OpenVPN inter-sites : 10.3.3.0/30 (server=10.3.3.1, client=10.3.3.2)
+DNS OP    → 192.168.255.254 (Cloud) via VPN → 1.1.1.1 → 8.8.8.8
+DNS Cloud → 172.16.255.254 (OP) via VPN → 8.8.8.8
 ```
 
 ---
@@ -131,6 +142,30 @@ Pour le réactiver sans accès réseau :
 1. Ouvrir la console Proxmox : `https://ns3050272.ip-51-255-76.eu:8006` (pour OP) ou `https://ns3183326.ip-146-59-253.eu:8006` (pour Cloud)
 2. Sélectionner la VM pfSense → **Console**
 3. Choisir l'**option 14** (Enable Secure Shell) — cette option toggle SSH, sélectionner une fois pour activer, une fois pour désactiver
+
+---
+
+## Emergency cut-off VPN (kill-switch)
+
+Coupe le tunnel inter-sites immédiatement. Le SSH WAN reste accessible sur les deux pfSenses pour récupération.
+
+```bash
+cd ansible
+
+# Couper le VPN
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml --tags killswitch
+
+# Rétablir le VPN
+ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml --tags restore
+```
+
+**Ce que fait le kill-switch :**
+1. Ajoute une règle `KILLSWITCH_OpenVPN_1194` (block UDP 1194) sur le WAN des deux pfSenses
+2. Tue le processus OpenVPN actif — le tunnel tombe immédiatement
+
+**Ce que fait le restore :**
+1. Supprime la règle `KILLSWITCH_OpenVPN_1194`
+2. Recrée le serveur/client OpenVPN — le tunnel remonte en ~20 secondes
 
 ---
 
