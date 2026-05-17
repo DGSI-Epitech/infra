@@ -344,9 +344,13 @@
   until: fleet_keys.status == 200 and (fleet_keys.json['items'] | default([]) | length) > 0
   become: false
 
-- name: Set fleet enrollment token fact
+- name: Set fleet enrollment token fact (regular agent policy only)
   set_fact:
-    fleet_enrollment_token: "{{ fleet_keys.json['items'][0].api_key }}"
+    fleet_enrollment_token: >-
+      {{ (fleet_keys.json['items']
+        | selectattr('policy_id', '!=', fleet_server_policy.json.item.id)
+        | selectattr('active', 'equalto', true)
+        | list)[0].api_key }}
   no_log: true
 
 # --- Écriture du token dans Vault ---
