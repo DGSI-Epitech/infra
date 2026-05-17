@@ -1,4 +1,11 @@
 ---
+# Configuration complète des deux pfSenses.
+#
+# Usage :
+#   ansible-playbook pfsense.yml                    # configuration complète
+#   ansible-playbook pfsense.yml --tags killswitch  # couper le VPN (urgence)
+#   ansible-playbook pfsense.yml --tags restore     # rétablir le VPN
+
 - name: Configure pfSense OP (Site Local)
   hosts: Pfsense_OP
   gather_facts: false
@@ -6,8 +13,20 @@
     - pfsensible.core
   vars_files:
     - ../vars/openvpn_secrets.yml
+  vars:
+    openvpn_client:
+      name: "VPN_vers_Cloud"
+      mode: p2p_shared_key
+      protocol: UDP4
+      server_addr: "5.196.50.52"
+      server_port: "1194"
+      tunnel_network: "10.3.3.0/30"
+      remote_network: "192.168.255.240/28"
+      data_ciphers: []
+      compression: ""
 
   tasks:
+    # ── Firewall ────────────────────────────────────────────────────────────
     - name: Autoriser tout le trafic LAN vers WAN
       pfsensible.core.pfsense_rule:
         name: "Allow LAN to WAN"
@@ -17,6 +36,7 @@
         source: any
         destination: any
         state: present
+      tags: [configure, firewall]
 
     - name: Autoriser SSH entrant sur WAN
       pfsensible.core.pfsense_rule:
@@ -28,6 +48,7 @@
         destination: any
         destination_port: "22"
         state: present
+      tags: [configure, firewall]
 
     - name: Autoriser HTTPS entrant sur WAN (webGUI)
       pfsensible.core.pfsense_rule:
@@ -39,8 +60,9 @@
         destination: any
         destination_port: "443"
         state: present
+      tags: [configure, firewall]
 
-    - name: Autoriser port OpenVPN sortant sur WAN
+    - name: Autoriser port OpenVPN sur WAN
       pfsensible.core.pfsense_rule:
         name: "Allow OpenVPN 1194"
         action: pass
@@ -50,22 +72,9 @@
         destination: any
         destination_port: "1194"
         state: present
+      tags: [configure, firewall, vpn]
 
-    - name: Configurer client OpenVPN (connexion vers Cloud)
-      pfsensible.core.pfsense_openvpn_client:
-        name: "VPN_vers_Cloud"
-        mode: p2p_shared_key
-        protocol: UDP4
-        server_addr: "5.196.50.52"
-        server_port: "1194"
-        tunnel_network: "10.3.3.0/30"
-        remote_network: "192.168.255.240/28"
-        shared_key: "{{ openvpn_shared_key }}"
-        data_ciphers: []
-        compression: ""
-        state: present
-
-    - name: Autoriser trafic inter-sites sur interface OpenVPN (OP)
+    - name: Autoriser trafic inter-sites sur interface OpenVPN
       pfsensible.core.pfsense_rule:
         name: "Allow OpenVPN inter-sites"
         action: pass
@@ -74,15 +83,35 @@
         source: any
         destination: any
         state: present
+      tags: [configure, firewall, vpn]
 
-    - name: Configurer les serveurs DNS cibles (Forwarders)
+    # ── VPN ─────────────────────────────────────────────────────────────────
+    - name: Configurer client OpenVPN (connexion vers Cloud)
+      pfsensible.core.pfsense_openvpn_client:
+        name: "{{ openvpn_client.name }}"
+        mode: "{{ openvpn_client.mode }}"
+        protocol: "{{ openvpn_client.protocol }}"
+        server_addr: "{{ openvpn_client.server_addr }}"
+        server_port: "{{ openvpn_client.server_port }}"
+        tunnel_network: "{{ openvpn_client.tunnel_network }}"
+        remote_network: "{{ openvpn_client.remote_network }}"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: "{{ openvpn_client.data_ciphers }}"
+        compression: "{{ openvpn_client.compression }}"
+        state: present
+      tags: [configure, vpn]
+
+    # ── DNS ─────────────────────────────────────────────────────────────────
+    - name: Configurer les serveurs DNS (Forwarders)
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
       with_items:
         - "192.168.255.254"
         - "1.1.1.1"
         - "8.8.8.8"
+      tags: [configure, dns]
 
+    # ── CA ──────────────────────────────────────────────────────────────────
     - name: Créer l'Autorité de Certification (CAPfsense)
       pfsensible.core.pfsense_ca:
         name: "CA Interne pour Vault TLS"
@@ -98,6 +127,7 @@
         dn_commonname: "CAPfsense"
         state: present
       register: ca_result
+      tags: [configure, ca]
 
     - name: Sauvegarder le certificat public CA en local
       ansible.builtin.copy:
@@ -105,6 +135,63 @@
         dest: "./CAPfsense.crt"
       delegate_to: localhost
       when: ca_result.ca is defined
+      tags: [configure, ca]
+
+    # ── KILLSWITCH ──────────────────────────────────────────────────────────
+    - name: "[KILLSWITCH] Bloquer OpenVPN 1194 sur WAN"
+      pfsensible.core.pfsense_rule:
+        name: "KILLSWITCH_OpenVPN_1194"
+        action: block
+        interface: wan
+        protocol: udp
+        source: any
+        destination: "{{ openvpn_client.server_addr }}"
+        destination_port: "1194"
+        state: present
+      tags: [never, killswitch]
+
+    - name: "[KILLSWITCH] Tuer le processus OpenVPN client"
+      ansible.builtin.raw: kill $(cat /var/run/openvpn_client1.pid 2>/dev/null) 2>/dev/null || pkill -f 'openvpn.*client1' 2>/dev/null; true
+      tags: [never, killswitch]
+
+    # ── RESTORE ─────────────────────────────────────────────────────────────
+    - name: "[RESTORE] Supprimer la règle KILLSWITCH"
+      pfsensible.core.pfsense_rule:
+        name: "KILLSWITCH_OpenVPN_1194"
+        interface: wan
+        state: absent
+      tags: [never, restore]
+
+    - name: "[RESTORE] Supprimer le client OpenVPN (forcer recréation)"
+      pfsensible.core.pfsense_openvpn_client:
+        name: "{{ openvpn_client.name }}"
+        mode: "{{ openvpn_client.mode }}"
+        server_addr: "{{ openvpn_client.server_addr }}"
+        server_port: "{{ openvpn_client.server_port }}"
+        tunnel_network: "{{ openvpn_client.tunnel_network }}"
+        remote_network: "{{ openvpn_client.remote_network }}"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: "{{ openvpn_client.data_ciphers }}"
+        compression: "{{ openvpn_client.compression }}"
+        state: absent
+      tags: [never, restore]
+
+    - name: "[RESTORE] Recréer le client OpenVPN"
+      pfsensible.core.pfsense_openvpn_client:
+        name: "{{ openvpn_client.name }}"
+        mode: "{{ openvpn_client.mode }}"
+        protocol: "{{ openvpn_client.protocol }}"
+        server_addr: "{{ openvpn_client.server_addr }}"
+        server_port: "{{ openvpn_client.server_port }}"
+        tunnel_network: "{{ openvpn_client.tunnel_network }}"
+        remote_network: "{{ openvpn_client.remote_network }}"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: "{{ openvpn_client.data_ciphers }}"
+        compression: "{{ openvpn_client.compression }}"
+        disable: false
+        state: present
+      tags: [never, restore]
+
 
 - name: Configure pfSense Cloud
   hosts: Pfsense_Cloud
@@ -113,8 +200,20 @@
     - pfsensible.core
   vars_files:
     - ../vars/openvpn_secrets.yml
+  vars:
+    openvpn_server:
+      name: "VPN_vers_OP"
+      mode: p2p_shared_key
+      protocol: UDP4
+      interface: wan
+      local_port: "1194"
+      tunnel_network: "10.3.3.0/30"
+      remote_network: "172.16.255.240/28"
+      data_ciphers: []
+      compression: ""
 
   tasks:
+    # ── Firewall ────────────────────────────────────────────────────────────
     - name: Autoriser tout le trafic DMZ vers ANY
       pfsensible.core.pfsense_rule:
         name: "Allow DMZ to ANY"
@@ -124,6 +223,7 @@
         source: any
         destination: any
         state: present
+      tags: [configure, firewall]
 
     - name: Autoriser tout le trafic LAN vers ANY
       pfsensible.core.pfsense_rule:
@@ -134,6 +234,7 @@
         source: any
         destination: any
         state: present
+      tags: [configure, firewall]
 
     - name: Autoriser SSH entrant sur WAN
       pfsensible.core.pfsense_rule:
@@ -145,6 +246,7 @@
         destination: any
         destination_port: "22"
         state: present
+      tags: [configure, firewall]
 
     - name: Autoriser HTTPS entrant sur WAN (webGUI)
       pfsensible.core.pfsense_rule:
@@ -156,6 +258,7 @@
         destination: any
         destination_port: "443"
         state: present
+      tags: [configure, firewall]
 
     - name: Autoriser port OpenVPN entrant (1194 UDP)
       pfsensible.core.pfsense_rule:
@@ -167,22 +270,9 @@
         destination: any
         destination_port: "1194"
         state: present
+      tags: [configure, firewall, vpn]
 
-    - name: Configurer serveur OpenVPN (site-to-site vers OP)
-      pfsensible.core.pfsense_openvpn_server:
-        name: "VPN_vers_OP"
-        mode: p2p_shared_key
-        protocol: UDP4
-        interface: wan
-        local_port: "1194"
-        tunnel_network: "10.3.3.0/30"
-        remote_network: "172.16.255.240/28"
-        shared_key: "{{ openvpn_shared_key }}"
-        data_ciphers: []
-        compression: ""
-        state: present
-
-    - name: Autoriser trafic inter-sites sur interface OpenVPN (Cloud)
+    - name: Autoriser trafic inter-sites sur interface OpenVPN
       pfsensible.core.pfsense_rule:
         name: "Allow OpenVPN inter-sites"
         action: pass
@@ -191,10 +281,76 @@
         source: any
         destination: any
         state: present
+      tags: [configure, firewall, vpn]
 
-    - name: Configurer les DNS cibles
+    # ── VPN ─────────────────────────────────────────────────────────────────
+    - name: Configurer serveur OpenVPN (site-to-site vers OP)
+      pfsensible.core.pfsense_openvpn_server:
+        name: "{{ openvpn_server.name }}"
+        mode: "{{ openvpn_server.mode }}"
+        protocol: "{{ openvpn_server.protocol }}"
+        interface: "{{ openvpn_server.interface }}"
+        local_port: "{{ openvpn_server.local_port }}"
+        tunnel_network: "{{ openvpn_server.tunnel_network }}"
+        remote_network: "{{ openvpn_server.remote_network }}"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: "{{ openvpn_server.data_ciphers }}"
+        compression: "{{ openvpn_server.compression }}"
+        state: present
+      tags: [configure, vpn]
+
+    # ── DNS ─────────────────────────────────────────────────────────────────
+    - name: Configurer les DNS cibles (Forwarders)
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
       with_items:
         - "172.16.255.254"
         - "8.8.8.8"
+      tags: [configure, dns]
+
+    # ── KILLSWITCH ──────────────────────────────────────────────────────────
+    - name: "[KILLSWITCH] Bloquer OpenVPN 1194 entrant sur WAN"
+      pfsensible.core.pfsense_rule:
+        name: "KILLSWITCH_OpenVPN_1194"
+        action: block
+        interface: wan
+        protocol: udp
+        source: any
+        destination: any
+        destination_port: "1194"
+        state: present
+      tags: [never, killswitch]
+
+    - name: "[KILLSWITCH] Tuer le processus OpenVPN serveur"
+      ansible.builtin.raw: kill $(cat /var/run/openvpn_server1.pid 2>/dev/null) 2>/dev/null || pkill -f 'openvpn.*server1' 2>/dev/null; true
+      tags: [never, killswitch]
+
+    # ── RESTORE ─────────────────────────────────────────────────────────────
+    - name: "[RESTORE] Supprimer la règle KILLSWITCH"
+      pfsensible.core.pfsense_rule:
+        name: "KILLSWITCH_OpenVPN_1194"
+        interface: wan
+        state: absent
+      tags: [never, restore]
+
+    - name: "[RESTORE] Supprimer le serveur OpenVPN (forcer recréation)"
+      pfsensible.core.pfsense_openvpn_server:
+        name: "{{ openvpn_server.name }}"
+        state: absent
+      tags: [never, restore]
+
+    - name: "[RESTORE] Recréer le serveur OpenVPN"
+      pfsensible.core.pfsense_openvpn_server:
+        name: "{{ openvpn_server.name }}"
+        mode: "{{ openvpn_server.mode }}"
+        protocol: "{{ openvpn_server.protocol }}"
+        interface: "{{ openvpn_server.interface }}"
+        local_port: "{{ openvpn_server.local_port }}"
+        tunnel_network: "{{ openvpn_server.tunnel_network }}"
+        remote_network: "{{ openvpn_server.remote_network }}"
+        shared_key: "{{ openvpn_shared_key }}"
+        data_ciphers: "{{ openvpn_server.data_ciphers }}"
+        compression: "{{ openvpn_server.compression }}"
+        disable: false
+        state: present
+      tags: [never, restore]
