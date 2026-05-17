@@ -233,16 +233,17 @@
 
 - block:
     - name: Wait for Fleet Server API to be ready
-      shell: >
-        curl -sf --connect-timeout 5 --max-time 10
-        http://127.0.0.1:{{ elk_fleet_port }}/api/status 2>/dev/null ||
-        curl -sfk --connect-timeout 5 --max-time 10
-        https://127.0.0.1:{{ elk_fleet_port }}/api/status 2>/dev/null
+      uri:
+        url: "http://127.0.0.1:{{ elk_fleet_port }}/api/status"
+        method: GET
+        status_code: 200
+        return_content: true
       register: fleet_api_check
       retries: 60
       delay: 15
-      until: fleet_api_check.rc == 0
-      changed_when: false
+      until: >
+        fleet_api_check.status == 200 and
+        (fleet_api_check.json.status | default('')) == 'HEALTHY'
       become: false
   rescue:
     - name: Get fleet-server logs on failure
