@@ -17,7 +17,7 @@ Proxmox (51.75.128.134) ← tunnel SSH
     ▼
 services-vm (172.16.0.242) ← Teleport
     │
-    ├── vault-vm     (172.16.0.11)
+    ├── ops-vm     (172.16.0.11)
     └── autres VMs du LAN
 ```
 

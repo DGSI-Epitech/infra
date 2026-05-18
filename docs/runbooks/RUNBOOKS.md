@@ -59,8 +59,8 @@ PROXMOX_STORAGE_VM="local"
 VM_ID_UBUNTU_TEMPLATE=1000
 VM_ID_PFSENSE_TEMPLATE=2000
 VM_ID_PFSENSE=2100
-VM_ID_SERVICES=2300
-VM_ID_OPS=2200
+VM_ID_SERVICES=1100
+VM_ID_OPS=1200
 
 VM_IP_SERVICES="172.16.0.241/24"   # fallback si OPS_IP non exporté
 VM_IP_OPS="172.16.0.242/24"        # fallback si SERVICES_IP non exporté
@@ -93,7 +93,7 @@ Le script fait dans l'ordre :
 4. Build Packer pfSense si le template est absent (~3 min)
 5. Terraform pfSense + attente 30s
 6. Build Packer Ubuntu si le template est absent (~25 min)
-7. Terraform vault-vm + services-vm
+7. Terraform ops-vm + services-vm
 8. Attente QEMU agent + injection clé SSH via API
 9. Vérification SSH via ProxyJump Proxmox
 10. Ansible : install Vault, init, unseal
@@ -252,7 +252,7 @@ ssh -o ProxyJump=root@51.75.128.134 ubuntu@172.16.0.242 \
 
 **Sauvegarder ces valeurs immédiatement.** Sans les unseal keys, les données Vault sont irrécupérables si la VM redémarre.
 
-Les unseal keys sont également sauvegardées automatiquement dans `/root/vault-init.json` sur `vault-vm` par le role Ansible.
+Les unseal keys sont également sauvegardées automatiquement dans `/root/vault-init.json` sur `ops-vm` par le role Ansible.
 
 ### 5.4 Unseal Vault
 
@@ -489,7 +489,7 @@ Packer arrive à la VM via le bastion mais la clé est rejetée. Causes possible
 2. **`SSH_PRIVATE_KEY_FILE` ne correspond pas à `SSH_PUBLIC_KEY`** dans `config.env` : les deux doivent être la même paire
 3. **`SSH_PRIVATE_KEY_FILE` non défini** dans `config.env` : le script affiche une erreur de validation au démarrage
 
-### Permission denied (publickey) sur vault-vm ou services-vm
+### Permission denied (publickey) sur ops-vm ou services-vm
 
 La clé SSH n'est pas dans `authorized_keys`. Cloud-init ne l'injecte pas pour les users créés par autoinstall.
 

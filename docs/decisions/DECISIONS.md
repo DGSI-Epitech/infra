@@ -265,23 +265,6 @@ Filebeat sur `services-vm` doit connaître l'IP de Logstash sur `ops-vm`. Cette 
 
 `ansible_host` de ops-vm (lu depuis l'inventaire dynamique, lui-même lu depuis `$OPS_IP` ou `config.env`) est injecté dans `filebeat.yml.j2` comme destination Logstash. Aucune IP hardcodée nulle part.
 
-### Résolution dynamique de l'IP ops-vm pour Filebeat
-
-Filebeat sur `services-vm` doit connaître l'IP de Logstash sur `ops-vm`. Cette IP est assignée par DHCP et peut changer à chaque déploiement. Le playbook `filebeat.yml` la résout dynamiquement :
-
-```yaml
-- name: Gather ops-vm facts for logstash host resolution
-  hosts: ops
-  gather_facts: true
-
-- name: Deploy Filebeat
-  hosts: services
-  vars:
-    elk_logstash_host: "{{ hostvars[groups['ops'][0]]['ansible_host'] }}"
-```
-
-`ansible_host` de ops-vm (lu depuis l'inventaire dynamique, lui-même lu depuis `$OPS_IP` ou `config.env`) est injecté dans `filebeat.yml.j2` comme destination Logstash. Aucune IP hardcodée nulle part.
-
 ### Renommage vault-vm → ops-vm
 
 La VM s'appelait initialement `vault-vm` car elle n'hébergeait que Vault. Après l'ajout de la stack ELK, ce nom ne reflétait plus son contenu. Elle a été renommée `ops-vm` (operations VM) : terme générique qui couvre les services transverses (secrets management + observabilité) sans être lié à un outil spécifique.
