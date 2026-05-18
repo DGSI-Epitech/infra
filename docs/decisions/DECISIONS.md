@@ -155,3 +155,58 @@ pfSense n'a pas de mécanisme de cloud-init. L'installation manuelle est répét
 ### Pourquoi `communicator = "none"` pour pfSense ?
 
 pfSense (FreeBSD) n'a pas Python ni d'environnement compatible avec les provisioners Packer. Toute la configuration est faite via le CD virtuel. Aucune connexion SSH post-install n'est nécessaire.
+
+---
+
+## Configuration pfSense dual-site via Ansible
+
+**Date :** 2026-05-18
+**Branche :** `config-Pfsense`
+
+### Décision
+
+Le playbook `ansible/playbooks/pfsense.yml` configure les deux pfSense (OP et Cloud) en un seul pipeline. Deux plays distincts ciblent respectivement `Pfsense-OP` et `Pfsense-Cloud`.
+
+### Ce que configure le playbook
+
+**Site OP (PVE1) :**
+- Règle LAN → WAN (trafic sortant libre)
+- SSH WAN ouvert (accès opérateur depuis n'importe où — lab)
+- DNS forwarders : `1.1.1.1`, `8.8.8.8`
+- Création de la CA interne (`CAPfsense`, RSA 4096, SHA-256, 10 ans)
+- Export du certificat public CA en local (`CAPfsense.crt`) pour distribution aux VMs
+
+**Site Cloud (PVE2) :**
+- DMZ → LAN bloqué (sauf port 3022 pour les agents Teleport)
+- DMZ → Internet autorisé
+- LAN → ANY autorisé
+- SSH WAN ouvert (lab)
+- OpenVPN 1194 UDP ouvert (tunnel inter-sites)
+- DNS : `172.16.255.254` (pfSense OP) + `8.8.8.8` — résolution interne via Site 1
+
+### Pourquoi la CA sur pfSense OP ?
+
+pfSense intègre une PKI native (OpenSSL/FreeBSD). La CA reste derrière le pare-feu, séparée des VMs applicatives. Elle signe les certificats OpenVPN inter-sites et les services internes (Vault TLS).
+
+### Pourquoi bloquer DMZ → LAN ?
+
+Le bastion Teleport est exposé à internet (DMZ). S'il est compromis, une règle `Allow DMZ to ANY` permet de pivoter librement vers le LAN. La règle `Block DMZ to LAN` isole la DMZ — seul le port 3022 (agent Teleport) est autorisé vers le LAN.
+
+---
+
+## Terraform — depends_on services_vm → vault_vm
+
+**Date :** 2026-05-18
+**Branche :** `config-Pfsense`
+
+### Problème
+
+Sans dépendance explicite, Terraform déployait `services_vm` et `vault_vm` en parallèle. Les deux clonent le même template Ubuntu (ID 1000). Proxmox verrouille le template pendant le clone — le second clone échoue avec une erreur de lock.
+
+### Décision
+
+`depends_on = [module.vault_vm]` dans `services_vm` force un déploiement séquentiel. Le template est libéré par Proxmox entre les deux clones.
+
+### Pourquoi pas un `depends_on` inverse ?
+
+`vault_vm` est le service critique — il doit être disponible en premier pour que les autres VMs puissent récupérer leurs secrets. L'ordre vault → services est cohérent avec la dépendance fonctionnelle.

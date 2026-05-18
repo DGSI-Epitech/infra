@@ -64,9 +64,30 @@
     - pfsensible.core
 
   tasks:
-    - name: Autoriser tout le trafic DMZ vers ANY
+    - name: Bloquer DMZ vers LAN interne
       pfsensible.core.pfsense_rule:
-        name: "Allow DMZ to ANY"
+        name: "Block DMZ to LAN"
+        action: block
+        interface: opt1
+        protocol: any
+        source: any
+        destination: "192.168.255.240/28"
+        state: present
+
+    - name: Autoriser Teleport (DMZ) vers noeuds LAN port 3022
+      pfsensible.core.pfsense_rule:
+        name: "Allow Teleport DMZ to LAN nodes"
+        action: pass
+        interface: opt1
+        protocol: tcp
+        source: any
+        destination: "192.168.255.240/28"
+        destination_port: "3022"
+        state: present
+
+    - name: Autoriser trafic DMZ vers internet
+      pfsensible.core.pfsense_rule:
+        name: "Allow DMZ to Internet"
         action: pass
         interface: opt1
         protocol: any
