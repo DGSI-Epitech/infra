@@ -54,8 +54,8 @@ variable "services_vm_id" {
   type        = number
 }
 
-variable "vault_vm_id" {
-  description = "Proxmox VM ID for Vault"
+variable "ops_vm_id" {
+  description = "Proxmox VM ID for Ops VM (Vault + ELK)"
   type        = number
 }
 

@@ -1,0 +1,21 @@
+filebeat.inputs:
+  - type: filestream
+    id: syslog
+    enabled: true
+    paths:
+      - /var/log/syslog
+      - /var/log/auth.log
+
+  - type: filestream
+    id: docker-containers
+    enabled: true
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    parsers:
+      - ndjson:
+          message_key: log
+          keys_under_root: true
+          overwrite_keys: true
+
+output.logstash:
+  hosts: ["{{ elk_logstash_host }}:{{ elk_logstash_port }}"]

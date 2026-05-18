@@ -13,7 +13,7 @@ Opérateur (machine locale)
   ├──► Proxmox root (51.75.128.134)     SSH directe
   │         │
   │         │  ProxyJump
-  │         ├──► vault-vm    (172.16.0.x)   clé injectée via QEMU agent
+  │         ├──► ops-vm    (172.16.0.x)   clé injectée via QEMU agent
   │         └──► services-vm (172.16.0.x)   clé injectée via QEMU agent
   │
   ├──► pfSense admin (172.16.0.254)     clé dans config.xml (Packer)
@@ -21,7 +21,7 @@ Opérateur (machine locale)
   └──► VM Ubuntu pendant build Packer   password éphémère (jamais stocké)
 ```
 
-Les VMs Ubuntu (`vault-vm`, `services-vm`) sont sur `vmbr1`, un réseau privé inaccessible directement depuis l'extérieur. Tout accès passe par Proxmox comme **ProxyJump SSH**.
+Les VMs Ubuntu (`ops-vm`, `services-vm`) sont sur `vmbr1`, un réseau privé inaccessible directement depuis l'extérieur. Tout accès passe par Proxmox comme **ProxyJump SSH**.
 
 ---
 
@@ -96,11 +96,11 @@ Après le `terraform apply`, `deploy.sh` utilise l'API Proxmox pour exécuter un
 Sequence dans deploy.sh :
 ```
 terraform apply (VMs créées)
-  └─► wait_for_agent(vault-vm)    # QEMU agent opérationnel ?
+  └─► wait_for_agent(ops-vm)    # QEMU agent opérationnel ?
   └─► wait_for_agent(services-vm)
-  └─► inject_ssh_key(vault-vm)    # écriture authorized_keys via API
+  └─► inject_ssh_key(ops-vm)    # écriture authorized_keys via API
   └─► inject_ssh_key(services-vm)
-  └─► wait_for_ssh(vault-vm)      # vérification SSH via ProxyJump
+  └─► wait_for_ssh(ops-vm)      # vérification SSH via ProxyJump
   └─► wait_for_ssh(services-vm)
   └─► ansible-playbook
 ```
@@ -152,7 +152,7 @@ npm run deploy
   ├─[6] Packer Ubuntu (si template absent)
   │       └─► password éphémère → build → clé injectée → nettoyée → template ID 1000
   │
-  ├─[7] Terraform vault-vm + services-vm → clones + cloud-init IP
+  ├─[7] Terraform ops-vm + services-vm → clones + cloud-init IP
   │
   ├─[8] wait_for_agent + inject_ssh_key (QEMU agent API)
   │
@@ -176,7 +176,7 @@ npm run deploy
 
 ## Phase 2 — Vault remplace config.env
 
-Une fois Vault opérationnel sur `vault-vm`, il prend la relève :
+Une fois Vault opérationnel sur `ops-vm`, il prend la relève :
 
 | Usage | Mécanisme Vault |
 |---|---|

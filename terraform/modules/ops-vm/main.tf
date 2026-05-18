@@ -1,8 +1,8 @@
-resource "proxmox_virtual_environment_vm" "vault_vm" {
-  name      = "vault-vm"
+resource "proxmox_virtual_environment_vm" "ops_vm" {
+  name      = "ops-vm"
   node_name = var.proxmox_node
   vm_id     = var.vm_id
-  tags      = ["vault", "ubuntu-22-04"]
+  tags      = ["ops", "ubuntu-22-04"]
   boot_order = ["virtio0"]
 
   clone {
@@ -32,6 +32,12 @@ resource "proxmox_virtual_environment_vm" "vault_vm" {
 
   operating_system {
     type = "l26"
+  }
+
+  disk {
+    datastore_id = var.storage_vm
+    interface    = "virtio0"
+    size         = var.disk_size_gb
   }
 
   initialization {

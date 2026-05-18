@@ -1,0 +1,6 @@
+---
+- name: restart elk
+  command: docker compose up -d --force-recreate
+  args:
+    chdir: "{{ elk_dir }}"
+  become: true

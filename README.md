@@ -28,7 +28,7 @@ Tout est automatisé : une commande déploie pfSense, les templates et les VMs. 
 
 ### Générer et configurer la clé SSH
 
-L'infrastructure n'utilise **aucun password** pour accéder aux VMs. Une unique paire de clés SSH couvre tous les accès : Packer (communicator + bastion), Terraform (provider bpg), Ansible (pfSense, vault-vm, services-vm).
+L'infrastructure n'utilise **aucun password** pour accéder aux VMs. Une unique paire de clés SSH couvre tous les accès : Packer (communicator + bastion), Terraform (provider bpg), Ansible (pfSense, ops-vm, services-vm).
 
 ```bash
 # 1. Générer la paire de clés (si elle n'existe pas déjà)
@@ -88,7 +88,7 @@ Le script fait dans l'ordre :
 2. Suppression des VMs existantes (pfSense, services, vault)
 3. Création du bridge LAN `vmbr1` si absent
 4. Build Packer de la template pfSense (si absente)
-5. `terraform apply` — template Ubuntu + pfSense VM + services-vm + vault-vm
+5. `terraform apply` — template Ubuntu + pfSense VM + services-vm + ops-vm
 
 ### 3. Configurer les services
 
@@ -125,7 +125,7 @@ VM_ID_UBUNTU_TEMPLATE=9000       # template Ubuntu (Terraform)
 VM_ID_PFSENSE_TEMPLATE=9001      # template pfSense (Packer)
 VM_ID_PFSENSE=1001               # VM pfSense déployée
 VM_ID_SERVICES=1003              # VM services (Netbox, etc.)
-VM_ID_VAULT=1002                 # VM HashiCorp Vault
+VM_ID_OPS=1200                   # VM ops (Vault + ELK)
 
 # SSH — aucun password sur les VMs, clé SSH uniquement
 SSH_PUBLIC_KEY="ssh-ed25519 AAAA..."       # cat ~/.ssh/id_ed25519.pub
@@ -154,7 +154,7 @@ SSH_PRIVATE_KEY_FILE="~/.ssh/id_ed25519"  # clé privée correspondante
 | pfsense-template | 9001 | — | — |
 | pfsense-fw-01 | 1001 | 172.16.255.254 (LAN) | vmbr0 + vmbr1 |
 | services-vm | 1003 | 172.16.255.242/28 | vmbr1 |
-| vault-vm | 1002 | 172.16.255.243/28 | vmbr1 |
+| ops-vm | 1200 | DHCP (172.16.0.x) | vmbr1 |
 
 ---
 
@@ -175,7 +175,7 @@ infra/
 │       ├── ubuntu-template/
 │       ├── pfsense/
 │       ├── services-vm/
-│       └── vault-vm/
+│       └── ops-vm/
 ├── ansible/
 │   ├── inventory/onprem.py
 │   ├── playbooks/vault.yml

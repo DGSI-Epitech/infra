@@ -1,0 +1,450 @@
+---
+- name: Set vm.max_map_count for Elasticsearch
+  sysctl:
+    name: vm.max_map_count
+    value: "262144"
+    state: present
+    reload: true
+
+- name: Create ELK directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ elk_dir }}",                          mode: "0755" }
+    - { path: "{{ elk_dir }}/elasticsearch/config",     mode: "0755" }
+    - { path: "{{ elk_dir }}/elasticsearch/data",       mode: "0755" }
+    - { path: "{{ elk_dir }}/logstash/config",          mode: "0755" }
+    - { path: "{{ elk_dir }}/logstash/pipeline",        mode: "0755" }
+    - { path: "{{ elk_dir }}/kibana/config",            mode: "0755" }
+
+- name: Set Elasticsearch data directory ownership
+  file:
+    path: "{{ elk_dir }}/elasticsearch/data"
+    state: directory
+    owner: "1000"
+    group: "1000"
+
+- name: Deploy Elasticsearch config
+  template:
+    src: elasticsearch.yml.j2
+    dest: "{{ elk_dir }}/elasticsearch/config/elasticsearch.yml"
+    mode: "0644"
+  notify: restart elk
+
+- name: Deploy Logstash config
+  template:
+    src: logstash.yml.j2
+    dest: "{{ elk_dir }}/logstash/config/logstash.yml"
+    mode: "0644"
+  notify: restart elk
+
+- name: Deploy Logstash pipeline
+  template:
+    src: pipeline.conf.j2
+    dest: "{{ elk_dir }}/logstash/pipeline/main.conf"
+    mode: "0644"
+  notify: restart elk
+
+- name: Deploy Kibana config
+  template:
+    src: kibana.yml.j2
+    dest: "{{ elk_dir }}/kibana/config/kibana.yml"
+    mode: "0644"
+  notify: restart elk
+
+- name: Deploy docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ elk_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: restart elk
+
+- name: Start Elasticsearch
+  command: docker compose up -d elasticsearch
+  args:
+    chdir: "{{ elk_dir }}"
+  changed_when: false
+
+- name: Wait for Elasticsearch to be ready
+  uri:
+    url: "http://127.0.0.1:{{ elk_es_port }}/_cluster/health"
+    method: GET
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    status_code: 200
+  register: es_health
+  retries: 20
+  delay: 10
+  until: es_health.status == 200
+
+- name: Set kibana_system password in Elasticsearch
+  uri:
+    url: "http://127.0.0.1:{{ elk_es_port }}/_security/user/kibana_system/_password"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      password: "{{ elk_kibana_system_password }}"
+    status_code: 200
+  no_log: true
+
+- name: Delete existing fleet-server service token (idempotent)
+  uri:
+    url: "http://127.0.0.1:{{ elk_es_port }}/_security/service/elastic/fleet-server/credential/token/fleet-ansible"
+    method: DELETE
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  no_log: true
+
+- name: Create fleet-server service token
+  uri:
+    url: "http://127.0.0.1:{{ elk_es_port }}/_security/service/elastic/fleet-server/credential/token/fleet-ansible"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    status_code: [200, 201]
+  register: fleet_token_result
+  no_log: true
+
+- name: Set fleet service token fact
+  set_fact:
+    fleet_server_service_token: "{{ fleet_token_result.json.token.value }}"
+  no_log: true
+
+- name: Re-deploy docker-compose.yml with service token
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ elk_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- block:
+    - name: Start logstash and kibana
+      command: docker compose up -d logstash kibana
+      args:
+        chdir: "{{ elk_dir }}"
+      register: compose_up
+      changed_when: >
+        'Started' in compose_up.stdout or
+        'Created' in compose_up.stdout or
+        'Recreated' in compose_up.stdout
+  rescue:
+    - name: Get kibana logs on failure
+      command: docker logs kibana --tail 80
+      register: kibana_logs
+      changed_when: false
+      ignore_errors: true
+
+    - name: Show kibana logs
+      debug:
+        var: kibana_logs.stdout_lines
+
+    - name: Get elasticsearch logs on failure
+      command: docker logs elasticsearch --tail 20
+      register: es_logs
+      changed_when: false
+      ignore_errors: true
+
+    - name: Show elasticsearch logs
+      debug:
+        var: es_logs.stdout_lines
+
+    - name: Fail with context
+      fail:
+        msg: "ELK stack failed to start. See logs above."
+
+- name: Allow Elasticsearch API
+  ufw:
+    rule: allow
+    port: "{{ elk_es_port | string }}"
+    proto: tcp
+
+- name: Allow Elasticsearch cluster
+  ufw:
+    rule: allow
+    port: "{{ elk_es_cluster_port | string }}"
+    proto: tcp
+
+- name: Allow Kibana
+  ufw:
+    rule: allow
+    port: "{{ elk_kibana_port | string }}"
+    proto: tcp
+
+- name: Allow Logstash Beats input
+  ufw:
+    rule: allow
+    port: "{{ elk_logstash_beats_port | string }}"
+    proto: tcp
+
+# --- Fleet Server ---
+
+- name: Wait for Kibana to be ready
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/status"
+    method: GET
+    status_code: 200
+  register: kibana_status
+  retries: 30
+  delay: 10
+  until: kibana_status.status == 200
+  become: false
+
+- name: Trigger Kibana Fleet initialization
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/setup"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    status_code: [200, 201]
+  register: fleet_setup
+  retries: 30
+  delay: 10
+  until: fleet_setup.status in [200, 201]
+
+- name: Create default regular agent policy
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/agent_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "Default policy"
+      namespace: "default"
+      is_default: true
+      monitoring_enabled: ["logs", "metrics"]
+    status_code: [200, 201]
+  register: default_policy
+  become: false
+
+- name: Get system package version
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/epm/packages/system"
+    method: GET
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    status_code: 200
+  register: system_pkg
+  become: false
+
+- name: Add system integration to Default policy
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/package_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "system-1"
+      namespace: "default"
+      policy_id: "{{ default_policy.json.item.id }}"
+      package:
+        name: "system"
+        version: "{{ system_pkg.json.item.version }}"
+      inputs: {}
+    status_code: [200, 201]
+  become: false
+
+- name: Configure Fleet Server URL in Kibana
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/fleet_server_hosts"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "default"
+      host_urls: ["http://{{ ansible_host }}:{{ elk_fleet_port }}"]
+      is_default: true
+    status_code: [200, 201]
+  become: false
+
+- name: Create default Fleet Server agent policy
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/agent_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "Default Fleet Server Policy"
+      namespace: "default"
+      is_default_fleet_server: true
+      monitoring_enabled: []
+    status_code: [200, 201]
+  register: fleet_server_policy
+  become: false
+
+- name: Get fleet_server package version
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/epm/packages/fleet_server"
+    method: GET
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    status_code: 200
+  register: fleet_server_pkg
+  become: false
+
+- name: Add fleet_server integration to Fleet Server policy
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/package_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "fleet_server-1"
+      namespace: "default"
+      policy_id: "{{ fleet_server_policy.json.item.id }}"
+      package:
+        name: "fleet_server"
+        version: "{{ fleet_server_pkg.json.item.version }}"
+      inputs: {}
+    status_code: [200, 201]
+  become: false
+
+- name: Start fleet-server (after Kibana Fleet is ready)
+  command: docker compose up -d fleet-server
+  args:
+    chdir: "{{ elk_dir }}"
+  changed_when: true
+
+- name: Wait for fleet-server container to be running
+  shell: docker ps --filter "name=^fleet-server$" --filter "status=running" -q
+  register: fleet_container_running
+  retries: 40
+  delay: 10
+  until: fleet_container_running.stdout | trim != ''
+  changed_when: false
+
+- name: Show fleet-server startup logs
+  command: docker logs fleet-server --tail 40
+  changed_when: false
+  ignore_errors: true
+
+- block:
+    - name: Wait for Fleet Server API to be ready
+      uri:
+        url: "http://127.0.0.1:{{ elk_fleet_port }}/api/status"
+        method: GET
+        status_code: [200, 503]
+        return_content: true
+      register: fleet_api_check
+      retries: 60
+      delay: 15
+      until: >
+        fleet_api_check.status == 200 and
+        (fleet_api_check.json.status | default('')) == 'HEALTHY'
+      become: false
+  rescue:
+    - name: Get fleet-server logs on failure
+      shell: docker logs fleet-server --tail 80 2>&1
+      register: fleet_logs
+      changed_when: false
+      ignore_errors: true
+
+    - name: Show fleet-server logs
+      debug:
+        var: fleet_logs.stdout_lines
+
+    - name: Fail with context
+      fail:
+        msg: "Fleet Server API unreachable after retries. See logs above."
+
+- name: Get Fleet enrollment token from Kibana
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/enrollment_api_keys"
+    method: GET
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    status_code: 200
+  register: fleet_keys
+  retries: 10
+  delay: 10
+  until: fleet_keys.status == 200 and (fleet_keys.json['items'] | default([]) | length) > 0
+  become: false
+
+- name: Set fleet enrollment token fact (regular agent policy only)
+  set_fact:
+    fleet_enrollment_token: >-
+      {{ (fleet_keys.json['items']
+        | rejectattr('policy_id', 'equalto', fleet_server_policy.json.item.id)
+        | selectattr('active', 'equalto', true)
+        | list)[0].api_key }}
+  no_log: true
+
+# --- Écriture du token dans Vault ---
+
+- name: Read vault-init.json
+  slurp:
+    src: /root/vault-init.json
+  become: true
+  register: vault_init_raw
+
+- name: Set vault root token
+  set_fact:
+    vault_root_token: "{{ (vault_init_raw.content | b64decode | from_json).root_token }}"
+  no_log: true
+
+- name: Enable KV secrets engine in Vault (idempotent)
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/mounts/secret"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      type: kv
+      options:
+        version: "2"
+    status_code: [200, 204, 400]
+
+- name: Store Fleet enrollment token in Vault
+  uri:
+    url: "http://127.0.0.1:8200/v1/secret/data/elk/fleet-enrollment-token"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      data:
+        value: "{{ fleet_enrollment_token }}"
+    status_code: [200, 204]
+  no_log: true
+
+- name: Allow Fleet Server port
+  ufw:
+    rule: allow
+    port: "{{ elk_fleet_port | string }}"
+    proto: tcp
