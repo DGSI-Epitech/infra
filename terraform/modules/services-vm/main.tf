@@ -36,14 +36,12 @@ resource "proxmox_virtual_environment_vm" "services_vm" {
     datastore_id = var.storage_iso
     ip_config {
       ipv4 {
-        address = var.vm_ip_cidr
-        gateway = var.vm_gateway
+        address = "dhcp"
       }
     }
 
     user_account {
       username = "ubuntu"
-      password = var.vm_password
       keys     = [var.vm_ssh_public_key]
     }
   }

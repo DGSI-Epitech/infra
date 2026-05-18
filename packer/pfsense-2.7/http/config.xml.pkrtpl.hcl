@@ -34,6 +34,7 @@
 			<bcrypt-hash>$2b$10$13u6qwCOwODv34GyCMgdWub6oQF3RX0rG7c3d3X4JvzuEmAXLYDd2</bcrypt-hash>
 			<uid>0</uid>
 			<priv>user-shell-access</priv>
+			<authorizedkeys>${admin_authorized_keys_b64}</authorizedkeys>
 		</user>
 		<nextuid>2000</nextuid>
 		<nextgid>2000</nextgid>

@@ -1,6 +1,7 @@
 ---
 - name: restart vault
-  systemd:
+  community.docker.docker_container:
     name: vault
-    state: restarted
+    state: started
+    restart: true
   become: true

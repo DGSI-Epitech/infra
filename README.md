@@ -23,8 +23,34 @@ Tout est automatisé : une commande déploie pfSense, les templates et les VMs. 
 - Terraform ≥ 1.9 (`npm run setup` l'installe)
 - Packer ≥ 1.11
 - Ansible (`pip install ansible`)
-- Une paire de clés SSH (`~/.ssh/id_ed25519`)
 - Accès SSH root au Proxmox
+- Une paire de clés SSH ED25519 (voir section ci-dessous)
+
+### Générer et configurer la clé SSH
+
+L'infrastructure n'utilise **aucun password** pour accéder aux VMs. Une unique paire de clés SSH couvre tous les accès : Packer (communicator + bastion), Terraform (provider bpg), Ansible (pfSense, vault-vm, services-vm).
+
+```bash
+# 1. Générer la paire de clés (si elle n'existe pas déjà)
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "lab-infra"
+
+# 2. Copier la clé publique sur Proxmox
+#    Requis pour : Packer bastion SSH + Terraform provider bpg disk import
+ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<PROXMOX_HOST>
+
+# 3. Ajouter la clé à l'agent SSH pour la session courante
+ssh-add ~/.ssh/id_ed25519
+
+# 4. Vérifier la connexion
+ssh root@<PROXMOX_HOST> echo "OK"
+```
+
+Ces valeurs sont ensuite reportées dans `config.env` :
+
+```bash
+SSH_PUBLIC_KEY="$(cat ~/.ssh/id_ed25519.pub)"
+SSH_PRIVATE_KEY_FILE="~/.ssh/id_ed25519"
+```
 
 ---
 
@@ -36,14 +62,19 @@ Tout est automatisé : une commande déploie pfSense, les templates et les VMs. 
 git clone <repo> && cd infra
 npm run setup                          # installe Terraform
 
-cp config.env.example config.env      # copier le template
-# éditer config.env avec tes valeurs  # voir section ci-dessous
-
-cp terraform/envs/onprem/terraform.tfvars.example terraform/envs/onprem/terraform.tfvars
-# éditer terraform.tfvars (IPs des VMs, clé SSH publique)
-
+# Clé SSH — voir section Prérequis
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "lab-infra"   # si elle n'existe pas
 ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<PROXMOX_HOST>
 ssh-add ~/.ssh/id_ed25519
+
+cp config.env.example config.env
+# Remplir config.env — notamment :
+#   PROXMOX_HOST, PROXMOX_PASSWORD, PROXMOX_NODE
+#   SSH_PUBLIC_KEY="$(cat ~/.ssh/id_ed25519.pub)"
+#   SSH_PRIVATE_KEY_FILE="~/.ssh/id_ed25519"
+
+cp terraform/envs/onprem/terraform.tfvars.example terraform/envs/onprem/terraform.tfvars
+# Remplir terraform.tfvars (IPs des VMs)
 ```
 
 ### 2. Déployer
@@ -65,7 +96,7 @@ Une fois les VMs démarrées :
 
 ```bash
 cd ansible
-ansible-playbook playbooks/vault.yml -i inventory/onprem.yml
+ansible-playbook playbooks/vault.yml -i inventory/onprem.py
 ```
 
 ### 4. Tout supprimer
@@ -85,7 +116,7 @@ Il est gitignored — ne jamais le committer.
 # Proxmox
 PROXMOX_HOST="X.X.X.X"          # IP du serveur Proxmox
 PROXMOX_USER="root@pam"
-PROXMOX_PASSWORD="..."           # mot de passe root Proxmox
+PROXMOX_PASSWORD="..."           # mot de passe root Proxmox (API uniquement)
 PROXMOX_NODE="proxmox-site1"     # nom du nœud dans Proxmox
 PROXMOX_STORAGE_VM="local"       # storage pour les disques VM
 
@@ -95,6 +126,10 @@ VM_ID_PFSENSE_TEMPLATE=9001      # template pfSense (Packer)
 VM_ID_PFSENSE=1001               # VM pfSense déployée
 VM_ID_SERVICES=1003              # VM services (Netbox, etc.)
 VM_ID_VAULT=1002                 # VM HashiCorp Vault
+
+# SSH — aucun password sur les VMs, clé SSH uniquement
+SSH_PUBLIC_KEY="ssh-ed25519 AAAA..."       # cat ~/.ssh/id_ed25519.pub
+SSH_PRIVATE_KEY_FILE="~/.ssh/id_ed25519"  # clé privée correspondante
 ```
 
 > Pour passer à Vault comme source de vérité à la place de `config.env` : remplacer le `source "$CONFIG_FILE"` dans les scripts par des appels `vault kv get`.
@@ -142,7 +177,7 @@ infra/
 │       ├── services-vm/
 │       └── vault-vm/
 ├── ansible/
-│   ├── inventory/onprem.yml
+│   ├── inventory/onprem.py
 │   ├── playbooks/vault.yml
 │   └── roles/vault/
 └── docs/

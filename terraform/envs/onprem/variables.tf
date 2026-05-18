@@ -26,12 +26,6 @@ variable "proxmox_node_address" {
   type        = string
 }
 
-variable "proxmox_ssh_private_key" {
-  description = "Path to the SSH private key for Proxmox root access"
-  type        = string
-  default     = "~/.ssh/id_ed25519"
-}
-
 variable "template_ubuntu_vm_id" {
   description = "Proxmox VM ID for the Ubuntu template"
   type        = number
@@ -50,16 +44,6 @@ variable "storage_vm" {
   default     = "local-lvm"
 }
 
-variable "vm_ip_cidr" {
-  description = "Services VM IP address in CIDR notation"
-  type        = string
-}
-
-variable "vm_gateway" {
-  description = "Default gateway for the services VM"
-  type        = string
-}
-
 variable "vm_ssh_public_key" {
   description = "SSH public key injected via cloud-init"
   type        = string
@@ -75,11 +59,6 @@ variable "vault_vm_id" {
   type        = number
 }
 
-variable "vault_vm_ip_cidr" {
-  description = "Vault VM IP address in CIDR notation"
-  type        = string
-}
-
 variable "pfsense_template_id" {
   description = "ID du template pfSense (Packer)"
   type        = number
@@ -90,8 +69,7 @@ variable "pfsense_vm_id" {
   type        = number
 }
 
-variable "vm_password" {
-  description = "Password for the ubuntu user on VMs"
+variable "proxmox_ssh_private_key" {
+  description = "Path to the SSH private key for Proxmox root SSH access (bpg provider disk import)"
   type        = string
-  sensitive   = true
 }

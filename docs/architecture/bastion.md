@@ -157,7 +157,7 @@ ssh_service:
 
 ```bash
 cd ansible
-ansible-playbook playbooks/teleport.yml -i inventory/onprem.yml
+ansible-playbook playbooks/teleport.yml -i inventory/onprem.py
 ```
 
 À la fin du playbook, le lien d'invitation s'affiche dans la sortie :

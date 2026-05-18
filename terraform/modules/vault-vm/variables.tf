@@ -15,25 +15,9 @@ variable "vm_id" {
   default     = 201
 }
 
-variable "vm_ip_cidr" {
-  description = "Vault VM IP address in CIDR notation (e.g. 192.168.100.51/24)"
-  type        = string
-}
-
-variable "vm_gateway" {
-  description = "Default gateway"
-  type        = string
-}
-
 variable "vm_ssh_public_key" {
   description = "SSH public key injected via cloud-init"
   type        = string
-}
-
-variable "vm_password" {
-  description = "Password for the ubuntu user"
-  type        = string
-  sensitive   = true
 }
 
 variable "vm_cores" {
