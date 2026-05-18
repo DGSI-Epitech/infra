@@ -23,12 +23,22 @@ def load_env(path):
 repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 env = load_env(os.path.join(repo_root, "config.env"))
 
-proxmox_host = env.get("PROXMOX_HOST", "")
-ssh_key      = env.get("SSH_PRIVATE_KEY_FILE", "~/.ssh/id_ed25519")
-vault_ip     = os.environ.get("VAULT_IP") or env.get("VM_IP_VAULT", "").split("/")[0]
-services_ip  = os.environ.get("SERVICES_IP") or env.get("VM_IP_SERVICES", "").split("/")[0]
-gateway      = env.get("VM_GATEWAY", "")
-proxy_jump   = f"-o StrictHostKeyChecking=no -o ProxyJump=root@{proxmox_host}"
+proxmox_host      = env.get("PROXMOX_HOST", "")
+proxmox2_host     = env.get("PROXMOX2_HOST", "")
+ssh_key           = env.get("SSH_PRIVATE_KEY_FILE", "~/.ssh/id_ed25519")
+vault_ip          = os.environ.get("VAULT_IP") or env.get("VM_IP_VAULT", "").split("/")[0]
+services_ip       = os.environ.get("SERVICES_IP") or env.get("VM_IP_SERVICES", "").split("/")[0]
+pfsense_op_wan    = env.get("PFSENSE_OP_WAN", "")    # 5.196.45.8  — accès direct WAN
+pfsense_cloud_wan = env.get("PFSENSE_CLOUD_WAN", "") # 5.196.50.52 — accès direct WAN
+pfsense_password  = env.get("PFSENSE_PASSWORD", "pfsense")
+proxy_jump        = f"-o StrictHostKeyChecking=no -o ProxyJump=root@{proxmox_host}"
+
+pfsense_common = {
+    "ansible_user":               "admin",
+    "ansible_password":           pfsense_password,
+    "ansible_connection":         "ssh",
+    "ansible_python_interpreter": "/usr/local/bin/python3.11",
+}
 
 # Format JSON attendu par Ansible pour un script d'inventaire dynamique
 inventory = {
@@ -38,29 +48,33 @@ inventory = {
     "services": {
         "hosts": ["services-vm"]
     },
-    "pfsense": {
-        "hosts": ["pfsense-fw-01"]
+    "Pfsense_OP": {
+        "hosts": ["pfsense-op"]
+    },
+    "Pfsense_Cloud": {
+        "hosts": ["pfsense-cloud"]
     },
     "_meta": {
         "hostvars": {
             "vault-vm": {
                 "ansible_host":                vault_ip,
-                "ansible_user":                "ubuntu",
+                "ansible_user":                "dgsi-cloud",
                 "ansible_ssh_private_key_file": ssh_key,
                 "ansible_ssh_common_args":      proxy_jump,
             },
             "services-vm": {
                 "ansible_host":                services_ip,
-                "ansible_user":                "ubuntu",
+                "ansible_user":                "dgsi-cloud",
                 "ansible_ssh_private_key_file": ssh_key,
                 "ansible_ssh_common_args":      proxy_jump,
             },
-            "pfsense-fw-01": {
-                "ansible_host":                gateway,
-                "ansible_user":                "admin",
-                "ansible_ssh_private_key_file": ssh_key,
-                "ansible_connection":           "ssh",
-                "ansible_python_interpreter":   "/usr/local/bin/python3.11",
+            "pfsense-op": {
+                **pfsense_common,
+                "ansible_host": pfsense_op_wan,
+            },
+            "pfsense-cloud": {
+                **pfsense_common,
+                "ansible_host": pfsense_cloud_wan,
             },
         }
     }
