@@ -26,6 +26,7 @@ env = load_env(os.path.join(repo_root, "config.env"))
 proxmox_host      = env.get("PROXMOX_HOST", "")
 proxmox2_host     = env.get("PROXMOX2_HOST", "")
 ssh_key           = env.get("SSH_PRIVATE_KEY_FILE", "~/.ssh/id_ed25519")
+vm_user           = env.get("VM_USERNAME", "ubuntu")
 vault_ip          = os.environ.get("VAULT_IP") or env.get("VM_IP_VAULT", "").split("/")[0]
 services_ip       = os.environ.get("SERVICES_IP") or env.get("VM_IP_SERVICES", "").split("/")[0]
 pfsense_op_wan    = env.get("PFSENSE_OP_WAN", "")    # 5.196.45.8  — accès direct WAN
@@ -58,13 +59,13 @@ inventory = {
         "hostvars": {
             "vault-vm": {
                 "ansible_host":                vault_ip,
-                "ansible_user":                "dgsi-cloud",
+                "ansible_user":                vm_user,
                 "ansible_ssh_private_key_file": ssh_key,
                 "ansible_ssh_common_args":      proxy_jump,
             },
             "services-vm": {
                 "ansible_host":                services_ip,
-                "ansible_user":                "dgsi-cloud",
+                "ansible_user":                vm_user,
                 "ansible_ssh_private_key_file": ssh_key,
                 "ansible_ssh_common_args":      proxy_jump,
             },
