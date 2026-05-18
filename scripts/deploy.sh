@@ -392,6 +392,7 @@ echo "==> Lancement Ansible..."
 cd "$REPO_ROOT/ansible"
 ansible-playbook playbooks/vault.yml         -i inventory/onprem.py
 ansible-playbook playbooks/elk.yml           -i inventory/onprem.py
+ansible-playbook playbooks/services-vm.yml   -i inventory/onprem.py
 ansible-playbook playbooks/elastic-agent.yml -i inventory/onprem.py
 
 echo ""

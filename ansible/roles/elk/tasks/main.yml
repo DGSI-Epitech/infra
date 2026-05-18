@@ -228,6 +228,39 @@
       is_default: true
       monitoring_enabled: ["logs", "metrics"]
     status_code: [200, 201]
+  register: default_policy
+  become: false
+
+- name: Get system package version
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/epm/packages/system"
+    method: GET
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    status_code: 200
+  register: system_pkg
+  become: false
+
+- name: Add system integration to Default policy
+  uri:
+    url: "http://127.0.0.1:{{ elk_kibana_port }}/api/fleet/package_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "system-1"
+      namespace: "default"
+      policy_id: "{{ default_policy.json.item.id }}"
+      package:
+        name: "system"
+        version: "{{ system_pkg.json.item.version }}"
+      inputs: {}
+    status_code: [200, 201]
   become: false
 
 - name: Configure Fleet Server URL in Kibana
