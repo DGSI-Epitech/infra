@@ -7,6 +7,7 @@ module "services_vm" {
   vm_ssh_public_key = var.vm_ssh_public_key
   storage_iso       = var.storage_iso
   storage_vm        = var.storage_vm
+  depends_on = [module.vault_vm]      #attendre que Proxmox déverrouille le template 
 }
 
 module "vault_vm" {
