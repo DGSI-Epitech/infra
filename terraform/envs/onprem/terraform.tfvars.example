@@ -1,14 +1,52 @@
-proxmox_api_token = "root@pam!packer-auto=XXXXXXXXXXXXXXXXXXXXXXXXXXX"
-proxmox_endpoint  = "https://XXXXXXXXXXXXXXXXXXXXX:8006"
-proxmox_node      = "pve"
-proxmox_node_address = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+proxmox_api_token      = "root@pam!packer-auto=XXXXXXXXXXXXXXXXXXXXXXXXXXX"
+proxmox_endpoint       = "https://XXXXXXXXXXXXXXXXXXXXX:8006"
+proxmox_node           = "pve"
+proxmox_node_address   = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+proxmox_ssh_private_key = "~/.ssh/id_rsa"
 
-# --- Templates ---
-template_vm_id       = 9001
+# ============================================================================
+# TEMPLATES - Cloud-init images
+# ============================================================================
+template_ubuntu_vm_id  = 100  # Ubuntu 22.04 template
+pfsense_template_id    = 200  # pfSense template (from Packer)
 
-# --- Variables Réseau (Ubuntu) ---
-vm_ip_cidr           = "192.168.100.50/24"
-vm_gateway           = "192.168.100.1"
-vm_ssh_public_key    = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-# --- Ops VM (Vault + ELK) ---
-ops_vm_id            = 201
+# ============================================================================
+# NETWORK CONFIGURATION
+# ============================================================================
+vm_network_bridge      = "vmbr0"
+vm_network_vlan_tag    = 0  # 0 = no VLAN tag (untagged)
+vm_ssh_public_key      = "ssh-rsa AAAA... your-key@domain"
+
+# ============================================================================
+# VM IDs (must be unique in Proxmox)
+# ============================================================================
+pfsense_vm_id          = 101
+ops_vm_id              = 102  # ELK + Vault
+services_vm_id         = 103  # NetBox + Web
+
+# ============================================================================
+# VM 1: pfSense Firewall
+# ============================================================================
+pfsense_vm_ip_cidr     = "192.168.100.1/24"
+pfsense_vm_gateway     = "192.168.1.1"
+pfsense_cores          = 2
+pfsense_memory_mb      = 2048
+pfsense_disk_size_gb   = 20
+
+# ============================================================================
+# VM 2: ELK Stack + Vault Hashicorp
+# ============================================================================
+elk_vm_ip_cidr         = "192.168.100.2/24"
+elk_vm_gateway         = "192.168.100.1"
+elk_cores              = 4
+elk_memory_mb          = 8192
+elk_disk_size_gb       = 50
+
+# ============================================================================
+# VM 3: Services VM (NetBox + Web)
+# ============================================================================
+services_vm_ip_cidr    = "192.168.100.3/24"
+services_vm_gateway    = "192.168.100.1"
+services_cores         = 4
+services_memory_mb     = 8192
+services_disk_size_gb  = 50

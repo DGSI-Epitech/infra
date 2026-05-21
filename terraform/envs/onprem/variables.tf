@@ -73,3 +73,102 @@ variable "proxmox_ssh_private_key" {
   description = "Path to the SSH private key for Proxmox root SSH access (bpg provider disk import)"
   type        = string
 }
+
+# ------- Network Configuration -------
+variable "vm_network_bridge" {
+  description = "Virtual bridge for Ubuntu VMs (e.g., vmbr0)"
+  type        = string
+  default     = "vmbr0"
+}
+
+variable "vm_network_vlan_tag" {
+  description = "VLAN tag for Ubuntu VMs (0 for no tag)"
+  type        = number
+  default     = 0
+}
+
+# ------- VM IPs -------
+variable "pfsense_vm_ip_cidr" {
+  description = "pfSense VM IP in CIDR format"
+  type        = string
+}
+
+variable "pfsense_vm_gateway" {
+  description = "pfSense VM gateway"
+  type        = string
+}
+
+variable "elk_vm_ip_cidr" {
+  description = "ELK Stack VM IP in CIDR format"
+  type        = string
+}
+
+variable "elk_vm_gateway" {
+  description = "ELK Stack VM gateway"
+  type        = string
+}
+
+variable "services_vm_ip_cidr" {
+  description = "Services VM (NetBox + Web) IP in CIDR format"
+  type        = string
+}
+
+variable "services_vm_gateway" {
+  description = "Services VM gateway"
+  type        = string
+}
+
+# ------- VM Specs -------
+variable "pfsense_cores" {
+  description = "pfSense CPU cores"
+  type        = number
+  default     = 2
+}
+
+variable "pfsense_memory_mb" {
+  description = "pfSense RAM in MB"
+  type        = number
+  default     = 2048
+}
+
+variable "pfsense_disk_size_gb" {
+  description = "pfSense disk size in GB"
+  type        = number
+  default     = 20
+}
+
+variable "elk_cores" {
+  description = "ELK Stack CPU cores"
+  type        = number
+  default     = 4
+}
+
+variable "elk_memory_mb" {
+  description = "ELK Stack RAM in MB"
+  type        = number
+  default     = 8192
+}
+
+variable "elk_disk_size_gb" {
+  description = "ELK Stack disk size in GB"
+  type        = number
+  default     = 50
+}
+
+variable "services_cores" {
+  description = "Services (NetBox + Web) CPU cores"
+  type        = number
+  default     = 4
+}
+
+variable "services_memory_mb" {
+  description = "Services RAM in MB"
+  type        = number
+  default     = 8192
+}
+
+variable "services_disk_size_gb" {
+  description = "Services disk size in GB"
+  type        = number
+  default     = 50
+}
