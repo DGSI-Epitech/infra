@@ -1,0 +1,74 @@
+---
+- name: Register deployed VMs in NetBox
+  hosts: services-vm
+  gather_facts: false
+  vars:
+    nb_url: "http://127.0.0.1:8080"
+    nb_token: "0123456789abcdef0123456789abcdef01234567"
+
+  tasks:
+    - name: Debug IP values
+      debug:
+        msg: "services_ip={{ services_ip | default('VIDE') }}  vault_ip={{ vault_ip | default('VIDE') }}"
+
+    - name: Register services-vm
+      uri:
+        url: "{{ nb_url }}/api/virtualization/virtual-machines/"
+        method: POST
+        headers:
+          Authorization: "Token {{ nb_token }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          name: services-vm
+          status: active
+          cluster:
+            name: On-Prem Proxmox
+          vcpus: 2
+          memory: 2048
+        status_code: [201, 400]
+
+    - name: Register vault-vm
+      uri:
+        url: "{{ nb_url }}/api/virtualization/virtual-machines/"
+        method: POST
+        headers:
+          Authorization: "Token {{ nb_token }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          name: vault-vm
+          status: active
+          cluster:
+            name: On-Prem Proxmox
+          vcpus: 2
+          memory: 2048
+        status_code: [201, 400]
+
+    - name: Register services-vm IP
+      uri:
+        url: "{{ nb_url }}/api/ipam/ip-addresses/"
+        method: POST
+        headers:
+          Authorization: "Token {{ nb_token }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          address: "{{ services_ip }}/24"
+          status: active
+          description: "services-vm"
+        status_code: [201, 400]
+
+    - name: Register vault-vm IP
+      uri:
+        url: "{{ nb_url }}/api/ipam/ip-addresses/"
+        method: POST
+        headers:
+          Authorization: "Token {{ nb_token }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          address: "{{ vault_ip }}/24"
+          status: active
+          description: "vault-vm"
+        status_code: [201, 400]

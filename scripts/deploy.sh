@@ -179,6 +179,8 @@ terraform apply -input=false -auto-approve \
 echo "    pfSense déployé — attente 30s pour qu'il soit opérationnel..."
 sleep 30
 
+
+
 # --- ÉTAPE 3 : Packer Ubuntu ---
 # pfSense est maintenant actif et route le trafic de vmbr1 vers internet
 
