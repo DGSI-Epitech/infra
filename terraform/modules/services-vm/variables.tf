@@ -14,6 +14,12 @@ variable "vm_id" {
   default     = 200
 }
 
+variable "vm_ip_address" {
+  description = "Static IP address for the VM"
+  type        = string
+  default     = "172.16.0.241"
+}
+
 variable "vm_cores" {
   description = "Number of vCPU cores"
   type        = number

@@ -376,6 +376,7 @@ terraform apply -input=false -auto-approve \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
   -var "services_vm_id=${VM_ID_SERVICES}" \
   -var "ops_vm_id=${VM_ID_OPS}" \
+  -var "vm_ip_address=${SERVICES_IP}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
@@ -397,7 +398,7 @@ ansible-playbook playbooks/services-vm.yml -i inventory/onprem.py
 
 wait_for_netbox() {
   local ip="$1"
-  local port="${NETBOX_PORT:-80}"
+  local port="${NETBOX_PORT:-8080}"
   local timeout=300
   local elapsed=0
   echo ""
@@ -446,6 +447,7 @@ terraform apply -input=false -auto-approve \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
   -var "ops_vm_id=${VM_ID_OPS}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
+  -var "vm_ip_address=${SERVICES_IP}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
 
