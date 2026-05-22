@@ -130,112 +130,7 @@ else
   echo "    Bridge vmbr1 déjà présent."
 fi
 
-# --- ÉTAPE 1 : Packer pfSense ---
-
-echo ""
-PFSENSE_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
-  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_PFSENSE_TEMPLATE}/status/current" 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
-
-if [[ "$PFSENSE_TEMPLATE_STATUS" == "notfound" ]]; then
-  echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) absent — build Packer..."
-  cd "$PACKER_DIR_PFSENSE"
-  export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
-  export PKR_VAR_proxmox_username="${PROXMOX_USER}"
-  export PKR_VAR_proxmox_password="${TF_VAR_proxmox_password}"
-  export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
-  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
-  export PKR_VAR_template_vm_id="${VM_ID_PFSENSE_TEMPLATE}"
-  export PKR_VAR_pfsense_admin_ssh_public_key="${SSH_PUBLIC_KEY}"
-  packer init .
-  packer build pfsense-2.7.pkr.hcl
-  echo "    Template pfSense créé."
-else
-  echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) déjà présent, build Packer sauté."
-fi
-
-# --- ÉTAPE 2 : Terraform - déploiement pfSense uniquement ---
-# pfSense doit tourner avant le build Ubuntu pour router le trafic de vmbr1 vers internet
-
-echo ""
-echo "==> Déploiement pfSense (phase 1)..."
-cd "$ONPREM_DIR"
-terraform init -input=false -upgrade
-terraform apply -input=false -auto-approve \
-  -target=module.pfsense \
-  -var "proxmox_endpoint=https://${PROXMOX_HOST}:8006" \
-  -var "proxmox_username=${PROXMOX_USER}" \
-  -var "proxmox_node=${PROXMOX_NODE}" \
-  -var "proxmox_node_address=${PROXMOX_HOST}" \
-  -var "storage_vm=${PROXMOX_STORAGE_VM}" \
-  -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
-  -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
-  -var "services_vm_id=${VM_ID_SERVICES}" \
-  -var "ops_vm_id=${VM_ID_OPS}" \
-  -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
-  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
-  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
-
-echo "    pfSense déployé — attente 30s pour qu'il soit opérationnel..."
-sleep 30
-
-
-
-# --- ÉTAPE 3 : Packer Ubuntu ---
-# pfSense est maintenant actif et route le trafic de vmbr1 vers internet
-
-echo ""
-UBUNTU_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
-  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_UBUNTU_TEMPLATE}/status/current" 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
-
-if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
-  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) absent — build Packer..."
-  cd "$PACKER_DIR_UBUNTU"
-  export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
-  export PKR_VAR_proxmox_username="${PROXMOX_USER}"
-  export PKR_VAR_proxmox_password="${TF_VAR_proxmox_password}"
-  export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
-  export PKR_VAR_proxmox_host="${PROXMOX_HOST}"
-  export PKR_VAR_proxmox_storage_iso="local"
-  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
-  export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
-  export PKR_VAR_build_username="${VM_USERNAME}"
-  export PKR_VAR_ssh_public_key="${SSH_PUBLIC_KEY}"
-  export PKR_VAR_ssh_bastion_private_key_file="${SSH_PRIVATE_KEY_FILE}"
-  # Password éphémère généré à la volée — utilisé uniquement pour le communicator Packer, jamais stocké
-  _PACKER_PASS="$(openssl rand -base64 16 | tr -d '+/=' | head -c 20)"
-  export PKR_VAR_build_password="${_PACKER_PASS}"
-  export PKR_VAR_build_password_hash="$(echo "${_PACKER_PASS}" | openssl passwd -6 -stdin)"
-  unset _PACKER_PASS
-  packer init .
-  packer build -on-error=abort ubuntu-22.04.pkr.hcl
-  echo "    Template Ubuntu créé — attente 30s pour déverrouillage Proxmox..."
-  sleep 30
-else
-  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) déjà présent, build Packer sauté."
-fi
-
-# --- ÉTAPE 4 : Terraform - déploiement VMs services + vault ---
-
-echo ""
-echo "==> Déploiement VMs services et vault (phase 2)..."
-cd "$ONPREM_DIR"
-terraform apply -input=false -auto-approve \
-  -var "proxmox_endpoint=https://${PROXMOX_HOST}:8006" \
-  -var "proxmox_username=${PROXMOX_USER}" \
-  -var "proxmox_node=${PROXMOX_NODE}" \
-  -var "proxmox_node_address=${PROXMOX_HOST}" \
-  -var "storage_vm=${PROXMOX_STORAGE_VM}" \
-  -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
-  -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
-  -var "services_vm_id=${VM_ID_SERVICES}" \
-  -var "ops_vm_id=${VM_ID_OPS}" \
-  -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
-  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
-  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
-
-# --- ÉTAPE 5 : Injection clé SSH + Ansible ---
+# --- Définition des fonctions utilitaires ---
 
 # Attend que le QEMU agent soit opérationnel dans la VM
 wait_for_agent() {
@@ -332,7 +227,7 @@ except: pass
   done
 }
 
-# Attend que SSH réponde via Proxmox comme ProxyJump
+# Attend que SSH réponde via Proxmox comme bastion
 wait_for_ssh() {
   local host="$1"
   local label="$2"
@@ -340,9 +235,11 @@ wait_for_ssh() {
   local elapsed=0
   echo ""
   echo "==> Vérification SSH ${label} (${host})..."
-  while ! ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
-              -o "ProxyJump=root@${PROXMOX_HOST}" \
-              -i "${SSH_PRIVATE_KEY_FILE}" \
+  while ! ssh -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=5 \
+              -o BatchMode=yes \
+              -o "ProxyCommand=ssh -W %h:%p -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_FILE} root@${PROXMOX_HOST}" \
+              -i "${SSH_KEY_FILE}" \
               ubuntu@"${host}" "exit" 2>/dev/null; do
     sleep 5
     elapsed=$((elapsed + 5))
@@ -355,28 +252,17 @@ wait_for_ssh() {
   echo "    ${label} accessible en SSH."
 }
 
-wait_for_agent "${VM_ID_OPS}"      "ops-vm"
-wait_for_agent "${VM_ID_SERVICES}" "services-vm"
-
-inject_ssh_key "${VM_ID_OPS}"      "ops-vm"
-inject_ssh_key "${VM_ID_SERVICES}" "services-vm"
-
-OPS_IP=$(get_vm_ip "${VM_ID_OPS}"       "ops-vm")
-SERVICES_IP=$(get_vm_ip "${VM_ID_SERVICES}" "services-vm")
-export OPS_IP SERVICES_IP
-
-wait_for_ssh "${OPS_IP}"      "ops-vm"
-wait_for_ssh "${SERVICES_IP}" "services-vm"
-
 # Étend la partition + filesystem si le disque est plus grand que la partition
 extend_disk() {
   local host="$1"
   local label="$2"
   echo ""
   echo "==> Extension partition disque ${label} (${host})..."
-  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
-      -o "ProxyJump=root@${PROXMOX_HOST}" \
-      -i "${SSH_PRIVATE_KEY_FILE}" \
+  ssh -o StrictHostKeyChecking=no \
+      -o ConnectTimeout=10 \
+      -o BatchMode=yes \
+      -o "ProxyCommand=ssh -W %h:%p -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_FILE} root@${PROXMOX_HOST}" \
+      -i "${SSH_KEY_FILE}" \
       ubuntu@"${host}" "
     sudo growpart /dev/vda 3 2>/dev/null || true
     sudo pvresize /dev/vda3 2>/dev/null || true
@@ -386,15 +272,196 @@ extend_disk() {
   echo "    Partition ${label} étendue."
 }
 
-extend_disk "${OPS_IP}"      "ops-vm"
-extend_disk "${SERVICES_IP}" "services-vm"
+# --- ÉTAPE 1 : Packer pfSense ---
+
+echo ""
+PFSENSE_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
+  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_PFSENSE_TEMPLATE}/status/current" 2>/dev/null | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
+
+if [[ "$PFSENSE_TEMPLATE_STATUS" == "notfound" ]]; then
+  echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) absent — build Packer..."
+  cd "$PACKER_DIR_PFSENSE"
+  export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
+  export PKR_VAR_proxmox_username="${PROXMOX_USER}"
+  export PKR_VAR_proxmox_password="${TF_VAR_proxmox_password}"
+  export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
+  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
+  export PKR_VAR_template_vm_id="${VM_ID_PFSENSE_TEMPLATE}"
+  export PKR_VAR_pfsense_admin_ssh_public_key="${SSH_PUBLIC_KEY}"
+  packer init .
+  packer build pfsense-2.7.pkr.hcl
+  echo "    Template pfSense créé."
+else
+  echo "==> Template pfSense (${VM_ID_PFSENSE_TEMPLATE}) déjà présent, build Packer sauté."
+fi
+
+# --- ÉTAPE 2 : Terraform - déploiement pfSense uniquement ---
+# pfSense doit tourner avant le build Ubuntu pour router le trafic de vmbr1 vers internet
+
+echo ""
+echo "==> Déploiement pfSense (phase 1)..."
+cd "$ONPREM_DIR"
+terraform init -input=false -upgrade
+terraform apply -input=false -auto-approve \
+  -target=module.pfsense \
+  -var "proxmox_endpoint=https://${PROXMOX_HOST}:8006" \
+  -var "proxmox_username=${PROXMOX_USER}" \
+  -var "proxmox_node=${PROXMOX_NODE}" \
+  -var "proxmox_node_address=${PROXMOX_HOST}" \
+  -var "storage_vm=${PROXMOX_STORAGE_VM}" \
+  -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
+  -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
+  -var "services_vm_id=${VM_ID_SERVICES}" \
+  -var "ops_vm_id=${VM_ID_OPS}" \
+  -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
+  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
+  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
+
+echo "    pfSense déployé — attente 30s pour qu'il soit opérationnel..."
+sleep 30
+
+
+
+# --- ÉTAPE 3 : Packer Ubuntu ---
+# pfSense est maintenant actif et route le trafic de vmbr1 vers internet
+
+echo ""
+UBUNTU_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
+  "${PROXMOX_API}/nodes/${PROXMOX_NODE}/qemu/${VM_ID_UBUNTU_TEMPLATE}/status/current" 2>/dev/null | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
+
+if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
+  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) absent — build Packer..."
+  cd "$PACKER_DIR_UBUNTU"
+  export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
+  export PKR_VAR_proxmox_username="${PROXMOX_USER}"
+  export PKR_VAR_proxmox_password="${TF_VAR_proxmox_password}"
+  export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
+  export PKR_VAR_proxmox_host="${PROXMOX_HOST}"
+  export PKR_VAR_proxmox_storage_iso="local"
+  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
+  export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
+  export PKR_VAR_build_username="${VM_USERNAME}"
+  export PKR_VAR_ssh_public_key="${SSH_PUBLIC_KEY}"
+  export PKR_VAR_ssh_bastion_private_key_file="${SSH_PRIVATE_KEY_FILE}"
+  # Password éphémère généré à la volée — utilisé uniquement pour le communicator Packer, jamais stocké
+  _PACKER_PASS="$(openssl rand -base64 16 | tr -d '+/=' | head -c 20)"
+  export PKR_VAR_build_password="${_PACKER_PASS}"
+  export PKR_VAR_build_password_hash="$(echo "${_PACKER_PASS}" | openssl passwd -6 -stdin)"
+  unset _PACKER_PASS
+  packer init .
+  packer build -on-error=abort ubuntu-22.04.pkr.hcl
+  echo "    Template Ubuntu créé — attente 30s pour déverrouillage Proxmox..."
+  sleep 30
+else
+  echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) déjà présent, build Packer sauté."
+fi
+
+# Terraform - déploiement VMs services + ops ---
+
+# --- Terraform - déploiement de la vm netbox ---
+
+echo ""
+echo "==> Déploiement VM Netbox..."
+cd "$ONPREM_DIR"
+terraform apply -input=false -auto-approve \
+  -target=module.services_vm \
+  -var "proxmox_endpoint=https://${PROXMOX_HOST}:8006" \
+  -var "proxmox_username=${PROXMOX_USER}" \
+  -var "proxmox_node=${PROXMOX_NODE}" \
+  -var "proxmox_node_address=${PROXMOX_HOST}" \
+  -var "storage_vm=${PROXMOX_STORAGE_VM}" \
+  -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
+  -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
+  -var "services_vm_id=${VM_ID_SERVICES}" \
+  -var "ops_vm_id=${VM_ID_OPS}" \
+  -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
+  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
+  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
+
+#Injection cle SSH dans services-vm + Ansible Netbox
+wait_for_agent "${VM_ID_SERVICES}" "services-vm"
+inject_ssh_key  "${VM_ID_SERVICES}" "services-vm"
+SERVICES_IP=$(get_vm_ip "${VM_ID_SERVICES}" "services-vm")
+export SERVICES_IP
+wait_for_ssh "${SERVICES_IP}" "services-vm"
+extend_disk  "${SERVICES_IP}" "services-vm"
+
+echo ""
+echo "==> Lancement Ansible Netbox..."
+cd "$REPO_ROOT/ansible"
+ansible-playbook playbooks/services-vm.yml -i inventory/onprem.py
+
+# --- Attente Netbox (IPAM) opérationnel avant de continuer ---
+
+wait_for_netbox() {
+  local ip="$1"
+  local port="${NETBOX_PORT:-80}"
+  local timeout=300
+  local elapsed=0
+  echo ""
+  echo "==> Attente Netbox opérationnel (http://${ip}:${port})..."
+  while true; do
+    local code
+    code=$(ssh -o StrictHostKeyChecking=no \
+               -o ConnectTimeout=5 \
+               -o BatchMode=yes \
+               -o "ProxyCommand=ssh -W %h:%p -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_FILE} root@${PROXMOX_HOST}" \
+               -i "${SSH_KEY_FILE}" \
+               ubuntu@"${ip}" \
+               "curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:${port}/" \
+               2>/dev/null || echo "000")
+    if [[ "$code" == "200" || "$code" == "301" || "$code" == "302" ]]; then
+      echo "    Netbox répond (HTTP ${code}) — IPAM prêt."
+      return 0
+    fi
+    sleep 10
+    elapsed=$((elapsed + 10))
+    echo "    ${elapsed}s — Netbox pas encore prêt (HTTP ${code})..."
+    if [[ $elapsed -ge $timeout ]]; then
+      echo "Erreur : Netbox inaccessible après ${timeout}s."
+      exit 1
+    fi
+  done
+}
+
+wait_for_netbox "${SERVICES_IP}"
+
+
+
+# --- Terraform - déploiement du reste des VMs ---
+
+echo ""
+echo "==> Déploiement VM ops (phase 2 — Netbox prêt)..."
+cd "$ONPREM_DIR"
+terraform apply -input=false -auto-approve \
+  -target=module.ops_vm \
+  -var "proxmox_endpoint=https://${PROXMOX_HOST}:8006" \
+  -var "proxmox_username=${PROXMOX_USER}" \
+  -var "proxmox_node=${PROXMOX_NODE}" \
+  -var "proxmox_node_address=${PROXMOX_HOST}" \
+  -var "storage_vm=${PROXMOX_STORAGE_VM}" \
+  -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
+  -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
+  -var "ops_vm_id=${VM_ID_OPS}" \
+  -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
+  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
+  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
+
+# --- Injection clé SSH + Ansible pour ops-vm ---
+wait_for_agent "${VM_ID_OPS}" "ops-vm"
+inject_ssh_key  "${VM_ID_OPS}" "ops-vm"
+OPS_IP=$(get_vm_ip "${VM_ID_OPS}" "ops-vm")
+export OPS_IP
+wait_for_ssh "${OPS_IP}" "ops-vm"
+extend_disk  "${OPS_IP}" "ops-vm"
 
 echo ""
 echo "==> Lancement Ansible..."
 cd "$REPO_ROOT/ansible"
 ansible-playbook playbooks/vault.yml         -i inventory/onprem.py
 ansible-playbook playbooks/elk.yml           -i inventory/onprem.py
-ansible-playbook playbooks/services-vm.yml   -i inventory/onprem.py
 ansible-playbook playbooks/elastic-agent.yml -i inventory/onprem.py
 
 echo ""
