@@ -312,6 +312,7 @@ terraform apply -input=false -auto-approve \
   -var "storage_vm=${PROXMOX_STORAGE_VM}" \
   -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
+  -var "vm_gateway=${VM_GATEWAY}" \
   -var "services_vm_id=${VM_ID_SERVICES}" \
   -var "ops_vm_id=${VM_ID_OPS}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
@@ -372,11 +373,12 @@ terraform apply -input=false -auto-approve \
   -var "proxmox_node=${PROXMOX_NODE}" \
   -var "proxmox_node_address=${PROXMOX_HOST}" \
   -var "storage_vm=${PROXMOX_STORAGE_VM}" \
+  -var "netbox_api_token=${NETBOX_API_TOKEN}" \
   -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
   -var "services_vm_id=${VM_ID_SERVICES}" \
   -var "ops_vm_id=${VM_ID_OPS}" \
-  -var "vm_ip_address=${SERVICES_IP}" \
+  -var "vm_ip_address=${VM_IP_SERVICES}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
@@ -429,7 +431,31 @@ wait_for_netbox() {
 
 wait_for_netbox "${SERVICES_IP}"
 
+# --- Tunnel SSH vers Netbox pour Terraform ---
 
+NETBOX_LOCAL_PORT=8000
+
+echo ""
+echo "==> Ouverture tunnel SSH vers Netbox pour Terraform..."
+ssh -f -N \
+    -o StrictHostKeyChecking=no \
+    -o BatchMode=yes \
+    -o ExitOnForwardFailure=yes \
+    -o ServerAliveInterval=15 \
+    -i "${SSH_KEY_FILE}" \
+    -L "${NETBOX_LOCAL_PORT}:${SERVICES_IP}:8080" \
+    root@"${PROXMOX_HOST}"
+
+TUNNEL_PID=$(pgrep -f "L ${NETBOX_LOCAL_PORT}:${SERVICES_IP}:8080" | head -1)
+trap "echo '==> Fermeture tunnel Netbox...'; kill ${TUNNEL_PID} 2>/dev/null || true" EXIT
+
+# Attente que le tunnel soit prêt
+until curl -s --max-time 2 "http://localhost:${NETBOX_LOCAL_PORT}/api/status/" > /dev/null 2>&1; do
+  sleep 2
+done
+echo "    Tunnel prêt (localhost:${NETBOX_LOCAL_PORT})."
+
+export NETBOX_SERVER="http://localhost:${NETBOX_LOCAL_PORT}"
 
 # --- Terraform - déploiement du reste des VMs ---
 
@@ -444,10 +470,11 @@ terraform apply -input=false -auto-approve \
   -var "proxmox_node_address=${PROXMOX_HOST}" \
   -var "storage_vm=${PROXMOX_STORAGE_VM}" \
   -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
+  -var "netbox_api_token=${NETBOX_API_TOKEN}" \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
+  -var "vm_gateway=${VM_GATEWAY}" \
   -var "ops_vm_id=${VM_ID_OPS}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
-  -var "vm_ip_address=${SERVICES_IP}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
 
