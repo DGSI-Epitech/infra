@@ -72,7 +72,31 @@ variable "ssh_bastion_private_key_file" {
 
 variable "proxmox_host" {
   type        = string
-  description = "IP de Proxmox, utilisée comme bastion SSH pour atteindre vmbr1"
+  description = "IP de Proxmox, utilisée comme bastion SSH pour atteindre le bridge de build"
+}
+
+variable "packer_build_ip" {
+  type        = string
+  description = "IP statique de la VM de build Packer (doit être hors plage DHCP du bridge)"
+  default     = "172.16.0.100"
+}
+
+variable "packer_build_prefix" {
+  type        = string
+  description = "Longueur du préfixe réseau pour la VM de build (ex: 24, 29)"
+  default     = "24"
+}
+
+variable "packer_build_gateway" {
+  type        = string
+  description = "Gateway par défaut pour la VM de build Packer"
+  default     = "172.16.0.254"
+}
+
+variable "packer_network_bridge" {
+  type        = string
+  description = "Bridge Proxmox utilisé par la VM de build Packer"
+  default     = "vmbr1"
 }
 
 # --- SOURCE ---
@@ -106,7 +130,7 @@ source "proxmox-iso" "ubuntu-2204" {
 
   network_adapters {
     model  = "virtio"
-    bridge = "vmbr1"
+    bridge = var.packer_network_bridge
   }
 
   additional_iso_files {
@@ -115,6 +139,9 @@ source "proxmox-iso" "ubuntu-2204" {
       "/user-data" = templatefile("${path.root}/http/user-data.pkrtpl.hcl", {
         build_username      = var.build_username
         build_password_hash = var.build_password_hash
+        build_ip            = var.packer_build_ip
+        build_prefix        = var.packer_build_prefix
+        build_gateway       = var.packer_build_gateway
       })
       "/meta-data" = ""
     }
@@ -133,7 +160,7 @@ source "proxmox-iso" "ubuntu-2204" {
 
   # Communicator : password éphémère généré dans deploy.sh, jamais stocké
   communicator            = "ssh"
-  ssh_host                = "172.16.0.100"
+  ssh_host                = var.packer_build_ip
   ssh_username            = var.build_username
   ssh_password            = var.build_password
   ssh_timeout             = "45m"

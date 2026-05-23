@@ -9,12 +9,12 @@ autoinstall:
       ethernets:
         ens18:
           addresses:
-            - 172.16.0.100/24
+            - ${build_ip}/${build_prefix}
           nameservers:
             addresses: [1.1.1.1, 8.8.8.8]
           routes:
             - to: default
-              via: 172.16.0.254
+              via: ${build_gateway}
   storage:
     layout:
       name: lvm

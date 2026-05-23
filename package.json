@@ -23,6 +23,8 @@
     "ansible:all":           "npm run ansible:vault && npm run ansible:elk && npm run ansible:elastic-agent",
 
     "deploy": "bash scripts/deploy.sh",
+    "deploy:remote": "bash scripts/deploy-remote.sh",
+    "deploy:all": "bash scripts/deploy-all.sh",
     "destroy": "bash scripts/destroy.sh"
   }
 }
