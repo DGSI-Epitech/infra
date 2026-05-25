@@ -1,0 +1,80 @@
+# roles/netbox/tasks/simple_facts_sync.yml
+
+- name: Install python3-pip
+  apt:
+    name: python3-pip
+    state: present
+
+- name: Install python3-venv
+  apt:
+    name: python3-venv
+    state: present
+    
+- name: Install Simple-Facts in a private env
+  pip:
+    name: "git+https://gitlab.com/netodata/simple-facts.git"
+    virtualenv: /opt/sfacts-venv
+    virtualenv_command: python3 -m venv
+
+- name: Créer répertoire .sfacts
+  file:
+    path: /root/.sfacts
+    state: directory
+    mode: '0700'
+
+- name: Créer config Simple-Facts
+  copy:
+    dest: /root/.sfacts/config.yaml
+    content: |
+      netbox:
+        url: http://localhost:8000
+        token: {{ netbox_api_token }}
+        verify_ssl: false
+
+- name: Lan discovery
+  command: >
+    /opt/sfacts-venv/bin/sfacts discover
+      --subnet 172.16.0.240/28
+      --output /tmp/discovery.json
+      --username ubuntu
+      --password "ubuntu"
+
+- name: Forcer SSH à ignorer la vérification de clé (yes/no)
+  blockinfile:
+    path: /root/.ssh/config
+    create: yes
+    mode: '0600'
+    block: |
+      Host 172.16.0.*
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null
+        
+- name: Collecte des facts
+  command: >
+     /opt/sfacts-venv/bin/sfacts facts
+      --input /tmp/discovery.json
+      --output /tmp/facts.json
+      --username ubuntu
+      --password "ubuntu"
+
+- name: Dry-run sync vers Netbox
+  command: >
+     /opt/sfacts-venv/bin/sfacts netbox sync
+      --input-file /tmp/facts.json
+      --site-name "onprem"
+      --dry-run
+  environment:
+    NETBOX_URL: "http://localhost:8080"
+    NETBOX_TOKEN: "{{ netbox_api_token }}"
+  register: sfacts_dryrun
+
+
+- name: Afficher le dry-run
+  debug:
+    var: sfacts_dryrun.stdout_lines
+
+- name: Sync réel vers Netbox
+  command: >
+     /opt/sfacts-venv/bin/sfacts netbox sync
+      --input /tmp/facts.json
+      --site-name "onprem"

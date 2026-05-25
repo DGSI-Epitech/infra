@@ -2,5 +2,5 @@
   hosts: services
   become: true
   roles:
-    - base
+    #- base
     - netbox

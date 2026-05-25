@@ -1,0 +1,175 @@
+- name: Create NetBox directory
+  file:
+    path: "{{ netbox_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Deploy NetBox docker-compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ netbox_dir }}/docker-compose.yml"
+    mode: '0644'
+  become: true
+
+- name: Start NetBox stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ netbox_dir }}"
+    state: present
+    pull: always
+  become: true
+
+- name: Wait for NetBox port to open
+  wait_for:
+    port: "{{ netbox_port }}"
+    host: 127.0.0.1
+    delay: 15
+    timeout: 600
+  become: true
+
+- name: Wait for NetBox API to respond
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/"
+    status_code: [200, 403]
+  register: netbox_health
+  until: netbox_health.status in [200, 403]
+  retries: 40
+  delay: 15
+  become: true
+
+- name: Bootstrap NetBox - create site
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/dcim/sites/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: onprem
+      slug: onprem
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create cluster type
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/cluster-types/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: proxmox
+      slug: proxmox
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create cluster
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/clusters/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: On-Prem Proxmox
+      type:
+        slug: proxmox
+      site:
+        slug: onprem
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create LAN prefix
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/ipam/prefixes/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      prefix: "172.16.0.240/28"
+      description: "LAN pfSense"
+      site:
+        slug: onprem
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - register NetBox VM self
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/virtual-machines/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: "services-vm"  
+      cluster:
+        name: "On-Prem Proxmox"
+      status: "active"
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - get existing interface or create it
+  block:
+    - name: Get existing eth0 interface
+      uri:
+        url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/interfaces/?virtual_machine_name=services-vm&name=eth0"
+        method: GET
+        headers:
+          Authorization: "Token {{ netbox_api_token }}"
+          Content-Type: application/json
+      register: existing_interface
+    
+    - name: Use existing interface if found, else create it
+      uri:
+        url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/interfaces/"
+        method: POST
+        headers:
+          Authorization: "Token {{ netbox_api_token }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          virtual_machine:
+            name: "services-vm"
+          name: "eth0"
+          enabled: true
+        status_code: [201, 400]
+      register: netbox_interface_res
+      when: existing_interface.json.results | length == 0
+    
+    - name: Set interface_res from existing if found
+      set_fact:
+        netbox_interface_res:
+          json:
+            id: "{{ existing_interface.json.results[0].id }}"
+      when: existing_interface.json.results | length > 0
+
+- name: Bootstrap NetBox - assign static IP to NetBox VM
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/ipam/ip-addresses/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      address: "172.16.0.241/28"
+      status: "active"
+      description: "IP Statique de la VM NetBox/Services elle-meme"
+      assigned_object_type: "virtualization.vminterface"
+      assigned_object_id: "{{ netbox_interface_res.json.id }}"
+    status_code: [201, 400]
+  register: netbox_ip_res
+
+- name: Bootstrap NetBox - Set Primary IPv4 on VM
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/virtual-machines/1/"
+    method: PATCH
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      primary_ip4: "{{ netbox_ip_res.json.id }}"
+    status_code: [200, 400]
+  when: netbox_ip_res.json is defined and netbox_ip_res.json.id is defined
