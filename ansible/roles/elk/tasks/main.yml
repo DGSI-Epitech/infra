@@ -12,10 +12,9 @@
     state: directory
     mode: "{{ item.mode }}"
   loop:
-    - { path: "{{ elk_dir }}",                          mode: "0755" }
-    - { path: "{{ elk_dir }}/elasticsearch/config",     mode: "0755" }
-    - { path: "{{ elk_dir }}/elasticsearch/data",       mode: "0755" }
-    - { path: "{{ elk_dir }}/kibana/config",            mode: "0755" }
+    - { path: "{{ elk_dir }}",                      mode: "0755" }
+    - { path: "{{ elk_dir }}/elasticsearch/config", mode: "0755" }
+    - { path: "{{ elk_dir }}/elasticsearch/data",   mode: "0755" }
 
 - name: Set Elasticsearch data directory ownership
   file:
@@ -28,12 +27,6 @@
   template:
     src: elasticsearch.yml.j2
     dest: "{{ elk_dir }}/elasticsearch/config/elasticsearch.yml"
-    mode: "0644"
-
-- name: Deploy Kibana config
-  template:
-    src: kibana.yml.j2
-    dest: "{{ elk_dir }}/kibana/config/kibana.yml"
     mode: "0644"
 
 - name: Deploy docker-compose.yml
@@ -79,6 +72,30 @@
   delay: 15
   until: kibana_pw.status == 200
   no_log: true
+
+- name: Create Filebeat ILM policy
+  uri:
+    url: "https://127.0.0.1:{{ elk_es_port }}/_ilm/policy/filebeat-policy"
+    method: PUT
+    url_username: elastic
+    url_password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    ca_path: "{{ elk_tls_host_dir }}/ca.crt"
+    body_format: json
+    body:
+      policy:
+        phases:
+          hot:
+            min_age: "0ms"
+            actions:
+              rollover:
+                max_size: "1gb"
+                max_age: "7d"
+          delete:
+            min_age: "30d"
+            actions:
+              delete: {}
+    status_code: 200
 
 - name: Allow Elasticsearch API
   ufw:

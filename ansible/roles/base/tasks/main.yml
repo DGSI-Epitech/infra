@@ -21,7 +21,7 @@
     enabled: true
     state: started
 
-- name: Ajouter la clé SSH autorisée
+- name: Add authorized SSH key
   authorized_key:
     user: "{{ ansible_user }}"
     key: "{{ ssh_public_key }}"
@@ -77,6 +77,21 @@
     state: present
     update_cache: true
 
+- name: Configure Docker daemon
+  copy:
+    content: |
+      {
+        "dns": ["8.8.8.8", "1.1.1.1"],
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: Restart Docker
+
 - name: Enable Docker
   systemd:
     name: docker
@@ -122,4 +137,11 @@
     rule: allow
     port: "8200"
     proto: tcp
-  become: true
+
+- name: Clean apt cache
+  apt:
+    autoclean: true
+
+- name: Vacuum systemd journal
+  command: journalctl --vacuum-size=100M
+  changed_when: false

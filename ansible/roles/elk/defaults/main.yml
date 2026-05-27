@@ -5,11 +5,9 @@ elk_cluster_name: "lab-elk"
 
 elk_es_heap_size: "256m"
 elk_es_mem_limit: "768m"
-elk_kibana_mem_limit: "512m"
 
 elk_es_port: 9200
 elk_es_cluster_port: 9300
-elk_kibana_port: 5601
 
 elk_elastic_password: "changeme"
 elk_kibana_system_password: "changeme"
