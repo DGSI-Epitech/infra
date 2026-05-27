@@ -1,0 +1,7 @@
+---
+tls_san:
+  - "IP:172.16.255.253"
+  - "IP:127.0.0.1"
+  - "DNS:ops-vm"
+  - "DNS:localhost"
+  - "DNS:elasticsearch"

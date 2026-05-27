@@ -13,3 +13,5 @@ elk_kibana_port: 5601
 
 elk_elastic_password: "changeme"
 elk_kibana_system_password: "changeme"
+
+elk_tls_host_dir: /etc/ssl/internal

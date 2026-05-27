@@ -47,11 +47,12 @@
     volumes:
       - "{{ vault_config_dir }}:/vault/config"
       - "{{ vault_data_dir }}:/vault/data"
+      - "{{ vault_tls_host_dir }}:/vault/certs:ro"
     capabilities:
       - IPC_LOCK
     env:
       VAULT_CONFIG_DIR: "/vault/config"
-    command: "server" 
+    command: "server"
   become: true
 
 - name: Wait for Vault to be ready
@@ -59,12 +60,13 @@
     port: 8200
     host: 127.0.0.1
     delay: 5
-    timeout: 60 
+    timeout: 60
 
 - name: Check Vault init status
   uri:
-    url: "http://127.0.0.1:8200/v1/sys/init"
+    url: "https://127.0.0.1:8200/v1/sys/init"
     method: GET
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
   register: vault_init_status
   retries: 10
   delay: 3
@@ -72,12 +74,13 @@
 
 - name: Initialize Vault
   uri:
-    url: "http://127.0.0.1:8200/v1/sys/init"
+    url: "https://127.0.0.1:8200/v1/sys/init"
     method: PUT
     body_format: json
     body:
-      secret_shares: 5
-      secret_threshold: 3
+      secret_shares: "{{ vault_init_shares }}"
+      secret_threshold: "{{ vault_init_threshold }}"
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
     status_code: 200
   register: vault_init_output
   when: not vault_init_status.json.initialized
@@ -98,14 +101,45 @@
     flat: true
   when: vault_init_output is not skipped
 
-- name: Unseal Vault
+- name: Unseal Vault (fresh init)
   uri:
-    url: "http://127.0.0.1:8200/v1/sys/unseal"
+    url: "https://127.0.0.1:8200/v1/sys/unseal"
     method: PUT
     body_format: json
     body:
       key: "{{ item }}"
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
     status_code: 200
-  loop: "{{ vault_init_output.json.keys_base64[:3] }}"
+  loop: "{{ vault_init_output.json.keys_base64[:vault_init_threshold] }}"
   when: vault_init_output is not skipped
+  no_log: true
+
+- name: Read existing init keys (already initialized)
+  slurp:
+    src: /root/vault-init.json
+  register: vault_init_json_file
+  become: true
+  when: vault_init_status.json.initialized
+
+- name: Check Vault seal status
+  uri:
+    url: "https://127.0.0.1:8200/v1/sys/seal-status"
+    method: GET
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
+  register: vault_seal_status
+  when: vault_init_status.json.initialized
+
+- name: Unseal already-initialized Vault
+  uri:
+    url: "https://127.0.0.1:8200/v1/sys/unseal"
+    method: PUT
+    body_format: json
+    body:
+      key: "{{ item }}"
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
+    status_code: 200
+  loop: "{{ (vault_init_json_file.content | b64decode | from_json).keys_base64[:vault_init_threshold] }}"
+  when:
+    - vault_init_status.json.initialized
+    - vault_seal_status.json.sealed
   no_log: true

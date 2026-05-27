@@ -7,3 +7,5 @@ kibana_es_host: "172.16.255.253"
 kibana_es_port: 9200
 kibana_elastic_password: "changeme"
 kibana_system_password: "changeme"
+
+kibana_tls_host_dir: /etc/ssl/internal

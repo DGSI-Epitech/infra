@@ -1,0 +1,105 @@
+---
+- name: Ensure local TLS directory exists
+  file:
+    path: "{{ tls_local_dir }}"
+    state: directory
+    mode: '0700'
+  delegate_to: localhost
+  run_once: true
+
+- name: Generate CA private key
+  community.crypto.openssl_privatekey:
+    path: "{{ tls_local_dir }}/ca.key"
+    size: 4096
+    type: RSA
+  delegate_to: localhost
+  run_once: true
+
+- name: Generate CA CSR
+  community.crypto.openssl_csr:
+    path: "{{ tls_local_dir }}/ca.csr"
+    privatekey_path: "{{ tls_local_dir }}/ca.key"
+    common_name: "{{ tls_ca_cn }}"
+    organization_name: "{{ tls_ca_org }}"
+    country_name: "{{ tls_ca_country }}"
+    basic_constraints: ["CA:TRUE"]
+    basic_constraints_critical: true
+    key_usage: [keyCertSign, cRLSign]
+    key_usage_critical: true
+    use_common_name_for_san: false
+  delegate_to: localhost
+  run_once: true
+
+- name: Generate CA certificate
+  community.crypto.x509_certificate:
+    path: "{{ tls_local_dir }}/ca.crt"
+    privatekey_path: "{{ tls_local_dir }}/ca.key"
+    csr_path: "{{ tls_local_dir }}/ca.csr"
+    provider: selfsigned
+    selfsigned_digest: sha256
+    selfsigned_not_after: "+3650d"
+  delegate_to: localhost
+  run_once: true
+
+- name: Generate server private key
+  community.crypto.openssl_privatekey:
+    path: "{{ tls_local_dir }}/{{ inventory_hostname }}.key"
+    size: 2048
+    type: RSA
+  delegate_to: localhost
+  when: tls_san | length > 0
+
+- name: Generate server CSR
+  community.crypto.openssl_csr:
+    path: "{{ tls_local_dir }}/{{ inventory_hostname }}.csr"
+    privatekey_path: "{{ tls_local_dir }}/{{ inventory_hostname }}.key"
+    common_name: "{{ inventory_hostname }}.internal"
+    organization_name: "{{ tls_ca_org }}"
+    country_name: "{{ tls_ca_country }}"
+    subject_alt_name: "{{ tls_san }}"
+    extended_key_usage: [serverAuth]
+    use_common_name_for_san: false
+  delegate_to: localhost
+  when: tls_san | length > 0
+
+- name: Sign server certificate
+  community.crypto.x509_certificate:
+    path: "{{ tls_local_dir }}/{{ inventory_hostname }}.crt"
+    csr_path: "{{ tls_local_dir }}/{{ inventory_hostname }}.csr"
+    ownca_path: "{{ tls_local_dir }}/ca.crt"
+    ownca_privatekey_path: "{{ tls_local_dir }}/ca.key"
+    provider: ownca
+    ownca_digest: sha256
+    ownca_not_after: "+3650d"
+  delegate_to: localhost
+  when: tls_san | length > 0
+
+- name: Create TLS directory on host
+  file:
+    path: "{{ tls_host_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Deploy CA certificate
+  copy:
+    src: "{{ tls_local_dir }}/ca.crt"
+    dest: "{{ tls_host_dir }}/ca.crt"
+    mode: '0644'
+  become: true
+
+- name: Deploy server certificate
+  copy:
+    src: "{{ tls_local_dir }}/{{ inventory_hostname }}.crt"
+    dest: "{{ tls_host_dir }}/server.crt"
+    mode: '0644'
+  become: true
+  when: tls_san | length > 0
+
+- name: Deploy server key
+  copy:
+    src: "{{ tls_local_dir }}/{{ inventory_hostname }}.key"
+    dest: "{{ tls_host_dir }}/server.key"
+    mode: '0644'
+  become: true
+  when: tls_san | length > 0

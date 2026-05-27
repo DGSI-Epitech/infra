@@ -31,8 +31,9 @@
 
 - name: Wait for Kibana to be ready
   uri:
-    url: "http://127.0.0.1:{{ kibana_port }}/api/status"
+    url: "https://127.0.0.1:{{ kibana_port }}/api/status"
     method: GET
+    validate_certs: false
     status_code: 200
   register: kibana_status
   retries: 40

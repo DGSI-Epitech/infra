@@ -1,5 +1,9 @@
 server.name: "kibana"
 server.host: "0.0.0.0"
-elasticsearch.hosts: ["http://{{ kibana_es_host }}:{{ kibana_es_port }}"]
+server.ssl.enabled: true
+server.ssl.certificate: /usr/share/kibana/config/certs/server.crt
+server.ssl.key: /usr/share/kibana/config/certs/server.key
+elasticsearch.hosts: ["https://{{ kibana_es_host }}:{{ kibana_es_port }}"]
 elasticsearch.username: "kibana_system"
 elasticsearch.password: "{{ kibana_system_password }}"
+elasticsearch.ssl.certificateAuthorities: ["/usr/share/kibana/config/certs/ca.crt"]

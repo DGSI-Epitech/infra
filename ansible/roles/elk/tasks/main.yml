@@ -50,11 +50,12 @@
 
 - name: Wait for Elasticsearch to be ready
   uri:
-    url: "http://127.0.0.1:{{ elk_es_port }}/_cluster/health"
+    url: "https://127.0.0.1:{{ elk_es_port }}/_cluster/health"
     method: GET
     url_username: elastic
     url_password: "{{ elk_elastic_password }}"
     force_basic_auth: true
+    ca_path: "{{ elk_tls_host_dir }}/ca.crt"
     status_code: 200
   register: es_health
   retries: 20
@@ -63,11 +64,12 @@
 
 - name: Set kibana_system password in Elasticsearch
   uri:
-    url: "http://127.0.0.1:{{ elk_es_port }}/_security/user/kibana_system/_password"
+    url: "https://127.0.0.1:{{ elk_es_port }}/_security/user/kibana_system/_password"
     method: POST
     url_username: elastic
     url_password: "{{ elk_elastic_password }}"
     force_basic_auth: true
+    ca_path: "{{ elk_tls_host_dir }}/ca.crt"
     body_format: json
     body:
       password: "{{ elk_kibana_system_password }}"

@@ -11,6 +11,7 @@ services:
     volumes:
       - {{ elk_dir }}/elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
       - {{ elk_dir }}/elasticsearch/data:/usr/share/elasticsearch/data
+      - {{ elk_tls_host_dir }}:/usr/share/elasticsearch/config/certs:ro
     ports:
       - "{{ elk_es_port }}:9200"
       - "{{ elk_es_cluster_port }}:9300"
@@ -19,7 +20,7 @@ services:
     restart: unless-stopped
     mem_limit: {{ elk_es_mem_limit }}
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf -u elastic:{{ elk_elastic_password }} http://localhost:9200/_cluster/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf -u elastic:{{ elk_elastic_password }} https://localhost:9200/_cluster/health --cacert /usr/share/elasticsearch/config/certs/ca.crt || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -28,12 +29,16 @@ services:
     image: docker.elastic.co/kibana/kibana:{{ elk_version }}
     container_name: kibana
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
       - ELASTICSEARCH_USERNAME=kibana_system
       - ELASTICSEARCH_PASSWORD={{ elk_kibana_system_password }}
+      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=/usr/share/kibana/config/certs/ca.crt
       - XPACK_SECURITY_ENCRYPTIONKEY=lab_infra_security_encryption_key_min_32chars
       - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=lab_infra_saved_objects_encryption_key_32
       - XPACK_REPORTING_ENCRYPTIONKEY=lab_infra_reporting_encryption_key_32chars
+    volumes:
+      - {{ elk_dir }}/kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - {{ elk_tls_host_dir }}:/usr/share/kibana/config/certs:ro
     ports:
       - "{{ elk_kibana_port }}:5601"
     networks:
@@ -44,7 +49,7 @@ services:
     restart: unless-stopped
     mem_limit: {{ elk_kibana_mem_limit }}
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
+      test: ["CMD-SHELL", "curl -sfk https://localhost:5601/api/status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 10
