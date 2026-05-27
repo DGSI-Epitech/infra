@@ -5,6 +5,7 @@
     state: directory
     mode: '0700'
   delegate_to: localhost
+  become: false
   run_once: true
 
 - name: Generate CA private key
@@ -13,6 +14,7 @@
     size: 4096
     type: RSA
   delegate_to: localhost
+  become: false
   run_once: true
 
 - name: Generate CA CSR
@@ -28,6 +30,7 @@
     key_usage_critical: true
     use_common_name_for_san: false
   delegate_to: localhost
+  become: false
   run_once: true
 
 - name: Generate CA certificate
@@ -39,6 +42,7 @@
     selfsigned_digest: sha256
     selfsigned_not_after: "+3650d"
   delegate_to: localhost
+  become: false
   run_once: true
 
 - name: Generate server private key
@@ -47,6 +51,7 @@
     size: 2048
     type: RSA
   delegate_to: localhost
+  become: false
   when: tls_san | length > 0
 
 - name: Generate server CSR
@@ -60,6 +65,7 @@
     extended_key_usage: [serverAuth]
     use_common_name_for_san: false
   delegate_to: localhost
+  become: false
   when: tls_san | length > 0
 
 - name: Sign server certificate
@@ -72,6 +78,7 @@
     ownca_digest: sha256
     ownca_not_after: "+3650d"
   delegate_to: localhost
+  become: false
   when: tls_san | length > 0
 
 - name: Create TLS directory on host
