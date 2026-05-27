@@ -1,0 +1,22 @@
+services:
+  kibana:
+    image: docker.elastic.co/kibana/kibana:{{ kibana_version }}
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://{{ kibana_es_host }}:{{ kibana_es_port }}
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD={{ kibana_system_password }}
+      - NODE_OPTIONS=--max-old-space-size=768
+      - XPACK_SECURITY_ENCRYPTIONKEY=lab_infra_security_encryption_key_min_32chars
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=lab_infra_saved_objects_encryption_key_32
+      - XPACK_REPORTING_ENCRYPTIONKEY=lab_infra_reporting_encryption_key_32chars
+    ports:
+      - "{{ kibana_port }}:5601"
+    restart: unless-stopped
+    mem_limit: {{ kibana_mem_limit }}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s

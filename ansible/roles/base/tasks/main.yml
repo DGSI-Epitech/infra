@@ -11,15 +11,43 @@
 
 - name: Install base packages
   apt:
-    name: "{{ base_packages }}"
+    name: "{{ base_packages + ['openssh-server'] }}"
     state: present
     update_cache: true
+
+- name: Enable SSH
+  systemd:
+    name: ssh
+    enabled: true
+    state: started
+
+- name: Ajouter la clé SSH autorisée
+  authorized_key:
+    user: "{{ ansible_user }}"
+    key: "{{ ssh_public_key }}"
+    state: present
 
 - name: Enable qemu-guest-agent
   systemd:
     name: qemu-guest-agent
     enabled: true
     state: started
+
+- name: Disable swap
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+  changed_when: true
+
+- name: Remove swap from fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^[^#].*\sswap\s.*$'
+    replace: ''
+
+- name: Remove swap file
+  file:
+    path: /swap.img
+    state: absent
 
 - name: Create keyrings directory
   file:
@@ -55,9 +83,9 @@
     enabled: true
     state: started
 
-- name: Add ubuntu user to docker group
+- name: Add ansible user to docker group
   user:
-    name: ubuntu
+    name: "{{ ansible_user }}"
     groups: docker
     append: true
 

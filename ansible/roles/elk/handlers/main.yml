@@ -1,6 +1,6 @@
 ---
 - name: restart elk
-  command: docker compose up -d --force-recreate
+  command: docker compose restart elasticsearch
   args:
     chdir: "{{ elk_dir }}"
   become: true
