@@ -25,36 +25,6 @@ services:
       timeout: 10s
       retries: 5
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:{{ elk_version }}
-    container_name: kibana
-    environment:
-      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
-      - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD={{ elk_kibana_system_password }}
-      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=/usr/share/kibana/config/certs/ca.crt
-      - XPACK_SECURITY_ENCRYPTIONKEY=lab_infra_security_encryption_key_min_32chars
-      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=lab_infra_saved_objects_encryption_key_32
-      - XPACK_REPORTING_ENCRYPTIONKEY=lab_infra_reporting_encryption_key_32chars
-    volumes:
-      - {{ elk_dir }}/kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
-      - {{ elk_tls_host_dir }}:/usr/share/kibana/config/certs:ro
-    ports:
-      - "{{ elk_kibana_port }}:5601"
-    networks:
-      - elk-net
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    restart: unless-stopped
-    mem_limit: {{ elk_kibana_mem_limit }}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sfk https://localhost:5601/api/status || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 120s
-
 networks:
   elk-net:
     driver: bridge
