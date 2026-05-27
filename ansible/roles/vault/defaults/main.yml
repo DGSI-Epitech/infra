@@ -2,8 +2,9 @@
 vault_version: "1.17.2"
 vault_config_dir: /etc/vault.d
 vault_data_dir: /opt/vault/data
-vault_api_addr: "http://{{ ansible_host }}:8200"
+vault_api_addr: "https://{{ ansible_host }}:8200"
 vault_ui: true
-vault_tls_disable: true
+vault_tls_disable: false
+vault_tls_host_dir: /etc/ssl/internal
 vault_init_shares: 5
 vault_init_threshold: 3

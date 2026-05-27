@@ -12,6 +12,7 @@
   collections:
     - pfsensible.core
   vars_files:
+    - ../vars/common.yml
     - ../vars/openvpn_secrets.yml
   vars:
     openvpn_client:
@@ -21,12 +22,18 @@
       server_addr: "5.196.50.52"
       server_port: "1194"
       tunnel_network: "10.3.3.0/30"
-      remote_network: "192.168.255.240/28"
+      remote_network: "192.168.255.240/28,10.255.255.248/29"
       data_ciphers: []
       compression: ""
 
   tasks:
-    # ── Firewall ────────────────────────────────────────────────────────────
+    - name: Configurer la clé SSH autorisée pour admin
+      pfsensible.core.pfsense_user:
+        name: admin
+        authorizedkeys: "{{ ssh_public_key }}"
+        state: present
+      tags: [configure, ssh]
+
     - name: Autoriser tout le trafic LAN vers WAN
       pfsensible.core.pfsense_rule:
         name: "Allow LAN to WAN"
@@ -85,7 +92,6 @@
         state: present
       tags: [configure, firewall, vpn]
 
-    # ── VPN ─────────────────────────────────────────────────────────────────
     - name: Configurer client OpenVPN (connexion vers Cloud)
       pfsensible.core.pfsense_openvpn_client:
         name: "{{ openvpn_client.name }}"
@@ -101,7 +107,6 @@
         state: present
       tags: [configure, vpn]
 
-    # ── DNS ─────────────────────────────────────────────────────────────────
     - name: Configurer les serveurs DNS (Forwarders)
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
@@ -111,7 +116,6 @@
         - "8.8.8.8"
       tags: [configure, dns]
 
-    # ── CA ──────────────────────────────────────────────────────────────────
     - name: Créer l'Autorité de Certification (CAPfsense)
       pfsensible.core.pfsense_ca:
         name: "CA Interne pour Vault TLS"
@@ -137,7 +141,6 @@
       when: ca_result.ca is defined
       tags: [configure, ca]
 
-    # ── KILLSWITCH ──────────────────────────────────────────────────────────
     - name: "[KILLSWITCH] Bloquer OpenVPN 1194 sur WAN"
       pfsensible.core.pfsense_rule:
         name: "KILLSWITCH_OpenVPN_1194"
@@ -154,7 +157,6 @@
       ansible.builtin.raw: kill $(cat /var/run/openvpn_client1.pid 2>/dev/null) 2>/dev/null || pkill -f 'openvpn.*client1' 2>/dev/null; true
       tags: [never, killswitch]
 
-    # ── RESTORE ─────────────────────────────────────────────────────────────
     - name: "[RESTORE] Supprimer la règle KILLSWITCH"
       pfsensible.core.pfsense_rule:
         name: "KILLSWITCH_OpenVPN_1194"
@@ -199,6 +201,7 @@
   collections:
     - pfsensible.core
   vars_files:
+    - ../vars/common.yml
     - ../vars/openvpn_secrets.yml
   vars:
     openvpn_server:
@@ -213,7 +216,13 @@
       compression: ""
 
   tasks:
-    # ── Firewall ────────────────────────────────────────────────────────────
+    - name: Configurer la clé SSH autorisée pour admin
+      pfsensible.core.pfsense_user:
+        name: admin
+        authorizedkeys: "{{ ssh_public_key }}"
+        state: present
+      tags: [configure, ssh]
+
     - name: Bloquer DMZ vers LAN interne
       pfsensible.core.pfsense_rule:
         name: "Block DMZ to LAN"
@@ -236,6 +245,18 @@
         destination_port: "3022"
         state: present
       tags: [configure, firewall]
+
+    - name: Autoriser bastion (DMZ) vers LAN OP via VPN
+      pfsensible.core.pfsense_rule:
+        name: "Allow DMZ to OP LAN VPN"
+        action: pass
+        interface: opt1
+        protocol: any
+        source: "10.255.255.248/29"
+        destination: "172.16.255.240/28"
+        before: "Allow DMZ to ANY"
+        state: present
+      tags: [configure, firewall, vpn]
 
     - name: Autoriser trafic DMZ vers internet
       pfsensible.core.pfsense_rule:
@@ -306,7 +327,6 @@
         state: present
       tags: [configure, firewall, vpn]
 
-    # ── VPN ─────────────────────────────────────────────────────────────────
     - name: Configurer serveur OpenVPN (site-to-site vers OP)
       pfsensible.core.pfsense_openvpn_server:
         name: "{{ openvpn_server.name }}"
@@ -322,7 +342,6 @@
         state: present
       tags: [configure, vpn]
 
-    # ── DNS ─────────────────────────────────────────────────────────────────
     - name: Configurer les DNS cibles (Forwarders)
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
@@ -331,7 +350,6 @@
         - "8.8.8.8"
       tags: [configure, dns]
 
-    # ── KILLSWITCH ──────────────────────────────────────────────────────────
     - name: "[KILLSWITCH] Bloquer OpenVPN 1194 entrant sur WAN"
       pfsensible.core.pfsense_rule:
         name: "KILLSWITCH_OpenVPN_1194"
@@ -348,7 +366,6 @@
       ansible.builtin.raw: kill $(cat /var/run/openvpn_server1.pid 2>/dev/null) 2>/dev/null || pkill -f 'openvpn.*server1' 2>/dev/null; true
       tags: [never, killswitch]
 
-    # ── RESTORE ─────────────────────────────────────────────────────────────
     - name: "[RESTORE] Supprimer la règle KILLSWITCH"
       pfsensible.core.pfsense_rule:
         name: "KILLSWITCH_OpenVPN_1194"

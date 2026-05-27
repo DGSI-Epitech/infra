@@ -1,0 +1,7 @@
+---
+tls_local_dir: "{{ lookup('env', 'HOME') }}/.ansible-tls"
+tls_host_dir: /etc/ssl/internal
+tls_ca_cn: "DGSI Internal CA"
+tls_ca_org: "DGSI-Epitech"
+tls_ca_country: "FR"
+tls_san: []

@@ -23,17 +23,19 @@ def load_env(path):
 repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 env = load_env(os.path.join(repo_root, "config.env"))
 
-proxmox_host      = env.get("PROXMOX_HOST", "")
-proxmox2_host     = env.get("PROXMOX2_HOST", "")
 ssh_key           = env.get("SSH_PRIVATE_KEY_FILE", "~/.ssh/id_ed25519")
-vm_user           = env.get("VM_USERNAME", "ubuntu")
-ops_ip       = os.environ.get("OPS_IP") or env.get("VM_IP_OPS", "").split("/")[0]
+vm_user_op        = env.get("VM_USERNAME_OP", "dgsi-op")
+vm_user_cloud     = env.get("VM_USERNAME_CLOUD", "dgsi-cloud")
+ops_ip            = os.environ.get("OPS_IP") or env.get("VM_IP_OPS", "").split("/")[0]
 services_ip       = os.environ.get("SERVICES_IP") or env.get("VM_IP_SERVICES", "").split("/")[0]
-pfsense_op_wan    = env.get("PFSENSE_OP_WAN", "")    # 5.196.45.8  — accès direct WAN
-pfsense_cloud_wan = env.get("PFSENSE_CLOUD_WAN", "") # 5.196.50.52 — accès direct WAN
+bastion_ip        = env.get("VM_IP_BASTION", "").split("/")[0]
+web_ip            = env.get("VM_IP_WEB", "").split("/")[0]
+pfsense_op_wan    = env.get("PFSENSE_OP_WAN", "")
+pfsense_cloud_wan = env.get("PFSENSE_CLOUD_WAN", "")
 pfsense_password  = env.get("PFSENSE_PASSWORD", "pfsense")
-gateway      = env.get("VM_GATEWAY", "")
-proxy_jump   = f"-o StrictHostKeyChecking=no -o ProxyJump=root@{proxmox_host} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+vm_password       = env.get("VM_PASSWORD", "")
+proxy_jump        = f"-o StrictHostKeyChecking=no -o ProxyJump=admin@{pfsense_op_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+proxy_jump_cloud  = f"-o StrictHostKeyChecking=no -o ProxyJump=admin@{pfsense_cloud_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
 pfsense_common = {
     "ansible_user":               "admin",
@@ -50,6 +52,12 @@ inventory = {
     "services": {
         "hosts": ["services-vm"]
     },
+    "bastion": {
+        "hosts": ["bastion-vm"]
+    },
+    "web": {
+        "hosts": ["web-vm"]
+    },
     "Pfsense_OP": {
         "hosts": ["pfsense-op"]
     },
@@ -60,15 +68,31 @@ inventory = {
         "hostvars": {
             "ops-vm": {
                 "ansible_host":                ops_ip,
-                "ansible_user":                "ubuntu",
+                "ansible_user":                vm_user_op,
+                "ansible_become_pass":         vm_password,
                 "ansible_ssh_private_key_file": ssh_key,
                 "ansible_ssh_common_args":      proxy_jump,
             },
             "services-vm": {
                 "ansible_host":                services_ip,
-                "ansible_user":                vm_user,
+                "ansible_user":                vm_user_op,
+                "ansible_become_pass":         vm_password,
                 "ansible_ssh_private_key_file": ssh_key,
                 "ansible_ssh_common_args":      proxy_jump,
+            },
+            "bastion-vm": {
+                "ansible_host":                bastion_ip,
+                "ansible_user":                vm_user_cloud,
+                "ansible_become_pass":         vm_password,
+                "ansible_ssh_private_key_file": ssh_key,
+                "ansible_ssh_common_args":      proxy_jump_cloud,
+            },
+            "web-vm": {
+                "ansible_host":                web_ip,
+                "ansible_user":                vm_user_cloud,
+                "ansible_become_pass":         vm_password,
+                "ansible_ssh_private_key_file": ssh_key,
+                "ansible_ssh_common_args":      proxy_jump_cloud,
             },
             "pfsense-op": {
                 **pfsense_common,
