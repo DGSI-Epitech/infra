@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport json, glob\ncontent = open('/home/user/infra/CLAUDE.md').read()\nmem_files = sorted(glob.glob('/home/user/.claude/projects/-home-user-infra/memory/*.md'))\nmem_content = '\\n\\n---\\n\\n'.join(open(f).read() for f in mem_files if 'MEMORY.md' not in f)\nctx = '=== CLAUDE.md (architecture) ===\\n' + content + '\\n\\n=== Memory (feedback + projet) ===\\n' + mem_content\nprint(json.dumps({'hookSpecificOutput': {'hookEventName': 'SessionStart', 'additionalContext': ctx}}))\n\"",
+            "timeout": 10,
+            "statusMessage": "Chargement architecture infra..."
+          }
+        ]
+      }
+    ]
+  }
+}
