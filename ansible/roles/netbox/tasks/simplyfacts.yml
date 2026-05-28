@@ -1,80 +1,44 @@
-# roles/netbox/tasks/simple_facts_sync.yml
-
-- name: Install python3-pip
-  apt:
-    name: python3-pip
-    state: present
-
-- name: Install python3-venv
-  apt:
-    name: python3-venv
-    state: present
-    
-- name: Install Simple-Facts in a private env
-  pip:
-    name: "git+https://gitlab.com/netodata/simple-facts.git"
-    virtualenv: /opt/sfacts-venv
-    virtualenv_command: python3 -m venv
-
-- name: Créer répertoire .sfacts
-  file:
-    path: /root/.sfacts
-    state: directory
-    mode: '0700'
-
-- name: Créer config Simple-Facts
+- name: Créer script auto-sync NetBox
   copy:
-    dest: /root/.sfacts/config.yaml
+    dest: /usr/local/bin/netbox-sync.sh
+    mode: '0755'
     content: |
-      netbox:
-        url: http://localhost:8000
-        token: {{ netbox_api_token }}
-        verify_ssl: false
+      #!/bin/bash
+      NETBOX_URL="http://localhost:{{ netbox_port }}"
+      NETBOX_TOKEN="{{ netbox_api_token }}"
+      HOSTNAME=$(hostname)
+      VCPUS=$(nproc)
+      MEMORY=$(free -m | awk '/^Mem:/{print $2}')
 
-- name: Lan discovery
-  command: >
-    /opt/sfacts-venv/bin/sfacts discover
-      --subnet 172.16.0.240/28
-      --output /tmp/discovery.json
-      --username ubuntu
-      --password "ubuntu"
+      VM_ID=$(curl -sf -H "Authorization: Token $NETBOX_TOKEN" \
+        "$NETBOX_URL/api/virtualization/virtual-machines/?name=$HOSTNAME" | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); print(d['results'][0]['id'] if d['count']>0 else '')" 2>/dev/null)
 
-- name: Forcer SSH à ignorer la vérification de clé (yes/no)
-  blockinfile:
-    path: /root/.ssh/config
-    create: yes
-    mode: '0600'
-    block: |
-      Host 172.16.0.*
-        StrictHostKeyChecking no
-        UserKnownHostsFile /dev/null
-        
-- name: Collecte des facts
-  command: >
-     /opt/sfacts-venv/bin/sfacts facts
-      --input /tmp/discovery.json
-      --output /tmp/facts.json
-      --username ubuntu
-      --password "ubuntu"
+      if [ -n "$VM_ID" ]; then
+        curl -sf -X PATCH -H "Authorization: Token $NETBOX_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"vcpus\": $VCPUS, \"memory\": $MEMORY, \"status\": \"active\"}" \
+          "$NETBOX_URL/api/virtualization/virtual-machines/$VM_ID/" > /dev/null
+        echo "$(date) updated $HOSTNAME (id=$VM_ID) vcpus=$VCPUS mem=${MEMORY}MB"
+      else
+        curl -sf -X POST -H "Authorization: Token $NETBOX_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"name\": \"$HOSTNAME\", \"cluster\": {\"name\": \"On-Prem Proxmox\"}, \"status\": \"active\", \"vcpus\": $VCPUS, \"memory\": $MEMORY}" \
+          "$NETBOX_URL/api/virtualization/virtual-machines/" > /dev/null
+        echo "$(date) created $HOSTNAME vcpus=$VCPUS mem=${MEMORY}MB"
+      fi
 
-- name: Dry-run sync vers Netbox
-  command: >
-     /opt/sfacts-venv/bin/sfacts netbox sync
-      --input-file /tmp/facts.json
-      --site-name "onprem"
-      --dry-run
-  environment:
-    NETBOX_URL: "http://localhost:8080"
-    NETBOX_TOKEN: "{{ netbox_api_token }}"
-  register: sfacts_dryrun
+- name: Lancer sync initial
+  command: /usr/local/bin/netbox-sync.sh
+  register: sync_result
 
-
-- name: Afficher le dry-run
+- name: Afficher résultat sync
   debug:
-    var: sfacts_dryrun.stdout_lines
+    var: sync_result.stdout_lines
 
-- name: Sync réel vers Netbox
-  command: >
-     /opt/sfacts-venv/bin/sfacts netbox sync
-      --input /tmp/facts.json
-      --site-name "onprem"
+- name: Planifier auto-sync NetBox toutes les heures
+  cron:
+    name: netbox-auto-sync
+    minute: "0"
+    hour: "*"
+    job: /usr/local/bin/netbox-sync.sh >> /var/log/netbox-sync.log 2>&1

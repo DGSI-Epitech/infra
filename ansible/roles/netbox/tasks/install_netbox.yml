@@ -79,6 +79,115 @@
         slug: onprem
     status_code: [201, 400]
 
+- name: Bootstrap NetBox - create device role hypervisor
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/dcim/device-roles/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: hypervisor
+      slug: hypervisor
+      color: "0000ff"
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create device role firewall
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/dcim/device-roles/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: firewall
+      slug: firewall
+      color: "ff0000"
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create manufacturer generic
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/dcim/manufacturers/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: generic
+      slug: generic
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create device type proxmox-host
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/dcim/device-types/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      manufacturer:
+        slug: generic
+      model: proxmox-host
+      slug: proxmox-host
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - create device type pfsense
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/dcim/device-types/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      manufacturer:
+        slug: generic
+      model: pfsense
+      slug: pfsense
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - register Proxmox physical host
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/dcim/devices/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: proxmox-host
+      device_type:
+        slug: proxmox-host
+      role:
+        slug: hypervisor
+      site:
+        slug: onprem
+      status: active
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - register pfSense firewall
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/dcim/devices/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: pfsense
+      device_type:
+        slug: pfsense
+      role:
+        slug: firewall
+      site:
+        slug: onprem
+      status: active
+    status_code: [201, 400]
+
 - name: Bootstrap NetBox - create LAN prefix
   uri:
     url: "http://127.0.0.1:{{ netbox_port }}/api/ipam/prefixes/"
