@@ -1,12 +1,6 @@
-- name: Deploy and initialize Vault
-  hosts: ops
-  become: true
-  roles:
-    - base
-    - vault
-
-- name: Register vault-vm in NetBox and setup auto-sync
-  hosts: ops
+---
+- name: Deploy NetBox sync agent on all VMs
+  hosts: services:ops
   become: true
   vars:
     netbox_api_token: "0123456789abcdef0123456789abcdef01234567"

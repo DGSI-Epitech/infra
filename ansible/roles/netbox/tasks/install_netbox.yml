@@ -203,7 +203,7 @@
         slug: onprem
     status_code: [201, 400]
 
-- name: Bootstrap NetBox - register NetBox VM self
+- name: Bootstrap NetBox - register services-vm
   uri:
     url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/virtual-machines/"
     method: POST
@@ -212,7 +212,22 @@
       Content-Type: application/json
     body_format: json
     body:
-      name: "services-vm"  
+      name: "services-vm"
+      cluster:
+        name: "On-Prem Proxmox"
+      status: "active"
+    status_code: [201, 400]
+
+- name: Bootstrap NetBox - register vault-vm
+  uri:
+    url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/virtual-machines/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: "vault-vm"
       cluster:
         name: "On-Prem Proxmox"
       status: "active"

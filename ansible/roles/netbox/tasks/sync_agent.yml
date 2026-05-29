@@ -1,0 +1,20 @@
+- name: Déployer script auto-sync NetBox
+  template:
+    src: netbox-sync.sh.j2
+    dest: /usr/local/bin/netbox-sync.sh
+    mode: '0755'
+
+- name: Lancer sync initial
+  command: /usr/local/bin/netbox-sync.sh
+  register: sync_result
+
+- name: Afficher résultat sync
+  debug:
+    var: sync_result.stdout_lines
+
+- name: Planifier auto-sync NetBox toutes les heures
+  cron:
+    name: netbox-auto-sync
+    minute: "0"
+    hour: "*"
+    job: /usr/local/bin/netbox-sync.sh >> /var/log/netbox-sync.log 2>&1
