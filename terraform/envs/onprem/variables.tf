@@ -73,3 +73,27 @@ variable "proxmox_ssh_private_key" {
   description = "Path to the SSH private key for Proxmox root SSH access (bpg provider disk import)"
   type        = string
 }
+
+variable "vm_ip_address" {
+  description = "Static IP address for the VM"
+  type        = string
+  default     = "172.16.0.241"
+}
+variable "netbox_api_token" {
+  description = "NetBox API token"
+  type        = string
+  sensitive   = true
+  default     = "value"
+}
+
+variable "vm_gateway" {
+  description = "Default gateway for the VM"
+  type        = string
+  default     = "172.16.0.254"
+}
+
+variable "netbox_url" {
+  description = "URL Netbox (via tunnel SSH en local)"
+  type        = string
+  default     = "http://localhost:18080"
+}

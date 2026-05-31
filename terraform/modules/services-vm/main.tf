@@ -36,7 +36,8 @@ resource "proxmox_virtual_environment_vm" "services_vm" {
     datastore_id = var.storage_iso
     ip_config {
       ipv4 {
-        address = "dhcp"
+        address = "172.16.0.241/28"
+        gateway = var.vm_gateway
       }
     }
 
