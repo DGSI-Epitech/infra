@@ -14,17 +14,17 @@ Internet
    ▼                                                                        ▼
 pfSense-OP (PVE1)                                              pfSense-Cloud (PVE2)
 5.196.45.8                                                     5.196.50.52
-LAN: 172.16.255.240/28                                         DMZ: 10.255.255.248/29
+LAN: 172.16.0.240/28                                         DMZ: 10.255.255.248/29
    │                                                           LAN: 192.168.255.240/28
    │  OpenVPN 10.3.3.0/29                                         │
    └──────────────────────────────────────────────────────────────┘
    │                                                           │
-   ├── 172.16.255.253  ops-vm                                  ├── 10.255.255.253  bastion
+   ├── 172.16.0.253  ops-vm                                  ├── 10.255.255.253  bastion
    │    Elasticsearch :9200                                    │    Kibana         :5601
    │    Vault         :8200                                    │    Filebeat
    │    Filebeat                                               │
    │                                                           └── 192.168.255.253  web
-   └── 172.16.255.241  services-vm (⚠️ hors ligne)                 Site web
+   └── 172.16.0.241  services-vm (⚠️ hors ligne)                 Site web
 ```
 
 ---
@@ -35,9 +35,9 @@ LAN: 172.16.255.240/28                                         DMZ: 10.255.255.2
 
 | VMID | VM | IP | Services |
 |------|----|----|----------|
-| 125 | pfSense-OP | WAN: 5.196.45.8 / LAN: 172.16.255.254 | Firewall, VPN, DNS |
-| 2038 | ops-vm | 172.16.255.253/28 | Elasticsearch, Vault, Filebeat |
-| 3038 | services-vm | 172.16.255.241/28 | ⚠️ hors ligne |
+| 125 | pfSense-OP | WAN: 5.196.45.8 / LAN: 172.16.0.254 | Firewall, VPN, DNS |
+| 2038 | ops-vm | 172.16.0.253/28 | Elasticsearch, Vault, Filebeat |
+| 3038 | services-vm | 172.16.0.241/28 | ⚠️ hors ligne |
 
 ### PVE2 — Cloud (`ns3183326.ip-146-59-253.eu`, nœud `vm002`)
 
@@ -55,7 +55,7 @@ Toutes les VMs sont sur des réseaux privés. L'accès passe par un ProxyJump pf
 
 ```
 # PVE1 (ops-vm, services-vm)
-ssh -J admin@5.196.45.8 dgsi-op@172.16.255.253
+ssh -J admin@5.196.45.8 dgsi-op@172.16.0.253
 
 # PVE2 (bastion, web)
 ssh -J admin@5.196.50.52 dgsi-cloud@10.255.255.253
@@ -83,7 +83,7 @@ Playbook : `playbooks/tls.yml` → cible `ops:bastion`.
 
 ## Services
 
-### ops-vm (172.16.255.253)
+### ops-vm (172.16.0.253)
 
 | Service | Container | Port | TLS |
 |---------|-----------|------|-----|
@@ -102,7 +102,7 @@ Certs : `/etc/ssl/internal/` monté en lecture seule dans les containers
 | Kibana | `kibana` (Docker Compose) | 5601 | HTTPS ✅ |
 | Filebeat | systemd service | — | Envoie vers ES en HTTPS |
 
-Kibana se connecte à Elasticsearch via HTTPS sur 172.16.255.253:9200 (via tunnel VPN).
+Kibana se connecte à Elasticsearch via HTTPS sur 172.16.0.253:9200 (via tunnel VPN).
 
 ### web (192.168.255.253)
 

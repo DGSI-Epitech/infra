@@ -154,7 +154,7 @@ Tout passe en **HTTPS** via une CA interne générée par Ansible (`community.cr
 
 ### Pourquoi une CA interne et non Let's Encrypt ?
 
-Les services sont sur des IPs privées (172.16.255.x, 10.255.255.x) et les domaines `op.local` / `cloud.local` ne sont pas routables publiquement. Let's Encrypt nécessite soit un challenge HTTP-01 (port 80 accessible depuis internet) soit DNS-01 (API d'un registrar DNS). Aucun des deux n'est disponible.
+Les services sont sur des IPs privées (172.16.0.x, 10.255.255.x) et les domaines `op.local` / `cloud.local` ne sont pas routables publiquement. Let's Encrypt nécessite soit un challenge HTTP-01 (port 80 accessible depuis internet) soit DNS-01 (API d'un registrar DNS). Aucun des deux n'est disponible.
 
 Solution : CA auto-signée générée par le rôle Ansible `tls` via `community.crypto`. La CA est stockée localement sur le controller Ansible (`~/.ansible-tls/`) — jamais dans le repo.
 

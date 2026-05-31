@@ -62,7 +62,7 @@ Toutes les variables viennent de `../config.env` (lu par l'inventaire dynamique 
 
 Variables critiques :
 ```
-VM_IP_OPS="172.16.255.253/28"
+VM_IP_OPS="172.16.0.253/28"
 VM_IP_BASTION="10.255.255.253/29"
 VM_IP_WEB="192.168.255.253/28"
 PFSENSE_OP_WAN="5.196.45.8"
@@ -78,9 +78,9 @@ Tous les services sont sur des réseaux privés. Il faut ouvrir des tunnels SSH 
 ### Tunnels PVE1 (Elasticsearch, Vault — via pfSense-OP)
 
 ```bash
-ssh -fNL 9200:172.16.255.253:9200 \
-       -L 8200:172.16.255.253:8200 \
-    -J admin@5.196.45.8 dgsi-op@172.16.255.253
+ssh -fNL 9200:172.16.0.253:9200 \
+       -L 8200:172.16.0.253:8200 \
+    -J admin@5.196.45.8 dgsi-op@172.16.0.253
 ```
 
 ### Tunnels PVE2 (Kibana — via pfSense-Cloud)
@@ -262,7 +262,7 @@ ssh admin@5.196.50.52 echo "pfSense-Cloud OK"
 
 ```bash
 # ops-vm
-ssh -J admin@5.196.45.8 dgsi-op@172.16.255.253 echo "ops-vm OK"
+ssh -J admin@5.196.45.8 dgsi-op@172.16.0.253 echo "ops-vm OK"
 
 # bastion
 ssh -J admin@5.196.50.52 dgsi-cloud@10.255.255.253 echo "bastion OK"

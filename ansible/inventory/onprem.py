@@ -66,8 +66,16 @@ pfsense_op_wan    = env.get("PFSENSE_OP_WAN", "")
 pfsense_cloud_wan = env.get("PFSENSE_CLOUD_WAN", "")
 pfsense_password  = env.get("PFSENSE_PASSWORD", "pfsense")
 vm_password       = env.get("VM_PASSWORD", "")
-proxy_jump        = f"-o StrictHostKeyChecking=no -o ProxyJump=admin@{pfsense_op_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
-proxy_jump_cloud  = f"-o StrictHostKeyChecking=no -o ProxyJump=admin@{pfsense_cloud_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+pfsense_username  = env.get("PFSENSE_USERNAME", "admin")
+
+# Env proxmox ecole (pfSense comme jump host) — garder pour l'autre environnement
+# proxy_jump       = f"-o StrictHostKeyChecking=no -o ProxyJump={pfsense_username}@{pfsense_op_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+# proxy_jump_cloud = f"-o StrictHostKeyChecking=no -o ProxyJump={pfsense_username}@{pfsense_cloud_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+
+# Env proxmox mel (Proxmox PVE1 comme jump host — root@<proxmox_ip>)
+proxmox_ssh_user  = env.get("PROXMOX_SSH_USER", "root")
+proxy_jump        = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{pfsense_op_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+proxy_jump_cloud  = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{pfsense_cloud_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
 pfsense_common = {
     "ansible_user":               "admin",

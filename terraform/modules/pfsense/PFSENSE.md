@@ -33,7 +33,7 @@ Les variables suivantes doivent être renseignées dans `config.env` :
 | `PFSENSE_OP_WAN` | `5.196.45.8` | IP WAN routable pfSense OP |
 | `PFSENSE_CLOUD_WAN` | `5.196.50.52` | IP WAN routable pfSense Cloud |
 | `PFSENSE_PASSWORD` | `pfsense` | Mot de passe compte `admin` pfSense |
-| `VM_GATEWAY` | `172.16.255.254` | Gateway LAN PVE1 (pfSense OP) |
+| `VM_GATEWAY` | `172.16.0.254` | Gateway LAN PVE1 (pfSense OP) |
 | `VM_GATEWAY2` | `192.168.255.254` | Gateway LAN PVE2 (pfSense Cloud) |
 
 ---
@@ -85,8 +85,8 @@ Ansible se connecte directement sur les IPs WAN avec le compte `admin` en authen
 | Règle HTTPS WAN | Autorise HTTPS entrant sur le WAN (port 443) — accès webGUI |
 | Règle OpenVPN 1194 | Autorise UDP 1194 entrant sur le WAN |
 | Règle OpenVPN interface | Autorise tout le trafic inter-sites sur l'interface OpenVPN |
-| Serveur OpenVPN | Écoute sur `1194/UDP` — tunnel `10.3.3.0/30`, route vers OP LAN `172.16.255.240/28` |
-| DNS Forwarders | `172.16.255.254` (OP via VPN) + `8.8.8.8` (secours) |
+| Serveur OpenVPN | Écoute sur `1194/UDP` — tunnel `10.3.3.0/30`, route vers OP LAN `172.16.0.240/28` |
+| DNS Forwarders | `172.16.0.254` (OP via VPN) + `8.8.8.8` (secours) |
 
 ---
 
@@ -98,8 +98,8 @@ Internet
     ├── PVE1 (OP)  5.196.45.8
     │       └── pfSense S1 (op.local)
     │               ├── WAN  vmbr0
-    │               └── LAN  vmbr1  172.16.255.240/28  GW 172.16.255.254
-    │                           └── vault-vm  172.16.255.253
+    │               └── LAN  vmbr1  172.16.0.240/28  GW 172.16.0.254
+    │                           └── vault-vm  172.16.0.253
     │
     └── PVE2 (Cloud)  5.196.50.52
             └── pfSense S2 (cloud.local)
@@ -111,7 +111,7 @@ Internet
 
 Tunnel OpenVPN inter-sites : 10.3.3.0/30 (server=10.3.3.1, client=10.3.3.2)
 DNS OP    → 192.168.255.254 (Cloud) via VPN → 1.1.1.1 → 8.8.8.8
-DNS Cloud → 172.16.255.254 (OP) via VPN → 8.8.8.8
+DNS Cloud → 172.16.0.254 (OP) via VPN → 8.8.8.8
 ```
 
 ---

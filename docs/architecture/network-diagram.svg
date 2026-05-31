@@ -15,11 +15,11 @@
   <text x="162" y="152" text-anchor="middle" font-size="11" fill="#664d03">5.196.45.8</text>
   <rect x="265" y="118" width="200" height="48" rx="6" fill="#ffc107" fill-opacity="0.3" stroke="#ffc107" stroke-width="1"/>
   <text x="365" y="136" text-anchor="middle" font-size="11" font-weight="bold" fill="#664d03">LAN</text>
-  <text x="365" y="152" text-anchor="middle" font-size="11" fill="#664d03">172.16.255.240/28</text>
+  <text x="365" y="152" text-anchor="middle" font-size="11" fill="#664d03">172.16.0.240/28</text>
 
   <!-- ops-vm -->
   <rect x="55" y="200" width="430" height="160" rx="8" fill="#e8f4fd" stroke="#0066cc" stroke-width="1.5"/>
-  <text x="270" y="222" text-anchor="middle" font-size="12" font-weight="bold" fill="#004085">🖥️  ops-vm  (VMID 2038) — 172.16.255.253</text>
+  <text x="270" y="222" text-anchor="middle" font-size="12" font-weight="bold" fill="#004085">🖥️  ops-vm  (VMID 2038) — 172.16.0.253</text>
 
   <rect x="75" y="232" width="185" height="60" rx="6" fill="#cce5ff" stroke="#004085" stroke-width="1"/>
   <text x="167" y="252" text-anchor="middle" font-size="11" font-weight="bold" fill="#004085">🔍 Elasticsearch</text>
@@ -38,7 +38,7 @@
   <!-- services-vm (offline) -->
   <rect x="55" y="385" width="430" height="65" rx="8" fill="#f8d7da" stroke="#842029" stroke-width="1.5" stroke-dasharray="6,3"/>
   <text x="270" y="408" text-anchor="middle" font-size="12" font-weight="bold" fill="#842029">⚠️  services-vm  (VMID 3038) — HORS LIGNE</text>
-  <text x="270" y="428" text-anchor="middle" font-size="11" fill="#842029">172.16.255.241 — inaccessible (réseau KO)</text>
+  <text x="270" y="428" text-anchor="middle" font-size="11" fill="#842029">172.16.0.241 — inaccessible (réseau KO)</text>
   <text x="270" y="443" text-anchor="middle" font-size="10" fill="#842029">Netbox bloqué (PR #72) — en attente</text>
 
   <!-- Disk legend PVE1 -->
@@ -78,7 +78,7 @@
   <rect x="633" y="252" width="390" height="60" rx="6" fill="#cce5ff" stroke="#004085" stroke-width="1"/>
   <text x="828" y="272" text-anchor="middle" font-size="11" font-weight="bold" fill="#004085">📊 Kibana</text>
   <text x="828" y="287" text-anchor="middle" font-size="10" fill="#004085">:5601 HTTPS</text>
-  <text x="828" y="301" text-anchor="middle" font-size="10" fill="#28a745">● available  →  ES 172.16.255.253:9200 (VPN)</text>
+  <text x="828" y="301" text-anchor="middle" font-size="10" fill="#28a745">● available  →  ES 172.16.0.253:9200 (VPN)</text>
 
   <rect x="633" y="325" width="390" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
   <text x="828" y="340" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">📦 Filebeat</text>
@@ -126,8 +126,8 @@
   <rect x="30" y="615" width="350" height="130" rx="10" fill="#e8fff0" stroke="#27ae60" stroke-width="2"/>
   <text x="205" y="636" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e8449">🔒 Accès Opérateur (SSH Tunnels)</text>
   <text x="50" y="655" font-size="10" fill="#1e8449" font-weight="bold">PVE1 (via pfSense-OP 5.196.45.8) :</text>
-  <text x="50" y="669" font-size="10" fill="#1e8449" font-family="monospace">ssh -fNL 9200:172.16.255.253:9200 \</text>
-  <text x="50" y="682" font-size="10" fill="#1e8449" font-family="monospace">       -L 8200:172.16.255.253:8200 \</text>
+  <text x="50" y="669" font-size="10" fill="#1e8449" font-family="monospace">ssh -fNL 9200:172.16.0.253:9200 \</text>
+  <text x="50" y="682" font-size="10" fill="#1e8449" font-family="monospace">       -L 8200:172.16.0.253:8200 \</text>
   <text x="50" y="695" font-size="10" fill="#1e8449" font-family="monospace">    -J admin@5.196.45.8 dgsi-op@…</text>
   <text x="50" y="712" font-size="10" fill="#1e8449" font-weight="bold">PVE2 (via pfSense-Cloud 5.196.50.52) :</text>
   <text x="50" y="726" font-size="10" fill="#1e8449" font-family="monospace">ssh -fNL 5601:10.255.255.253:5601 \</text>

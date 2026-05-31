@@ -211,7 +211,7 @@
       interface: wan
       local_port: "1194"
       tunnel_network: "10.3.3.0/30"
-      remote_network: "172.16.255.240/28"
+      remote_network: "172.16.0.240/28"
       data_ciphers: []
       compression: ""
 
@@ -253,7 +253,7 @@
         interface: opt1
         protocol: any
         source: "10.255.255.248/29"
-        destination: "172.16.255.240/28"
+        destination: "172.16.0.240/28"
         before: "Allow DMZ to ANY"
         state: present
       tags: [configure, firewall, vpn]
@@ -346,7 +346,7 @@
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
       with_items:
-        - "172.16.255.254"
+        - "172.16.0.254"
         - "8.8.8.8"
       tags: [configure, dns]
 

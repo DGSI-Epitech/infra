@@ -145,15 +145,15 @@ SSH_PRIVATE_KEY_FILE="~/.ssh/id_ed25519"  # clé privée correspondante
 | Proxmox IP | `51.75.128.134` |
 | Proxmox node | `proxmox-site1` |
 | pfSense WAN | `vmbr0` (interface physique) |
-| pfSense LAN | `vmbr1` — `172.16.255.254/28` |
-| Réseau LAN | `172.16.255.240/28` |
+| pfSense LAN | `vmbr1` — `172.16.0.254/28` |
+| Réseau LAN | `172.16.0.240/28` |
 
 | VM | ID | IP | Bridge |
 |---|---|---|---|
 | ubuntu-template | 9000 | — | — |
 | pfsense-template | 9001 | — | — |
-| pfsense-fw-01 | 1001 | 172.16.255.254 (LAN) | vmbr0 + vmbr1 |
-| services-vm | 1003 | 172.16.255.242/28 | vmbr1 |
+| pfsense-fw-01 | 1001 | 172.16.0.254 (LAN) | vmbr0 + vmbr1 |
+| services-vm | 1003 | 172.16.0.242/28 | vmbr1 |
 | ops-vm | 1200 | DHCP (172.16.0.x) | vmbr1 |
 
 ---
