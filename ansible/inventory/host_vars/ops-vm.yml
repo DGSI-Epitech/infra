@@ -1,6 +1,7 @@
 ---
 tls_san:
-  - "IP:172.16.0.253"
+  # Ancien: "IP:172.16.0.253"  ← IP hardcodée, utilise ansible_host (vient de config.env via l'inventaire)
+  - "IP:{{ ansible_host }}"
   - "IP:127.0.0.1"
   - "DNS:ops-vm"
   - "DNS:localhost"

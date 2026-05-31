@@ -3,6 +3,7 @@
   become: true
   roles:
     - base
+    - tls
     - vault
 
 - name: Register vault-vm in NetBox and setup auto-sync
@@ -10,6 +11,11 @@
   become: true
   vars:
     netbox_api_token: "0123456789abcdef0123456789abcdef01234567"
-    netbox_remote_url: "http://172.16.0.241:8080"
+    # Ancien: netbox_remote_url: "http://172.16.0.241:8080"  ← IP hardcodée
+    netbox_remote_url: "http://{{ hostvars[groups['services'][0]]['ansible_host'] }}:{{ netbox_port | default(8080) }}"
   tasks:
-    - import_tasks: ../roles/netbox/tasks/sync_agent.yml
+    # Ancien: import_tasks: ../roles/netbox/tasks/sync_agent.yml
+    # → ne résolvait pas les templates/ du rôle (Ansible cherchait dans playbooks/)
+    - include_role:
+        name: netbox
+        tasks_from: sync_agent

@@ -120,12 +120,12 @@ if [[ "$VMBR1_STATUS" == "notfound" ]]; then
     --data-urlencode "bridge_ports=" \
     --data-urlencode "bridge_stp=off" \
     --data-urlencode "bridge_fd=0" \
-    --data-urlencode "address=172.16.0.254" \
+    --data-urlencode "address=${VM_GATEWAY}" \
     --data-urlencode "netmask=255.255.255.240" \
     --data-urlencode "comments=LAN pfSense S1" > /dev/null
   curl -s -k -X PUT "${PROXMOX_API}/nodes/${PROXMOX_NODE}/network" \
     -H "CSRFPreventionToken: ${CSRF}" -b "PVEAuthCookie=${TICKET}" > /dev/null
-  echo "    Bridge vmbr1 créé (172.16.0.254/28)."
+  echo "    Bridge vmbr1 créé (${VM_GATEWAY}/28)."
 else
   echo "    Bridge vmbr1 déjà présent."
 fi

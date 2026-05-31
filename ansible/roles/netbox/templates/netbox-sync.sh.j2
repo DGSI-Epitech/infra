@@ -1,5 +1,6 @@
 #!/bin/bash
-NETBOX_URL="{{ netbox_remote_url | default('http://172.16.0.241:8080') }}"
+# Ancien: default('http://172.16.0.241:8080')  ← IP hardcodée en fallback
+NETBOX_URL="{{ netbox_remote_url }}"
 NETBOX_TOKEN="{{ netbox_api_token }}"
 HOSTNAME=$(hostname)
 VCPUS=$(nproc)

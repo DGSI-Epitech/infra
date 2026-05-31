@@ -1,6 +1,7 @@
 ---
 filebeat_version: "8.13.0"
-elk_elasticsearch_host: "172.16.0.253"
+# Ancien: elk_elasticsearch_host: "172.16.0.253"  ← IP hardcodée
+elk_elasticsearch_host: "{{ hostvars[groups['ops'][0]]['ansible_host'] }}"
 elk_elasticsearch_port: 9200
 elk_elastic_password: "changeme"
 filebeat_tls_ca_path: /etc/ssl/internal/ca.crt

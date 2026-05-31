@@ -197,7 +197,7 @@
       Content-Type: application/json
     body_format: json
     body:
-      prefix: "172.16.0.240/28"
+      prefix: "{{ vm_lan_subnet }}"
       description: "LAN pfSense"
       site:
         slug: onprem
@@ -277,7 +277,7 @@
       Content-Type: application/json
     body_format: json
     body:
-      address: "172.16.0.241/28"
+      address: "{{ vm_ip_services }}"
       status: "active"
       description: "IP Statique de la VM NetBox/Services elle-meme"
       assigned_object_type: "virtualization.vminterface"

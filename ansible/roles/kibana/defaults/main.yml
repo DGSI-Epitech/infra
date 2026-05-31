@@ -3,7 +3,8 @@ kibana_version: "8.13.0"
 kibana_dir: /opt/kibana
 kibana_port: 5601
 kibana_mem_limit: "1g"
-kibana_es_host: "172.16.0.253"
+# Ancien: kibana_es_host: "172.16.0.253"  ← IP hardcodée
+kibana_es_host: "{{ hostvars[groups['ops'][0]]['ansible_host'] }}"
 kibana_es_port: 9200
 kibana_elastic_password: "changeme"
 kibana_system_password: "changeme"
