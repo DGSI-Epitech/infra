@@ -1,0 +1,6 @@
+---
+- name: Deploy TLS certificates
+  hosts: ops:bastion
+  become: true
+  roles:
+    - tls

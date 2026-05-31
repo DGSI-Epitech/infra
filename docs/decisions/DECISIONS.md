@@ -140,6 +140,97 @@ pfSense (FreeBSD) n'a pas Python ni d'environnement compatible avec les provisio
 
 ---
 
+## HTTPS sur tous les services — PKI interne
+
+**Date :** 2026-05-27
+
+### Problème
+
+L'infrastructure tournait entièrement en HTTP non chiffré (Vault, Elasticsearch, Kibana, Filebeat). Les credentials circulaient en clair sur le réseau privé.
+
+### Décision
+
+Tout passe en **HTTPS** via une CA interne générée par Ansible (`community.crypto`). Pas de Let's Encrypt : aucun domaine public n'est associé à l'infra.
+
+### Pourquoi une CA interne et non Let's Encrypt ?
+
+Les services sont sur des IPs privées (172.16.255.x, 10.255.255.x) et les domaines `op.local` / `cloud.local` ne sont pas routables publiquement. Let's Encrypt nécessite soit un challenge HTTP-01 (port 80 accessible depuis internet) soit DNS-01 (API d'un registrar DNS). Aucun des deux n'est disponible.
+
+Solution : CA auto-signée générée par le rôle Ansible `tls` via `community.crypto`. La CA est stockée localement sur le controller Ansible (`~/.ansible-tls/`) — jamais dans le repo.
+
+### Implémentation
+
+| Composant | Avant | Après |
+|-----------|-------|-------|
+| Vault listener | `tls_disable = true` | TLS avec certs `/vault/certs/` |
+| Elasticsearch | HTTP | HTTPS + xpack.security.http.ssl |
+| Kibana | HTTP | HTTPS + server.ssl |
+| Filebeat output | `http://es:9200` | `https://es:9200` + ca_path |
+| Vault URI Ansible | `http://` | `https://` + ca_path |
+
+SANs par host configurés dans `inventory/host_vars/` (IP + DNS).
+
+---
+
+## Kibana séparé d'ops-vm — gestion du disque
+
+**Date :** 2026-05-27
+
+### Problème
+
+ops-vm (7.6G disk) atteignait 100% avec ES (1.88GB) + Vault (612MB) + Kibana (1.73GB). Kibana étant le plus grand et le moins critique pour les opérations, il a été déplacé.
+
+### Décision
+
+Kibana tourne sur **bastion** (PVE2 Cloud) en tant que service standalone dans son propre Docker Compose. Il se connecte à Elasticsearch via HTTPS à travers le tunnel VPN inter-sites.
+
+Avantage supplémentaire : Kibana est maintenant dans la DMZ Cloud (10.255.255.x), séparé physiquement d'Elasticsearch.
+
+### Pourquoi bastion et non web ?
+
+- web n'a pas Docker installé (et a des problèmes de connectivité internet pour l'installation)
+- bastion héberge déjà le rôle base (Docker, UFW) — coût d'ajout nul
+
+---
+
+## Filebeat direct vers Elasticsearch — suppression de Logstash
+
+**Date :** 2026-05-27
+
+### Problème
+
+La stack ELK initiale incluait Logstash comme pipeline intermédiaire (Filebeat → Logstash → ES). Logstash ne remplissait aucune fonction de transformation — il ne faisait que forwarder les logs.
+
+### Décision
+
+Suppression de Logstash. Filebeat envoie directement vers Elasticsearch via HTTPS.
+
+Gain : ~600MB d'image Docker en moins sur ops-vm. Configuration simplifiée.
+
+---
+
+## Gestion disque — ILM + rotation logs
+
+**Date :** 2026-05-27
+
+### Problème
+
+Toutes les VMs ont 7.6G de disque. Les images Docker seules consomment 2-4GB selon la VM. Sans politique de rétention, Elasticsearch et les logs système peuvent remplir le disque en quelques semaines.
+
+### Décision
+
+Trois niveaux de protection :
+
+1. **ILM Elasticsearch** : politique `filebeat-policy` — rollover à 1GB ou 7 jours, suppression après 30 jours. Appliquée lors du déploiement ELK.
+
+2. **Rotation logs Docker** : `log-driver: json-file`, `max-size: 10m`, `max-file: 3` dans `/etc/docker/daemon.json`. Configuré via le rôle `base`.
+
+3. **Nettoyage periodique** : `apt-get clean` + `journalctl --vacuum-size=100M` dans le rôle `base`.
+
+La config Docker daemon est centralisée dans le rôle `base` (DNS + log rotation). Le rôle `vault` ne gère plus `daemon.json`.
+
+---
+
 ## Stack ELK sur ops-vm — centralisation des logs
 
 **Date :** 2026-05-03

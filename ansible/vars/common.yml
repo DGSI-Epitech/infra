@@ -1,0 +1,4 @@
+---
+# Variables communes aux deux plays pfSense (OP et Cloud).
+# Lit la clé SSH publique depuis config.env (source unique de vérité).
+ssh_public_key: "{{ lookup('pipe', playbook_dir + '/../../ansible/scripts/get_ssh_key.sh ' + playbook_dir + '/../../config.env') }}"

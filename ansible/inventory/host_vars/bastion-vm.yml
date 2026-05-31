@@ -1,0 +1,7 @@
+---
+tls_san:
+  - "IP:10.255.255.253"
+  - "IP:127.0.0.1"
+  - "DNS:bastion"
+  - "DNS:localhost"
+  - "DNS:kibana"

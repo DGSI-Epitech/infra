@@ -52,11 +52,12 @@
     volumes:
       - "{{ vault_config_dir }}:/vault/config"
       - "{{ vault_data_dir }}:/vault/data"
+      - "{{ vault_tls_host_dir }}:/vault/certs:ro"
     capabilities:
       - IPC_LOCK
     env:
       VAULT_CONFIG_DIR: "/vault/config"
-    command: "server" 
+    command: "server"
   become: true
 
 - name: Wait for Vault to be ready
@@ -64,7 +65,7 @@
     port: 8200
     host: 127.0.0.1
     delay: 5
-    timeout: 60 
+    timeout: 60
 
 ## --- INITIALIZATION LOGIC ---
 
@@ -78,8 +79,9 @@
 # 2. On vérifie le statut de Vault via l'API
 - name: Check Vault init status
   uri:
-    url: "http://127.0.0.1:8200/v1/sys/init"
+    url: "https://127.0.0.1:8200/v1/sys/init"
     method: GET
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
   register: vault_init_status
 
 # 3. Sécurité : Si Vault est initialisé mais qu'on n'a pas les clés, on reset tout
@@ -111,12 +113,13 @@
 # 5. Initialisation réelle
 - name: Initialize Vault
   uri:
-    url: "http://127.0.0.1:8200/v1/sys/init"
+    url: "https://127.0.0.1:8200/v1/sys/init"
     method: PUT
     body_format: json
     body:
-      secret_shares: 5
-      secret_threshold: 3
+      secret_shares: "{{ vault_init_shares }}"
+      secret_threshold: "{{ vault_init_threshold }}"
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
     status_code: 200
   register: vault_init_output
   when: not (vault_init_status.json.initialized | default(false))
@@ -163,13 +166,14 @@
     method: GET
   register: vault_seal_status
 
-- name: Unseal Vault
+- name: Unseal Vault (fresh init)
   uri:
-    url: "http://127.0.0.1:8200/v1/sys/unseal"
+    url: "https://127.0.0.1:8200/v1/sys/unseal"
     method: PUT
     body_format: json
     body:
       key: "{{ item }}"
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
     status_code: 200
   loop: "{{ vault_keys[:3] }}"
   when: 

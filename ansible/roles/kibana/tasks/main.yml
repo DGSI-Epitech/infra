@@ -1,0 +1,42 @@
+---
+- name: Create Kibana directory
+  file:
+    path: "{{ kibana_dir }}/config"
+    state: directory
+    mode: "0755"
+
+- name: Deploy Kibana config
+  template:
+    src: kibana.yml.j2
+    dest: "{{ kibana_dir }}/config/kibana.yml"
+    mode: "0644"
+
+- name: Deploy docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ kibana_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start Kibana
+  command: docker compose up -d kibana
+  args:
+    chdir: "{{ kibana_dir }}"
+  changed_when: false
+
+- name: Allow Kibana port
+  ufw:
+    rule: allow
+    port: "{{ kibana_port | string }}"
+    proto: tcp
+
+- name: Wait for Kibana to be ready
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/status"
+    method: GET
+    validate_certs: false
+    status_code: 200
+  register: kibana_status
+  retries: 40
+  delay: 15
+  until: kibana_status.status == 200
+  become: false

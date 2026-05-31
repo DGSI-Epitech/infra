@@ -1,0 +1,6 @@
+---
+- name: restart kibana
+  command: docker compose restart kibana
+  args:
+    chdir: "{{ kibana_dir }}"
+  become: true

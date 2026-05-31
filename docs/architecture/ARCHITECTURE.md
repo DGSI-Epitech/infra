@@ -1,205 +1,178 @@
 # Architecture
 
 Infrastructure as Code pour un lab école déployé sur deux sites Proxmox.
-Objectif : lab entièrement reproductible en moins de 10 minutes sur un environnement vierge.
 
 ---
 
 ## Vue d'ensemble
 
 ```
-                        ┌─────────────────────────────────────────────────┐
-                        │                  GitHub Actions                  │
-                        │  push → terraform apply → ansible-playbook       │
-                        └───────────────────┬─────────────────────────────┘
-                                            │ self-hosted runner
-                   ┌────────────────────────┴─────────────────────────┐
-                   │                                                   │
-          ┌────────▼────────┐                              ┌──────────▼──────────┐
-          │   PVE1 (local)  │                              │   PVE2 (cloud)      │
-          │  51.75.128.134  │                              │  ns3183326.ip-...   │
-          │                 │                              │                     │
-          │  pfSense S1     │  ◄── OpenVPN 10.3.3.0/29 ──►│  pfSense S2         │
-          │  LAN: 172.16.0.0/24                            │  LAN: .240/28       │
-          │                 │                              │  DMZ: .248/29       │
-          │  services-vm    │                              │  Teleport (bastion) │
-          │  ops-vm         │                              │  website            │
-          └─────────────────┘                              └─────────────────────┘
+Internet
+   │
+   ├── SSH direct ──────────────────────────────────────────────────────────┐
+   │                                                                        │
+   ▼                                                                        ▼
+pfSense-OP (PVE1)                                              pfSense-Cloud (PVE2)
+5.196.45.8                                                     5.196.50.52
+LAN: 172.16.255.240/28                                         DMZ: 10.255.255.248/29
+   │                                                           LAN: 192.168.255.240/28
+   │  OpenVPN 10.3.3.0/29                                         │
+   └──────────────────────────────────────────────────────────────┘
+   │                                                           │
+   ├── 172.16.255.253  ops-vm                                  ├── 10.255.255.253  bastion
+   │    Elasticsearch :9200                                    │    Kibana         :5601
+   │    Vault         :8200                                    │    Filebeat
+   │    Filebeat                                               │
+   │                                                           └── 192.168.255.253  web
+   └── 172.16.255.241  services-vm (⚠️ hors ligne)                 Site web
 ```
 
 ---
 
-## Flux de déploiement
+## Sites Proxmox
+
+### PVE1 — On-Premise (`ns3050272.ip-51-255-76.eu`, nœud `vm3`)
+
+| VMID | VM | IP | Services |
+|------|----|----|----------|
+| 125 | pfSense-OP | WAN: 5.196.45.8 / LAN: 172.16.255.254 | Firewall, VPN, DNS |
+| 2038 | ops-vm | 172.16.255.253/28 | Elasticsearch, Vault, Filebeat |
+| 3038 | services-vm | 172.16.255.241/28 | ⚠️ hors ligne |
+
+### PVE2 — Cloud (`ns3183326.ip-146-59-253.eu`, nœud `vm002`)
+
+| VMID | VM | IP | Services |
+|------|----|----|----------|
+| 106 | pfSense-Cloud | WAN: 5.196.50.52 | Firewall, VPN |
+| 2038 | bastion | 10.255.255.253/29 (DMZ) | Kibana, Filebeat |
+| 3038 | web | 192.168.255.253/28 (LAN) | Site web |
+
+---
+
+## Accès SSH
+
+Toutes les VMs sont sur des réseaux privés. L'accès passe par un ProxyJump pfSense :
 
 ```
-Jour 0 — Bootstrap (une seule fois)
-  terraform/envs/bootstrap/
-    └─► Crée TerraformRole + token root@pam!terraform sur Proxmox
+# PVE1 (ops-vm, services-vm)
+ssh -J admin@5.196.45.8 dgsi-op@172.16.255.253
 
-Jour 1+ — Déploiement standard via npm run deploy
-  Packer
-    └─► Build template pfSense (ID 2000) sur Proxmox
+# PVE2 (bastion, web)
+ssh -J admin@5.196.50.52 dgsi-cloud@10.255.255.253
+```
 
-  Packer
-    └─► Build template Ubuntu (ID 1000) sur Proxmox
+Ansible utilise le script dynamique `inventory/onprem.py` qui configure automatiquement le ProxyJump depuis `config.env`.
 
-  Terraform (terraform/envs/onprem/)
-    ├─► Clone pfSense template → pfsense-fw-01 (ID 2100)
-    ├─► Clone Ubuntu template  → services-vm (ID 2300) + cloud-init DHCP
-    └─► Clone Ubuntu template  → ops-vm (ID 2200) + cloud-init DHCP + 30 Go disque
+---
 
-  deploy.sh
-    ├─► Extension partition disque (growpart + pvresize + lvextend + resize2fs)
-    └─► Ansible (inventory/onprem.py — dynamique depuis config.env)
-          ├─► roles/base    → Docker, UFW, paquets de base (toutes les VMs)
-          ├─► roles/vault   → HashiCorp Vault (container Docker standalone)
-          ├─► roles/elk     → ELK stack (Docker Compose : Elasticsearch + Logstash + Kibana)
-          └─► roles/filebeat → Filebeat sur services-vm (envoi logs vers Logstash)
+## TLS / PKI interne
+
+Une CA interne (DGSI Internal CA) gère les certificats de tous les services.
+
+| Composant | Localisation |
+|-----------|-------------|
+| CA privkey | `~/.ansible-tls/ca.key` (hors repo, sur le controller) |
+| CA cert | `~/.ansible-tls/ca.crt` |
+| Certs par host | `~/.ansible-tls/<hostname>/` |
+| Déploiement | `/etc/ssl/internal/` sur chaque VM |
+
+Rôle Ansible : `roles/tls/` — génère sur localhost, déploie sur les hosts cibles.
+Playbook : `playbooks/tls.yml` → cible `ops:bastion`.
+
+---
+
+## Services
+
+### ops-vm (172.16.255.253)
+
+| Service | Container | Port | TLS |
+|---------|-----------|------|-----|
+| Elasticsearch | `elasticsearch` (Docker Compose) | 9200 (API), 9300 (cluster) | HTTPS ✅ |
+| Vault | `vault` (Docker standalone) | 8200 | HTTPS ✅ |
+| Filebeat | systemd service | — | Envoie vers ES en HTTPS |
+
+Docker Compose file : `/opt/elk/docker-compose.yml`
+Config ES : `/opt/elk/elasticsearch/config/elasticsearch.yml`
+Certs : `/etc/ssl/internal/` monté en lecture seule dans les containers
+
+### bastion (10.255.255.253)
+
+| Service | Container | Port | TLS |
+|---------|-----------|------|-----|
+| Kibana | `kibana` (Docker Compose) | 5601 | HTTPS ✅ |
+| Filebeat | systemd service | — | Envoie vers ES en HTTPS |
+
+Kibana se connecte à Elasticsearch via HTTPS sur 172.16.255.253:9200 (via tunnel VPN).
+
+### web (192.168.255.253)
+
+Site web uniquement. Pas de Docker installé.
+
+---
+
+## Flux de logs
+
+```
+ops-vm   ─── Filebeat ──────────────────────────────────────────┐
+bastion  ─── Filebeat ──────────────────────────────────────────┤
+                                                                 │ HTTPS:9200
+                                                                 ▼
+                                                       Elasticsearch (ops-vm)
+                                                                 │
+                                                                 ▼
+                                                       Kibana (bastion) :5601
+                                                       index: filebeat-8.x-*
+                                                       ILM: rollover 1GB/7j, delete 30j
 ```
 
 ---
 
-## Composants
+## Gestion du disque
 
-### terraform/envs/bootstrap/
+Toutes les VMs ont un disque de **7.6G**. Contrainte structurelle : les images Docker lourdes laissent peu de marge.
 
-Tourne **une seule fois** sur un Proxmox vierge. S'authentifie avec `root@pam` username/password, crée le rôle `TerraformRole` avec les privileges nécessaires, génère le token `root@pam!terraform` et lui assigne le rôle. Output : le token à injecter dans `TF_VAR_proxmox_api_token`.
+| VM | Disk% | Images Docker | Marge |
+|----|-------|--------------|-------|
+| ops-vm | ~87% | ES 1.88GB + Vault 612MB | ~900MB |
+| bastion | ~73% | Kibana 1.73GB | ~2GB |
+| web | ~63% | aucune | ~2.7GB |
 
-### terraform/envs/onprem/
-
-Environnement principal PVE1. Appelle quatre modules :
-
-| Module | Ressource créée | ID Proxmox | Disque |
-|---|---|---|---|
-| `pfsense` | Clone le template pfSense Packer | 2100 | — |
-| `services-vm` | Clone le template Ubuntu, DHCP | 2300 | 20 Go |
-| `ops-vm` | Clone le template Ubuntu, DHCP | 2200 | 30 Go |
-
-`ops-vm` a un disque plus large (30 Go) pour héberger les images Docker ELK (~4-5 Go) en plus de Vault.
-
-### packer/pfsense-2.7/
-
-Build automatisé du template pfSense via séquence de touches clavier simulées. Injecte `config.xml.pkrtpl.hcl` (template Packer) via un CD virtuel — contient les interfaces vtnet, IP LAN `172.16.0.254/24`, DNS, SSH activé, et la clé SSH publique admin. Produit le template ID 2000 sur Proxmox.
-
-### packer/ubuntu-22.04/
-
-Build automatisé du template Ubuntu 22.04 via autoinstall. Utilise un password éphémère (généré dans deploy.sh, jamais stocké) pour le communicator SSH. Injecte la clé SSH via provisioner, désactive le password SSH, nettoie le template. Produit le template ID 1000 sur Proxmox.
-
-### ansible/
-
-| Playbook | Rôles | Cible | Port(s) |
-|---|---|---|---|
-| `playbooks/vault.yml` | `base`, `vault` | ops-vm | 8200 |
-| `playbooks/elk.yml` | `elk` | ops-vm | 9200, 9300, 5601, 5044, 8220 |
-| `playbooks/elastic-agent.yml` | `elastic-agent` | ops-vm + services-vm | — |
-
-L'inventaire `inventory/onprem.py` est un script Python dynamique qui lit `config.env`. Les IPs, la clé SSH et le ProxyJump SSH (via Proxmox) sont toujours cohérents avec l'environnement déployé.
-
-#### Rôle `vault`
-
-Installe HashiCorp Vault en **container Docker standalone** (`hashicorp/vault:latest`). Configure le storage Raft local (`/opt/vault/data`), le listener TCP sur `0.0.0.0:8200`. Init + unseal automatique via le rôle Ansible ; les unseal keys sont sauvegardées dans `/root/vault-init.json` sur ops-vm.
-
-#### Rôle `elk`
-
-Déploie la stack ELK + Fleet Server via **Docker Compose** dans `/opt/elk`. Quatre containers :
-
-| Container | Image | Port |
-|---|---|---|
-| `elasticsearch` | `elasticsearch:8.13.0` | 9200 (API), 9300 (cluster) |
-| `logstash` | `logstash:8.13.0` | 5044 (Beats input) |
-| `kibana` | `kibana:8.13.0` | 5601 (UI web) |
-| `fleet-server` | `elastic-agent:8.13.0` | 8220 (enrollment Elastic Agents) |
-
-Tous les containers partagent le réseau Docker `elk-net`. Logstash, Kibana et Fleet Server démarrent uniquement après le healthcheck Elasticsearch. `vm.max_map_count` est fixé à `262144` via `sysctl` (requis par Elasticsearch).
-
-Après le démarrage, le rôle récupère le Fleet enrollment token via l'API Kibana et le stocke dans Vault à `secret/data/elk/fleet-enrollment-token`. Ce token est lu par le rôle `elastic-agent` lors de l'enrollment des agents.
-
-#### Rôle `elastic-agent`
-
-Installe Elastic Agent via le dépôt apt Elastic sur **ops-vm et services-vm**. L'agent lit le Fleet enrollment token depuis Vault (via l'API KV), s'enrôle dans Fleet Server en mode insecure (`--insecure`), puis démarre le service `elastic-agent`. L'enrollment est idempotent : si l'agent est déjà `Healthy`, l'étape est sautée.
+Mesures en place :
+- ILM Elasticsearch : rollover 1GB/7j, delete après 30 jours
+- Docker log rotation : 10MB/3 fichiers max (configuré dans `/etc/docker/daemon.json`)
+- Journal systemd : vacuum à 100MB (via rôle `base`)
+- Cache apt : nettoyage à chaque run du rôle `base`
 
 ---
 
-## Réseau
+## Ansible — Rôles
 
-### PVE1 — On-premise
+| Rôle | Playbook | Cible | Description |
+|------|----------|-------|-------------|
+| `tls` | `tls.yml` | ops, bastion | CA interne + certs signés |
+| `base` | (inclus) | toutes VMs | Docker, UFW, SSH, rotation logs |
+| `vault` | `vault.yml` | ops | HashiCorp Vault en Docker |
+| `elk` | `elk.yml` | ops | Elasticsearch seul (Docker Compose) |
+| `kibana` | `kibana.yml` | bastion | Kibana standalone (Docker Compose) |
+| `filebeat` | `filebeat.yml` | ops, bastion | Filebeat → Elasticsearch HTTPS |
+| `pfsense` | `pfsense.yml` | pfsense-op, pfsense-cloud | Firewall, VPN, DNS |
 
-| Élément | Valeur |
-|---|---|
-| Proxmox IP publique | `51.75.128.134` |
-| Proxmox node | `proxmox-site1` |
-| WAN pfSense | `vmbr0` (IP publique) |
-| LAN pfSense | `vmbr1` — `172.16.0.254/24` |
-| Réseau LAN | `172.16.0.0/24` |
-
-| VM | ID | IP | Rôle |
-|---|---|---|---|
-| ubuntu-template | 1000 | — | Template Ubuntu (ne pas démarrer) |
-| pfsense-template | 2000 | — | Template pfSense (ne pas démarrer) |
-| pfsense-fw-01 | 2100 | `172.16.0.254` | Pare-feu LAN/WAN, DHCP |
-| services-vm | 2300 | DHCP `172.16.0.241` | Netbox, website, Elastic Agent |
-| ops-vm | 2200 | DHCP `172.16.0.242` | Vault + ELK + Fleet Server + Elastic Agent |
-
-### Ports exposés sur ops-vm (UFW)
-
-| Port | Service | Accessible depuis |
-|---|---|---|
-| 8200 | Vault API | LAN + tunnel SSH |
-| 9200 | Elasticsearch API | LAN interne |
-| 9300 | Elasticsearch cluster | LAN interne |
-| 5601 | Kibana UI | LAN + tunnel SSH |
-| 5044 | Logstash Beats input | LAN interne |
-| 8220 | Fleet Server | ops-vm + services-vm (enrollment agents) |
-
-### PVE2 — Cloud
-
-| VM | IP | Réseau | Rôle |
-|---|---|---|---|
-| Teleport | `10.255.255.249` | DMZ `10.255.255.248/29` | Bastion SSH |
-| website | `192.168.255.243` | LAN `192.168.255.240/28` | Site web |
-
-### Tunnel inter-sites
-
-OpenVPN sur `10.3.3.0/29` entre pfSense S1 (PVE1) et pfSense S2 (PVE2).
+Ordre de déploiement :
+1. `tls.yml` — certs avant tout
+2. `vault.yml`
+3. `elk.yml`
+4. `kibana.yml`
+5. `filebeat.yml`
 
 ---
 
-## CI/CD
-
-```
-push main
-  ├── packer/**     → packer.yml    → packer build (templates)
-  └── terraform/**
-      ansible/**    → deploy-onprem.yml
-                         ├── terraform init + plan + apply
-                         ├── injection clé SSH via QEMU agent
-                         ├── attente SSH (ProxyJump via Proxmox)
-                         └── ansible-playbook -i inventory/onprem.py
-                               ├── vault.yml          → ops-vm
-                               ├── elk.yml            → ops-vm (ELK + Fleet Server + token → Vault)
-                               └── elastic-agent.yml  → ops-vm + services-vm
-```
-
-Les deux workflows tournent sur un **self-hosted runner** installé sur le réseau Proxmox (accès direct aux IPs `172.16.0.x`).
-
----
-
-## Décisions techniques
+## Décisions techniques récentes
 
 | Décision | Raison |
-|---|---|
-| Template Ubuntu via Packer | Contrôle total du build — password éphémère, clé SSH injectée par provisioner |
-| Template pfSense via Packer | pfSense n'a pas de cloud-init — config injectée via CD (config.xml template) |
-| Vault en container Docker standalone | Isolation du process, redémarrage automatique, pas de dépendance système |
-| ELK via Docker Compose | Orchestration des dépendances (ES healthcheck → Logstash/Kibana), volumes persistants, rollback simple |
-| Vault + ELK sur la même VM (ops-vm) | Mutualisation des ressources sur un lab mono-site, même réseau Docker |
-| Vault et ELK en containers séparés | Isolation des processus, redémarrage indépendant, pas de Docker-in-Docker |
-| `bpg/proxmox` provider | Support cloud-init, download_file, SSH pour import disque |
-| Bootstrap Terraform séparé | Évite la dépendance circulaire token/permissions — tourne une seule fois |
-| Inventaire Ansible dynamique (Python) | IPs et ProxyJump toujours cohérents avec config.env, pas de duplication |
-| QEMU agent pour injection clé SSH | cloud-init ne met pas à jour authorized_keys pour un user créé par autoinstall |
-| ProxyJump Proxmox pour Ansible | VMs sur vmbr1 (réseau privé), inaccessibles directement depuis l'extérieur |
-| growpart dans deploy.sh | cloud-init ne redimensionne pas automatiquement la partition sur un clone Ubuntu LVM |
-| Fleet Server dans le Compose ELK | Même cycle de vie que la stack, même réseau Docker `elk-net`, pas de container séparé à gérer |
-| Elastic Agent via apt (pas Docker) | L'agent doit surveiller les containers Docker du host — plus simple depuis le host que depuis un container |
-| Enrollment token dans Vault | Le token ne transite jamais en clair dans le code ou les variables d'env CI — lu depuis Vault au moment de l'enrollment |
+|----------|--------|
+| Kibana séparé du Compose ELK | ops-vm à 90% disk — Kibana (1.73GB) déplacé sur bastion |
+| Filebeat direct → ES (sans Logstash) | Logstash inutile pour du log forwarding simple ; réduit les images Docker |
+| TLS interne via CA Ansible | Pas de domaine public → Let's Encrypt impossible ; CA interne via `community.crypto` |
+| ProxyJump via pfSense (pas Proxmox) | Proxmox école : pas d'accès SSH root sur les nœuds PVE |
+| ILM Elasticsearch | Prévenir la croissance non contrôlée de l'index sur 7.6G |
+| daemon.json centralisé dans `base` | DNS + log rotation dans un seul endroit — évite les conflits entre rôles |

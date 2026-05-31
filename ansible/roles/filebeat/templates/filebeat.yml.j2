@@ -17,5 +17,8 @@ filebeat.inputs:
           keys_under_root: true
           overwrite_keys: true
 
-output.logstash:
-  hosts: ["{{ elk_logstash_host }}:{{ elk_logstash_port }}"]
+output.elasticsearch:
+  hosts: ["https://{{ elk_elasticsearch_host }}:{{ elk_elasticsearch_port }}"]
+  username: elastic
+  password: "{{ elk_elastic_password }}"
+  ssl.certificate_authorities: ["{{ filebeat_tls_ca_path }}"]

@@ -1,4 +1,6 @@
 ---
 filebeat_version: "8.13.0"
-elk_logstash_host: "127.0.0.1"
-elk_logstash_port: 5044
+elk_elasticsearch_host: "172.16.255.253"
+elk_elasticsearch_port: 9200
+elk_elastic_password: "changeme"
+filebeat_tls_ca_path: /etc/ssl/internal/ca.crt
