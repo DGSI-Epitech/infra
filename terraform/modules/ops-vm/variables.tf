@@ -49,3 +49,9 @@ variable "storage_iso" {
   type        = string
   default     = "local"
 }
+
+variable "vm_gateway" {
+  description = "Gateway for the VM"
+  type        = string
+  default     = "172.16.0.254"
+}

@@ -1,8 +1,23 @@
+# 1. Recherche du sous-réseau dans NetBox
+data "netbox_prefix" "lan" {
+  prefix = "172.16.0.240/28"
+}
+
+# 2. Réservation de la première IP libre liée à l'interface eth0 (déclarée plus bas)
+resource "netbox_available_ip_address" "ops_vm_ip" {
+  prefix_id                    = data.netbox_prefix.lan.id
+  status                       = "active"
+  dns_name                     = "ops-vm.local"
+  description                  = "IP allouée dynamiquement par Terraform pour la VM Ops"
+  virtual_machine_interface_id = netbox_interface.ops_vm_eth0.id
+}
+
+# 3. Création de la machine virtuelle dans Proxmox
 resource "proxmox_virtual_environment_vm" "ops_vm" {
-  name      = "ops-vm"
-  node_name = var.proxmox_node
-  vm_id     = var.vm_id
-  tags      = ["ops", "ubuntu-22-04"]
+  name       = "ops-vm"
+  node_name  = var.proxmox_node
+  vm_id      = var.vm_id
+  tags       = ["ops", "ubuntu-22-04"]
   boot_order = ["virtio0"]
 
   clone {
@@ -22,7 +37,6 @@ resource "proxmox_virtual_environment_vm" "ops_vm" {
   agent {
     enabled = true
     timeout = "60s"
-
   }
 
   network_device {
@@ -42,9 +56,10 @@ resource "proxmox_virtual_environment_vm" "ops_vm" {
 
   initialization {
     datastore_id = var.storage_iso
+    
     ip_config {
       ipv4 {
-        address = "dhcp"
+        address = "${netbox_available_ip_address.ops_vm_ip.ip_address},gw=${var.vm_gateway}"
       }
     }
 
@@ -54,3 +69,19 @@ resource "proxmox_virtual_environment_vm" "ops_vm" {
     }
   }
 }
+
+# 4. Enregistrement de la VM dans l'inventaire NetBox
+resource "netbox_virtual_machine" "ops_vm_netbox" {
+  name       = "ops-vm"
+  cluster_id = 1 
+  status     = "active"
+  vcpus      = var.vm_cores
+  memory_mb  = var.vm_memory_mb 
+}
+
+# 5. Création de l'interface réseau de la VM dans NetBox
+resource "netbox_interface" "ops_vm_eth0" {
+  name               = "eth0"
+  virtual_machine_id = netbox_virtual_machine.ops_vm_netbox.id
+}
+

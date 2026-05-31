@@ -1,0 +1,62 @@
+#!/bin/bash
+NETBOX_URL="{{ netbox_remote_url | default('http://172.16.0.241:8080') }}"
+NETBOX_TOKEN="{{ netbox_api_token }}"
+HOSTNAME=$(hostname)
+VCPUS=$(nproc)
+MEMORY=$(free -m | awk '/^Mem:/{print $2}')
+
+nb_get()  { curl -sf -H "Authorization: Token $NETBOX_TOKEN" "$NETBOX_URL$1"; }
+nb_post() { curl -sf -X POST  -H "Authorization: Token $NETBOX_TOKEN" -H "Content-Type: application/json" -d "$2" "$NETBOX_URL$1"; }
+nb_patch(){ curl -sf -X PATCH -H "Authorization: Token $NETBOX_TOKEN" -H "Content-Type: application/json" -d "$2" "$NETBOX_URL$1"; }
+nb_id()   { python3 -c "import sys,json; d=json.load(sys.stdin); print(d['results'][0]['id'] if d.get('count',0)>0 else '')" 2>/dev/null; }
+
+# --- DCIM : create or update VM ---
+VM_ID=$(nb_get "/api/virtualization/virtual-machines/?name=$HOSTNAME" | nb_id)
+if [ -n "$VM_ID" ]; then
+  nb_patch "/api/virtualization/virtual-machines/$VM_ID/" \
+    "{\"vcpus\": $VCPUS, \"memory\": $MEMORY, \"status\": \"active\"}" > /dev/null
+  echo "$(date) [DCIM] updated $HOSTNAME vcpus=$VCPUS mem=${MEMORY}MB"
+else
+  VM_ID=$(nb_post "/api/virtualization/virtual-machines/" \
+    "{\"name\": \"$HOSTNAME\", \"cluster\": {\"name\": \"On-Prem Proxmox\"}, \"status\": \"active\", \"vcpus\": $VCPUS, \"memory\": $MEMORY}" | \
+    python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+  echo "$(date) [DCIM] created $HOSTNAME (id=$VM_ID)"
+fi
+
+# --- IPAM : interfaces physiques (exclut lo, docker, br-, veth) ---
+ip -o addr show | awk '$3=="inet" && $2!~/^(lo|docker|br-|veth)/ {print $2, $4}' | while read IFACE CIDR; do
+  IFACE_ID=$(nb_get "/api/virtualization/interfaces/?virtual_machine_id=$VM_ID&name=$IFACE" | nb_id)
+  if [ -z "$IFACE_ID" ]; then
+    IFACE_ID=$(nb_post "/api/virtualization/interfaces/" \
+      "{\"virtual_machine\": {\"id\": $VM_ID}, \"name\": \"$IFACE\", \"enabled\": true}" | \
+      python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+    echo "$(date) [IPAM] created interface $IFACE on $HOSTNAME"
+  fi
+  IP_ID=$(nb_get "/api/ipam/ip-addresses/?address=$CIDR&assigned_object_id=$IFACE_ID" | nb_id)
+  if [ -z "$IP_ID" ]; then
+    nb_post "/api/ipam/ip-addresses/" \
+      "{\"address\": \"$CIDR\", \"status\": \"active\", \"assigned_object_type\": \"virtualization.vminterface\", \"assigned_object_id\": $IFACE_ID}" > /dev/null
+    echo "$(date) [IPAM] created IP $CIDR on $IFACE ($HOSTNAME)"
+  else
+    echo "$(date) [IPAM] IP $CIDR on $IFACE already up-to-date"
+  fi
+done
+
+# --- IPAM : IPs Docker (label: docker:<container> on <vm>) ---
+if command -v docker &>/dev/null && docker ps &>/dev/null 2>&1; then
+  docker ps -q | while read CID; do
+    CONTAINER=$(docker inspect --format {% raw %}'{{.Name}}'{% endraw %} "$CID" | tr -d '/')
+    CIDR=$(docker inspect --format {% raw %}'{{range .NetworkSettings.Networks}}{{if .IPAddress}}{{.IPAddress}}/{{.IPPrefixLen}}{{end}}{{end}}'{% endraw %} "$CID" 2>/dev/null | awk 'NF' | head -1)
+    [ -z "$CIDR" ] && continue
+    DESCRIPTION="docker:${CONTAINER} on ${HOSTNAME}"
+    IP_ID=$(nb_get "/api/ipam/ip-addresses/?address=${CIDR}" | nb_id)
+    if [ -z "$IP_ID" ]; then
+      nb_post "/api/ipam/ip-addresses/" \
+        "{\"address\": \"$CIDR\", \"status\": \"active\", \"description\": \"$DESCRIPTION\"}" > /dev/null
+      echo "$(date) [IPAM] created Docker IP $CIDR ($CONTAINER on $HOSTNAME)"
+    else
+      nb_patch "/api/ipam/ip-addresses/$IP_ID/" "{\"description\": \"$DESCRIPTION\"}" > /dev/null
+      echo "$(date) [IPAM] Docker IP $CIDR ($CONTAINER) up-to-date"
+    fi
+  done
+fi
