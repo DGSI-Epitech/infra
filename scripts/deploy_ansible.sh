@@ -30,6 +30,8 @@ echo ""
 echo "==> [1/4] Ansible services-vm (Netbox)..."
 ansible-playbook playbooks/services-vm.yml -i inventory/onprem.py
 
+ansible-playbook playbooks/tls.yml         -i inventory/onprem.py
+
 echo ""
 echo "==> [2/4] Ansible Vault..."
 ansible-playbook playbooks/vault.yml -i inventory/onprem.py

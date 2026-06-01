@@ -489,6 +489,7 @@ extend_disk  "${OPS_IP}" "ops-vm"
 echo ""
 echo "==> Lancement Ansible..."
 cd "$REPO_ROOT/ansible"
+ansible-playbook playbooks/tls.yml         -i inventory/onprem.py
 ansible-playbook playbooks/vault.yml         -i inventory/onprem.py
 ansible-playbook playbooks/elk.yml           -i inventory/onprem.py
 ansible-playbook playbooks/elastic-agent.yml -i inventory/onprem.py

@@ -81,7 +81,8 @@
   uri:
     url: "https://127.0.0.1:8200/v1/sys/init"
     method: GET
-    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
+    validate_certs: false
+   # ca_path: "{{ vault_tls_host_dir }}/ca.crt"
   register: vault_init_status
 
 # 3. Sécurité : Si Vault est initialisé mais qu'on n'a pas les clés, on reset tout
