@@ -5,7 +5,10 @@ module "pfsense" {
   vm_id          = var.pfsense_vm_id
   template_vm_id = var.pfsense_template_id
   wan_bridge     = var.pfsense_wan_bridge
+  # Ancien: lan_bridge = var.pfsense_lan_bridge (default "vmbr1") ← conflit avec pfSense OP
   lan_bridge     = var.pfsense_lan_bridge
+  # DMZ/opt1 → même bridge que bastion (var.dmz_bridge = "vmbr3")
+  dmz_bridge     = var.dmz_bridge
   vm_name        = "pfsense-cloud-01"
 }
 
