@@ -132,7 +132,7 @@ source "proxmox-iso" "ubuntu-2204" {
 
   disks {
     type         = "virtio"
-    disk_size    = "20G"
+    disk_size    = "8G"
     storage_pool = var.proxmox_storage_vm
     discard      = true
   }
