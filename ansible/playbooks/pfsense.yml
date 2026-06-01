@@ -19,10 +19,14 @@
       name: "VPN_vers_Cloud"
       mode: p2p_shared_key
       protocol: UDP4
-      server_addr: "5.196.50.52"
-      server_port: "1194"
-      tunnel_network: "10.3.3.0/30"
-      remote_network: "192.168.255.240/28,10.255.255.248/29"
+      # Ancien: server_addr: "5.196.50.52"  ← IP hardcodée, utilise PFSENSE_CLOUD_WAN
+      server_addr: "{{ pfsense_cloud_wan }}"
+      # Ancien: server_port: "1194"  ← port hardcodé, utilise VPN_PORT
+      server_port: "{{ vpn_port }}"
+      # Ancien: tunnel_network: "10.3.3.0/30"  ← réseau hardcodé, utilise VPN_TUNNEL_NETWORK
+      tunnel_network: "{{ vpn_tunnel_network }}"
+      # Ancien: remote_network: "192.168.255.240/28,10.255.255.248/29"  ← IPs hardcodées
+      remote_network: "{{ vm_cloud_lan_subnet }},{{ vm_cloud_dmz_subnet }}"
       data_ciphers: []
       compression: ""
 
@@ -111,7 +115,8 @@
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
       with_items:
-        - "192.168.255.254"
+        # Ancien: "192.168.255.254"  ← IP hardcodée, utilise PFSENSE_CLOUD_LAN_IP
+        - "{{ pfsense_cloud_lan_ip }}"
         - "1.1.1.1"
         - "8.8.8.8"
       tags: [configure, dns]
@@ -209,9 +214,12 @@
       mode: p2p_shared_key
       protocol: UDP4
       interface: wan
-      local_port: "1194"
-      tunnel_network: "10.3.3.0/30"
-      remote_network: "172.16.0.240/28"
+      # Ancien: local_port: "1194"  ← port hardcodé, utilise VPN_PORT
+      local_port: "{{ vpn_port }}"
+      # Ancien: tunnel_network: "10.3.3.0/30"  ← réseau hardcodé, utilise VPN_TUNNEL_NETWORK
+      tunnel_network: "{{ vpn_tunnel_network }}"
+      # Ancien: remote_network: "172.16.0.240/28"  ← IP hardcodée, utilise VM_LAN_SUBNET
+      remote_network: "{{ vm_lan_subnet }}"
       data_ciphers: []
       compression: ""
 
@@ -230,7 +238,8 @@
         interface: opt1
         protocol: any
         source: any
-        destination: "192.168.255.240/28"
+        # Ancien: destination: "192.168.255.240/28"  ← IP hardcodée, utilise VM_CLOUD_LAN_SUBNET
+        destination: "{{ vm_cloud_lan_subnet }}"
         state: present
       tags: [configure, firewall]
 
@@ -241,7 +250,8 @@
         interface: opt1
         protocol: tcp
         source: any
-        destination: "192.168.255.240/28"
+        # Ancien: destination: "192.168.255.240/28"  ← IP hardcodée, utilise VM_CLOUD_LAN_SUBNET
+        destination: "{{ vm_cloud_lan_subnet }}"
         destination_port: "3022"
         state: present
       tags: [configure, firewall]
@@ -252,8 +262,10 @@
         action: pass
         interface: opt1
         protocol: any
-        source: "10.255.255.248/29"
-        destination: "172.16.0.240/28"
+        # Ancien: source: "10.255.255.248/29"  ← IP hardcodée, utilise VM_CLOUD_DMZ_SUBNET
+        source: "{{ vm_cloud_dmz_subnet }}"
+        # Ancien: destination: "172.16.0.240/28"  ← IP hardcodée, utilise VM_LAN_SUBNET
+        destination: "{{ vm_lan_subnet }}"
         before: "Allow DMZ to ANY"
         state: present
       tags: [configure, firewall, vpn]
@@ -346,7 +358,8 @@
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
       with_items:
-        - "172.16.0.254"
+        # Ancien: "172.16.0.254"  ← IP hardcodée, utilise VM_GATEWAY
+        - "{{ vm_gateway }}"
         - "8.8.8.8"
       tags: [configure, dns]
 
