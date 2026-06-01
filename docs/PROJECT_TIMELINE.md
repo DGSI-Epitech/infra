@@ -39,6 +39,7 @@ gantt
 ## Détail des phases
 
 ### Phase 1 : Bootstrap & Configuration Initiale (Février - Mars 2026)
+
 **Période : 02-02 au 10-03**
 
 Mise en place de base du projet d'infrastructure
@@ -49,6 +50,7 @@ Mise en place de base du projet d'infrastructure
 | Documentation réseau | 10-03 | Finalisation du plan réseau |
 
 **Commits clés :**
+
 - Initialisation du repo
 - Configuration .gitignore
 - Documentation d'architecture
@@ -56,6 +58,7 @@ Mise en place de base du projet d'infrastructure
 ---
 
 ### Phase 2 : Proxmox & Packer Setup (Avril 2026)
+
 **Période : 21-04 au 27-04**
 
 Configuration d'un environnement de template automatisé avec Packer pour les VMs
@@ -68,6 +71,7 @@ Configuration d'un environnement de template automatisé avec Packer pour les VM
 | Intégration Terraform | 26-04 | Intégration Packer → Terraform |
 
 **Commits clés :**
+
 - `feat(pfsense): full automation of installation and network patching`
 - `Update ubuntu-22.04.pkr.hcl` (multiple iterations)
 - Packer build working avec cloud-init
@@ -75,6 +79,7 @@ Configuration d'un environnement de template automatisé avec Packer pour les VM
 ---
 
 ### Phase 3 : VM Deployment On-Prem (Avril - Mai 2026)
+
 **Période : 25-04 au 21-05**
 
 Déploiement initial des VMs sur Proxmox local (PVE1)
@@ -87,6 +92,7 @@ Déploiement initial des VMs sur Proxmox local (PVE1)
 | Configuration finalisée | 21-05 | VM provisionning stabilisé |
 
 **Commits clés :**
+
 - Adding ubuntu-template module
 - Adding deploy vms with template on proxmox
 - Corrections du DHCP et des routes
@@ -94,6 +100,7 @@ Déploiement initial des VMs sur Proxmox local (PVE1)
 ---
 
 ### Phase 4 : pfSense & VPN Site-to-Site (Mai 2026)
+
 **Période : 04-05 au 18-05**
 
 Configuration complète du firewall dual-site et tunnel VPN
@@ -108,6 +115,7 @@ Configuration complète du firewall dual-site et tunnel VPN
 | Config finalisée | 18-05 | Configuration pfSense stable |
 
 **Commits clés :**
+
 - `Add OpenVPN site-to-site tunnel between pfSense-OP and pfSense-Cloud`
 - `Configure pfSense firewall rules and document webGUI access`
 - `Add VPN emergency kill-switch and restore playbooks`
@@ -116,6 +124,7 @@ Configuration complète du firewall dual-site et tunnel VPN
 ---
 
 ### Phase 5 : Vault & SSH Keys (Avril - Mai 2026)
+
 **Période : 29-04 au 04-05**
 
 Mise en place de la gestion des secrets et authentification SSH
@@ -128,6 +137,7 @@ Mise en place de la gestion des secrets et authentification SSH
 | Playbook Vault | 02-05 | Ansible playbook Vault stable |
 
 **Commits clés :**
+
 - `adding script python to generate a xml config with secret from config.env`
 - `deploy vault with docker`
 - `Merge pull request #60 - remove-password-and-setup-ssh-key`
@@ -135,6 +145,7 @@ Mise en place de la gestion des secrets et authentification SSH
 ---
 
 ### Phase 6 : ELK Stack Complet (Mai 2026)
+
 **Période : 03-05 au 25-05**
 
 Déploiement de la stack de monitoring et logging (Elasticsearch, Kibana, Logstash, Filebeat)
@@ -151,6 +162,7 @@ Déploiement de la stack de monitoring et logging (Elasticsearch, Kibana, Logsta
 | Netbox fonctionnel | 07-05 | Netbox opérationnel |
 
 **Commits clés :**
+
 - `adding stack elk and remove useless code`
 - `adding agents ELK in vms` (elastic-agent + filebeat)
 - Multiples fixes: fleet enrollment, policies, configurations
@@ -161,6 +173,7 @@ Déploiement de la stack de monitoring et logging (Elasticsearch, Kibana, Logsta
 ---
 
 ### Phase 7 : HTTPS/TLS Migration (Mai 2026)
+
 **Période : 27-05 au 31-05**
 
 Migration complète vers HTTPS avec certificats TLS internes
@@ -177,6 +190,7 @@ Migration complète vers HTTPS avec certificats TLS internes
 | Corrections finales | 31-05 | Derniers ajustements TLS |
 
 **Commits clés :**
+
 - `feat: HTTPS sur tous les services (Vault, Elasticsearch, Kibana, Filebeat)`
 - `feat: HTTPS complet, Kibana role, cloud VMs, ELK refactor`
 - `feat: gestion disque — ILM ES, rotation logs Docker, nettoyage rôle ELK`
@@ -187,6 +201,7 @@ Migration complète vers HTTPS avec certificats TLS internes
 ---
 
 ### Phase 8 : Cloud VMs & Teleport (Mai - Juin 2026)
+
 **Période : 23-05 au 01-06**
 
 Déploiement de l'infrastructure cloud et outils d'accès sécurisé
@@ -200,6 +215,7 @@ Déploiement de l'infrastructure cloud et outils d'accès sécurisé
 | Teleport déploiement | 01-06 | Déploiement Teleport sur bastion |
 
 **Commits clés :**
+
 - `deplopyement 2 vms with pfsense on cloud`
 - `adding and starting 2 vms on cloud proxmox`
 - `vm-provisionning adjustement`
@@ -210,11 +226,13 @@ Déploiement de l'infrastructure cloud et outils d'accès sécurisé
 ---
 
 ### Phase 9 : Documentation & Finalisation (Mai - Juin 2026)
+
 **Période : 27-05 au 01-06**
 
 Documentation complète et stabilisation de l'infrastructure
 
 **Commits clés :**
+
 - Mise à jour ARCHITECTURE.md
 - RUNBOOKS.md complet
 - DECISIONS.md post-HTTPS
@@ -260,13 +278,13 @@ Documentation & Finalization (Ph9)
 
 ## État actuel (01-06-2026)
 
-- ✅ Infrastructure on-prem stable (Proxmox PVE1)
-- ✅ Infrastructure cloud en cours (Proxmox PVE2, bastion-vm lancée)
-- ✅ Stack ELK complet avec monitoring et logging
-- ✅ pfSense dual-site avec VPN site-to-site
-- ✅ HTTPS/TLS sur tous les services
-- ✅ Vault pour gestion des secrets
-- ⚠️ services-vm hors ligne (réseau KO)
-- 🔄 Teleport déployé et en test
+- Infrastructure on-prem stable (Proxmox PVE1)
+- Infrastructure cloud en cours (Proxmox PVE2, bastion-vm lancée)
+- Stack ELK complet avec monitoring et logging
+- pfSense dual-site avec VPN site-to-site
+- HTTPS/TLS sur tous les services
+- Vault pour gestion des secrets
+- services-vm hors ligne (réseau KO)
+- Teleport déployé et en test
 
 ---
