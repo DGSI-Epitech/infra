@@ -1,0 +1,13 @@
+---
+- name: Configurer la clé SSH autorisée pour admin
+  pfsensible.core.pfsense_user:
+    name: admin
+    authorizedkeys: "{{ ssh_public_key }}"
+    state: present
+  tags: [configure, ssh]
+
+- import_tasks: interfaces.yml
+- import_tasks: firewall.yml
+- import_tasks: openvpn.yml
+- import_tasks: dns.yml
+- import_tasks: killswitch.yml

@@ -40,6 +40,11 @@ variable "pfsense_template_id" {
   type        = number
 }
 
+variable "pfsense_cloud_template_id" {
+  description = "Proxmox VM ID du template pfSense Cloud sur PVE2"
+  type        = number
+}
+
 variable "template_ubuntu_vm_id" {
   description = "Proxmox VM ID of the Ubuntu template on PVE2"
   type        = number

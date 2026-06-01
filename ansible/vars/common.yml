@@ -12,6 +12,8 @@ vm_gateway:      "{{ lookup('env', 'VM_GATEWAY')     | default('172.16.0.254') }
 vm_cloud_lan_subnet:  "{{ lookup('env', 'VM_CLOUD_LAN_SUBNET')  | default('192.168.255.240/28') }}"
 vm_cloud_dmz_subnet:  "{{ lookup('env', 'VM_CLOUD_DMZ_SUBNET')  | default('10.255.255.248/29') }}"
 pfsense_cloud_lan_ip: "{{ lookup('env', 'PFSENSE_CLOUD_LAN_IP') | default('192.168.255.254') }}"
+pfsense_cloud_dmz_ip: "{{ lookup('env', 'PFSENSE_CLOUD_DMZ_IP') | default('10.255.255.254') }}"
+pfsense_cloud_dmz_if: "{{ lookup('env', 'PFSENSE_CLOUD_DMZ_IF') | default('vtnet2') }}"
 pfsense_cloud_wan:    "{{ lookup('env', 'PFSENSE_CLOUD_WAN')    | default('') }}"
 
 # OpenVPN

@@ -1,0 +1,13 @@
+---
+# Configuration du serveur OpenVPN site-to-site (pfSense Cloud = serveur).
+# Les variables vpn_port, vpn_tunnel_network, vm_lan_subnet viennent de common.yml (via config.env).
+openvpn_server:
+  name: "VPN_vers_OP"
+  mode: p2p_shared_key
+  protocol: UDP4
+  interface: wan
+  local_port: "{{ vpn_port }}"
+  tunnel_network: "{{ vpn_tunnel_network }}"
+  remote_network: "{{ vm_lan_subnet }}"
+  data_ciphers: []
+  compression: ""

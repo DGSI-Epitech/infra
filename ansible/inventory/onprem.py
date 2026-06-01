@@ -67,15 +67,21 @@ pfsense_cloud_wan = env.get("PFSENSE_CLOUD_WAN", "")
 pfsense_password  = env.get("PFSENSE_PASSWORD", "pfsense")
 vm_password       = env.get("VM_PASSWORD", "")
 pfsense_username  = env.get("PFSENSE_USERNAME", "admin")
+proxmox_host      = env.get("PROXMOX_HOST", "")
 
 # Env proxmox ecole (pfSense comme jump host) — garder pour l'autre environnement
 # proxy_jump       = f"-o StrictHostKeyChecking=no -o ProxyJump={pfsense_username}@{pfsense_op_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 # proxy_jump_cloud = f"-o StrictHostKeyChecking=no -o ProxyJump={pfsense_username}@{pfsense_cloud_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
-# Env proxmox mel (Proxmox PVE1 comme jump host — root@<proxmox_ip>)
+# Env proxmox mel (Proxmox comme jump host — root@PROXMOX_HOST)
+# Ancien: proxy_jump utilisait pfsense_op_wan comme jump → cassait quand PFSENSE_OP_WAN = IP interne
 proxmox_ssh_user  = env.get("PROXMOX_SSH_USER", "root")
-proxy_jump        = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{pfsense_op_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
-proxy_jump_cloud  = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{pfsense_cloud_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+proxy_jump        = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+proxy_jump_cloud  = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+
+# ProxyJump pour pfSense (Proxmox → IP WAN interne pfSense)
+proxy_jump_pfsense_op    = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host}"
+proxy_jump_pfsense_cloud = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host}"
 
 pfsense_common = {
     "ansible_user":               "admin",
@@ -146,11 +152,13 @@ inventory = {
             },
             "pfsense-op": {
                 **pfsense_common,
-                "ansible_host": pfsense_op_wan,
+                "ansible_host":            pfsense_op_wan,
+                "ansible_ssh_common_args": proxy_jump_pfsense_op,
             },
             "pfsense-cloud": {
                 **pfsense_common,
-                "ansible_host": pfsense_cloud_wan,
+                "ansible_host":            pfsense_cloud_wan,
+                "ansible_ssh_common_args": proxy_jump_pfsense_cloud,
             },
         }
     }
