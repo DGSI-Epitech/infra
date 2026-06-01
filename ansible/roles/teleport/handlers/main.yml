@@ -1,0 +1,10 @@
+---
+- name: Update CA certificates
+  command: update-ca-certificates
+  become: true
+
+- name: Restart Teleport
+  systemd:
+    name: teleport
+    state: restarted
+  become: true

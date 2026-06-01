@@ -1,0 +1,33 @@
+---
+teleport_version: "16"
+teleport_data_dir: /var/lib/teleport
+teleport_cluster_name: cloud.local
+teleport_nodename: bastion.cloud.local
+
+teleport_auth_listen: "0.0.0.0:3025"
+teleport_auth_port: 3025
+
+teleport_proxy_web_listen: "0.0.0.0:443"
+teleport_proxy_ssh_listen: "0.0.0.0:3022"
+teleport_proxy_ssh_port: 3022
+
+# Adresse publique exposée aux clients — via DNAT Proxmox (51.75.128.134:3080 → bastion:443)
+teleport_public_addr: "51.75.128.134:3080"
+
+# TLS — certs générés par le rôle tls, déployés dans /etc/ssl/internal/
+teleport_tls_dir: /etc/ssl/internal
+teleport_tls_cert: "{{ teleport_tls_dir }}/server.crt"
+teleport_tls_key: "{{ teleport_tls_dir }}/server.key"
+
+# Vault — join token stocké dans Vault KV (même pattern que Fleet enrollment token)
+vault_addr: "http://{{ hostvars[groups['ops'][0]]['ansible_host'] }}:8200"
+teleport_vault_token_path: "secret/data/teleport/join-token"
+
+# Subnets autorisés à joindre le port auth interne (3025)
+teleport_dmz_cidr: "10.255.255.248/29"
+teleport_onprem_cidr: "172.16.0.0/24"
+
+# Labels du nœud SSH local (bastion lui-même)
+teleport_labels:
+  role: bastion
+  site: cloud

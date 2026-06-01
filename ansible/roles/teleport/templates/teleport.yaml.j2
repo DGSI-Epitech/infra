@@ -1,0 +1,30 @@
+version: v3
+teleport:
+  nodename: {{ teleport_nodename }}
+  data_dir: {{ teleport_data_dir }}
+  log:
+    output: stderr
+    severity: INFO
+
+auth_service:
+  enabled: "yes"
+  cluster_name: {{ teleport_cluster_name }}
+  listen_addr: "{{ teleport_auth_listen }}"
+  proxy_listener_mode: multiplex
+  tokens:
+    - "node:{{ teleport_join_token }}"
+
+proxy_service:
+  enabled: "yes"
+  web_listen_addr: "{{ teleport_proxy_web_listen }}"
+  public_addr: "{{ teleport_public_addr }}"
+  https_keypairs:
+    - key_file: {{ teleport_tls_key }}
+      cert_file: {{ teleport_tls_cert }}
+
+ssh_service:
+  enabled: "yes"
+  labels:
+{% for key, value in teleport_labels.items() %}
+    {{ key }}: {{ value }}
+{% endfor %}

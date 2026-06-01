@@ -354,11 +354,45 @@ wait_for_ssh "${WEBSITE_IP}"  "website"
 extend_disk "${BASTION_IP}" "bastion"
 extend_disk "${WEBSITE_IP}"  "website"
 
+# --- DNAT Teleport — port forwarding Proxmox → bastion ---
+# Permet l'accès internet à Teleport (web proxy + SSH proxy)
+
+echo ""
+echo "==> Configuration DNAT Teleport sur hôte Proxmox..."
+ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "${SSH_KEY_FILE}" root@"${PROXMOX_HOST_REMOTE}" \
+  "bash -s" << 'DNATEOF'
+# Teleport Web Proxy : externe:3080 → bastion:443
+iptables -t nat -C PREROUTING -p tcp -d 51.75.128.134 --dport 3080 \
+  -j DNAT --to-destination 10.255.255.249:443 2>/dev/null \
+  || iptables -t nat -A PREROUTING -p tcp -d 51.75.128.134 --dport 3080 \
+     -j DNAT --to-destination 10.255.255.249:443
+
+# Teleport SSH Proxy : externe:3022 → bastion:3022
+iptables -t nat -C PREROUTING -p tcp -d 51.75.128.134 --dport 3022 \
+  -j DNAT --to-destination 10.255.255.249:3022 2>/dev/null \
+  || iptables -t nat -A PREROUTING -p tcp -d 51.75.128.134 --dport 3022 \
+     -j DNAT --to-destination 10.255.255.249:3022
+
+# Persister les règles DNAT dans /etc/network/interfaces (vmbr3 post-up)
+if ! grep -q "dport 3080" /etc/network/interfaces 2>/dev/null; then
+  sed -i '/^#Cloud DMZ — bastion$/i\\tpost-up iptables -t nat -A PREROUTING -p tcp -d 51.75.128.134 --dport 3080 -j DNAT --to-destination 10.255.255.249:443\n\tpost-up iptables -t nat -A PREROUTING -p tcp -d 51.75.128.134 --dport 3022 -j DNAT --to-destination 10.255.255.249:3022\n\tpost-down iptables -t nat -D PREROUTING -p tcp -d 51.75.128.134 --dport 3080 -j DNAT --to-destination 10.255.255.249:443\n\tpost-down iptables -t nat -D PREROUTING -p tcp -d 51.75.128.134 --dport 3022 -j DNAT --to-destination 10.255.255.249:3022' \
+    /etc/network/interfaces
+fi
+DNATEOF
+echo "    DNAT Teleport configuré (3080→443, 3022→3022)."
+
+# --- Ansible — déploiement Teleport sur bastion ---
+
+echo ""
+echo "==> Déploiement Ansible bastion (base + tls + teleport)..."
+cd "$REPO_ROOT/ansible"
+export BASTION_IP WEBSITE_IP
+ansible-playbook playbooks/teleport.yml -i inventory/onprem.py
+
 echo ""
 echo "==> Déploiement PVE2 complet."
 echo "    bastion  : ${BASTION_IP} (DMZ 10.255.255.248/29)"
 echo "    website  : ${WEBSITE_IP} (LAN Cloud 192.168.255.240/28)"
 echo ""
-echo "    Prochaine étape — Ansible :"
-echo "      ansible-playbook playbooks/teleport.yml -i inventory/cloud.py"
-echo "      ansible-playbook playbooks/website.yml  -i inventory/cloud.py"
+echo "    Teleport Web UI : https://51.75.128.134:3080"
+echo "    Teleport SSH    : tsh login --proxy=51.75.128.134:3022 --user=<user>"
