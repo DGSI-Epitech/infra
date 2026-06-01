@@ -62,11 +62,11 @@ Toutes les variables viennent de `../config.env` (lu par l'inventaire dynamique 
 
 Variables critiques :
 ```
-VM_IP_OPS="172.16.0.253/28"
-VM_IP_BASTION="10.255.255.253/29"
-VM_IP_WEB="192.168.255.253/28"
-PFSENSE_OP_WAN="5.196.45.8"
-PFSENSE_CLOUD_WAN="5.196.50.52"
+VM_IP_OPS="172.16.0.253/28"    # assigné par DHCP — vérifier via QEMU agent
+PROXMOX_HOST="51.75.128.134"   # hôte commun PVE1 + PVE2
+# PVE2 Cloud (IPs statiques, injectées via QEMU agent)
+BASTION_IP="10.255.255.249"    # bridge vmbr3 (Cloud DMZ)
+WEBSITE_IP="192.168.255.243"   # bridge vmbr4 (Cloud LAN)
 ```
 
 ---
@@ -83,11 +83,11 @@ ssh -fNL 9200:172.16.0.253:9200 \
     -J admin@5.196.45.8 dgsi-op@172.16.0.253
 ```
 
-### Tunnels PVE2 (Kibana — via pfSense-Cloud)
+### Tunnels PVE2 (Kibana — via ProxyJump Proxmox)
 
 ```bash
-ssh -fNL 5601:10.255.255.253:5601 \
-    -J admin@5.196.50.52 dgsi-cloud@10.255.255.253
+ssh -fNL 5601:10.255.255.249:5601 \
+    -J root@51.75.128.134 ubuntu@10.255.255.249
 ```
 
 ### Fermer les tunnels
@@ -262,10 +262,10 @@ ssh admin@5.196.50.52 echo "pfSense-Cloud OK"
 
 ```bash
 # ops-vm
-ssh -J admin@5.196.45.8 dgsi-op@172.16.0.253 echo "ops-vm OK"
+ssh -J root@51.75.128.134 ubuntu@172.16.0.x echo "ops-vm OK"
 
 # bastion
-ssh -J admin@5.196.50.52 dgsi-cloud@10.255.255.253 echo "bastion OK"
+ssh -J root@51.75.128.134 ubuntu@10.255.255.249 echo "bastion OK"
 ```
 
 ### Si pfSense refuse le forwarding TCP

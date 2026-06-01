@@ -21,21 +21,6 @@ module "bastion" {
   network_bridge    = var.dmz_bridge
   storage_vm        = var.storage_vm
   storage_iso       = var.storage_iso
-provider "proxmox" {
-  endpoint = var.proxmox_endpoint
-  username = var.proxmox_username
-  password = var.proxmox_password
-  insecure = true
-
-  ssh {
-    username    = "root"
-    private_key = file(pathexpand(var.proxmox_ssh_private_key))
-
-    node {
-      name    = var.proxmox_node
-      address = var.proxmox_node_address
-    }
-  }
 }
 
 module "website" {

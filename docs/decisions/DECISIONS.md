@@ -2,6 +2,70 @@
 
 ---
 
+## Déploiement VMs Cloud PVE2 — bridges et réseau
+
+**Date :** 2026-06-01
+
+### Contexte
+
+Le déploiement des VMs cloud (`bastion`, `website`, `pfsense-cloud-01`) sur PVE2 a révélé trois problèmes distincts, résolus dans `scripts/deploy-remote.sh` et `terraform/envs/remote/`.
+
+---
+
+### Problème 1 — Mauvais bridges pour les VMs Cloud
+
+Les bridges `vmbr1` (LAN on-prem, 172.16.0.1/24) et `vmbr2` (transit WAN pfSense, 10.0.0.1/30) étaient utilisés par les variables Terraform pour le Cloud. Les VMs cloud se retrouvaient sur les bridges on-prem avec des IPs incompatibles → pas d'ARP, pas de connectivité réseau.
+
+**Décision :** Créer deux bridges dédiés Cloud créés au démarrage de `deploy-remote.sh` via SSH direct sur l'hôte Proxmox :
+
+| Bridge | IP hôte | Réseau | Usage |
+|---|---|---|---|
+| `vmbr3` | `10.255.255.254/29` | `10.255.255.248/29` | Cloud DMZ — bastion |
+| `vmbr4` | `192.168.255.254/28` | `192.168.255.240/28` | Cloud LAN — website + pfSense LAN |
+
+**Pourquoi SSH direct et non l'API Proxmox ?**
+L'API Proxmox `POST /nodes/{node}/network` + `PUT /nodes/{node}/network` enregistre les changements en "pending" mais ne les écrit pas dans `/etc/network/interfaces` de manière fiable. La création directe via SSH (`printf >> /etc/network/interfaces` + `ifup`) est déterministe.
+
+La règle NAT pour le bastion (internet via Proxmox) est ajoutée via `iptables -t nat -A POSTROUTING -s 10.255.255.248/29 -o vmbr0 -j MASQUERADE`, persistée dans les stanzas `post-up`/`post-down` du bridge.
+
+---
+
+### Problème 2 — cloud-init génère `eth0`, Ubuntu 22.04 utilise `ens18`
+
+Le provider bpg/proxmox génère les ISOs cloud-init en **format v1** (`version: 1`) avec le nom d'interface `eth0`. Ubuntu 22.04 utilise les noms d'interface prévisibles (`ens18`). Le netplan généré par cloud-init cible `eth0` → interface non trouvée → aucune IP assignée → fallback silencieux en DHCP (sans serveur DHCP, la VM reste sans IP).
+
+**Symptôme :** `cloud-init status: done` mais `ens18` sans IPv4, uniquement link-local IPv6.
+
+**Décision :** Injection de la configuration réseau via l'agent QEMU (`POST .../agent/exec`) après le boot, indépendamment de cloud-init. La fonction `configure_network()` dans `deploy-remote.sh` :
+
+1. Génère un netplan v2 ciblant `ens18` encodé en base64 (évite les problèmes d'échappement JSON/shell dans le payload de l'agent)
+2. L'injecte dans `/etc/netplan/99-static.yaml` via `echo | base64 -d`
+3. Applique avec `netplan apply`
+4. Force l'IP avec `ip addr add` + `ip route replace` en fallback si netplan est lent
+
+```bash
+configure_network "${VM_ID_BASTION}" "bastion" "${BASTION_IP}/29" "10.255.255.254"
+configure_network "${VM_ID_WEBSITE}"  "website" "${WEBSITE_IP}/28" "192.168.255.254"
+```
+
+Cette approche est analogue à `inject_ssh_key` — cloud-init ne gère pas non plus correctement les clés SSH sur des users créés par autoinstall Ubuntu (voir décision *SSH key-only*).
+
+**Pourquoi ne pas corriger le template Packer ?**
+Ajouter `net.ifnames=0 biosdevname=0` au GRUB forcerait `eth0` sur toute l'infra, ce qui casserait les interfaces on-prem déjà opérationnelles. La correction côté agent QEMU est ciblée et n'affecte que le clone au boot.
+
+---
+
+### Problème 3 — Artefact de rebase dans `terraform/envs/remote/`
+
+Le rebase de la branche cloud avait produit deux artefacts :
+
+- **`main.tf`** : bloc `module "bastion"` sans `}` fermant, bloc `provider "proxmox"` intercalé (dupliqué avec `providers.tf`)
+- **`variables.tf`** : 6 variables déclarées deux fois avec des valeurs par défaut contradictoires
+
+`terraform validate` échouait immédiatement. Corrigé manuellement.
+
+---
+
 ## Authentification SSH uniquement — suppression des passwords
 
 **Date :** 2026-04-29

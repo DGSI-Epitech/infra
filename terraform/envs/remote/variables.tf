@@ -110,15 +110,15 @@ variable "lan_gateway" {
 }
 
 variable "dmz_bridge" {
-  description = "Proxmox bridge for DMZ on PVE2"
+  description = "Proxmox bridge for Cloud DMZ on PVE2 (10.255.255.248/29)"
   type        = string
-  default     = "vmbr2"
+  default     = "vmbr3"
 }
 
 variable "lan_bridge" {
-  description = "Proxmox bridge for LAN Cloud on PVE2"
+  description = "Proxmox bridge for Cloud LAN on PVE2 (192.168.255.240/28)"
   type        = string
-  default     = "vmbr1"
+  default     = "vmbr4"
 }
 
 # --- Stockage ---
@@ -133,36 +133,4 @@ variable "storage_iso" {
   description = "Proxmox storage for cloud-init files on PVE2"
   type        = string
   default     = "local"
-}
-variable "proxmox_endpoint" {
-  description = "Proxmox API URL (ex: https://ns3183326.ip-146-59-253.eu:8006)"
-  type        = string
-}
-
-variable "proxmox_username" {
-  description = "Proxmox username (ex: GR38@pve)"
-  type        = string
-  default     = "GR38@pve"
-}
-
-variable "proxmox_password" {
-  description = "Proxmox password"
-  type        = string
-  sensitive   = true
-}
-
-variable "proxmox_node" {
-  description = "Proxmox node name"
-  type        = string
-  default     = "vm002"
-}
-
-variable "proxmox_node_address" {
-  description = "Proxmox node IP/hostname for SSH"
-  type        = string
-}
-
-variable "proxmox_ssh_private_key" {
-  description = "Path to the SSH private key for Proxmox root SSH access"
-  type        = string
 }

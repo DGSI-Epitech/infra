@@ -84,6 +84,30 @@ ENDJSON
   echo "    Clé SSH injectée dans ${label}."
 }
 
+configure_network() {
+  local vmid="$1" label="$2" ip_cidr="$3" gateway="$4"
+  echo ""
+  echo "==> Configuration réseau ${label} (${ip_cidr}, gw ${gateway})..."
+  # Netplan encodé en base64 pour éviter les problèmes d'échappement JSON/shell
+  local netplan_b64
+  netplan_b64=$(printf 'network:\n  version: 2\n  ethernets:\n    ens18:\n      dhcp4: false\n      addresses: [%s]\n      routes:\n        - to: default\n          via: %s\n      nameservers:\n        addresses: [1.1.1.1, 8.8.8.8]\n' \
+    "${ip_cidr}" "${gateway}" | base64 -w0)
+  local tmpjson
+  tmpjson=$(mktemp)
+  cat > "$tmpjson" << ENDJSON
+{"command":["bash","-c","echo '${netplan_b64}' | base64 -d > /etc/netplan/99-static.yaml && chmod 600 /etc/netplan/99-static.yaml && netplan apply 2>/dev/null; ip addr add ${ip_cidr} dev ens18 2>/dev/null || true; ip route replace default via ${gateway} dev ens18 2>/dev/null || true"]}
+ENDJSON
+  curl -s -k -X POST \
+    "${PROXMOX_API_REMOTE}/nodes/${PROXMOX_NODE_REMOTE}/qemu/${vmid}/agent/exec" \
+    -H "CSRFPreventionToken: ${CSRF}" \
+    -b "PVEAuthCookie=${TICKET}" \
+    -H "Content-Type: application/json" \
+    -d "@${tmpjson}" > /dev/null
+  rm -f "$tmpjson"
+  sleep 8
+  echo "    Réseau configuré sur ${label}."
+}
+
 wait_for_ssh() {
   local host="$1"
   local label="$2"
@@ -183,31 +207,51 @@ for VMID in "${VM_ID_PFSENSE_REMOTE}" "${VM_ID_BASTION}" "${VM_ID_WEBSITE}"; do
   fi
 done
 
-# --- Bridges vmbr1 (LAN Cloud) et vmbr2 (DMZ) ---
+# --- Bridges Cloud dédiés : vmbr3 (DMZ) et vmbr4 (LAN Cloud) ---
+# vmbr1 (LAN on-prem) et vmbr2 (transit WAN pfSense) existent déjà — ne pas toucher.
+# Création directement via SSH dans /etc/network/interfaces (l'API Proxmox ne persiste pas).
 
 echo ""
-echo "==> Vérification bridges PVE2 (vmbr1, vmbr2)..."
-for BRIDGE in vmbr1 vmbr2; do
-  BRIDGE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
-    "${PROXMOX_API_REMOTE}/nodes/${PROXMOX_NODE_REMOTE}/network/${BRIDGE}" 2>/dev/null | \
-    python3 -c "import sys,json; d=json.load(sys.stdin); print('ok' if d.get('data') else 'notfound')" 2>/dev/null || echo "notfound")
-  if [[ "$BRIDGE_STATUS" == "notfound" ]]; then
-    echo "    Bridge ${BRIDGE} absent — création..."
-    curl -s -k -X POST "${PROXMOX_API_REMOTE}/nodes/${PROXMOX_NODE_REMOTE}/network" \
-      -H "CSRFPreventionToken: ${CSRF}" -b "PVEAuthCookie=${TICKET}" \
-      --data-urlencode "iface=${BRIDGE}" \
-      --data-urlencode "type=bridge" \
-      --data-urlencode "autostart=1" \
-      --data-urlencode "bridge_ports=" \
-      --data-urlencode "bridge_stp=off" \
-      --data-urlencode "bridge_fd=0" > /dev/null
-    curl -s -k -X PUT "${PROXMOX_API_REMOTE}/nodes/${PROXMOX_NODE_REMOTE}/network" \
-      -H "CSRFPreventionToken: ${CSRF}" -b "PVEAuthCookie=${TICKET}" > /dev/null
-    echo "    Bridge ${BRIDGE} créé."
+echo "==> Création bridges Cloud (vmbr3=DMZ 10.255.255.248/29, vmbr4=LAN 192.168.255.240/28)..."
+ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "${SSH_KEY_FILE}" root@"${PROXMOX_HOST_REMOTE}" \
+  "bash -s" << 'SSHEOF'
+set -euo pipefail
+
+add_bridge() {
+  local iface="$1" cidr="$2" comment="$3" nat_src="${4:-}"
+  if grep -q "auto ${iface}" /etc/network/interfaces 2>/dev/null; then
+    echo "    Bridge ${iface} déjà dans /etc/network/interfaces."
   else
-    echo "    Bridge ${BRIDGE} déjà présent."
+    echo "    Ajout de ${iface} dans /etc/network/interfaces..."
+    printf '\nauto %s\niface %s inet static\n\taddress %s\n\tbridge-ports none\n\tbridge-stp off\n\tbridge-fd 0\n' \
+      "${iface}" "${iface}" "${cidr}" >> /etc/network/interfaces
+    if [[ -n "${nat_src}" ]]; then
+      printf '\tpost-up iptables -t nat -A POSTROUTING -s %s -o vmbr0 -j MASQUERADE\n' "${nat_src}" >> /etc/network/interfaces
+      printf '\tpost-down iptables -t nat -D POSTROUTING -s %s -o vmbr0 -j MASQUERADE\n' "${nat_src}" >> /etc/network/interfaces
+    fi
+    printf '#%s\n' "${comment}" >> /etc/network/interfaces
   fi
-done
+
+  if ! ip link show "${iface}" &>/dev/null; then
+    echo "    Activation de ${iface}..."
+    ifup "${iface}" 2>/dev/null \
+      || { ip link add name "${iface}" type bridge 2>/dev/null || true
+           ip link set "${iface}" up
+           ip addr add "${cidr}" dev "${iface}" 2>/dev/null || true; }
+  else
+    echo "    ${iface} déjà actif."
+  fi
+
+  if [[ -n "${nat_src}" ]]; then
+    iptables -t nat -C POSTROUTING -s "${nat_src}" -o vmbr0 -j MASQUERADE 2>/dev/null \
+      || iptables -t nat -A POSTROUTING -s "${nat_src}" -o vmbr0 -j MASQUERADE
+  fi
+}
+
+add_bridge "vmbr3" "10.255.255.254/29" "Cloud DMZ — bastion" "10.255.255.248/29"
+add_bridge "vmbr4" "192.168.255.254/28" "Cloud LAN — website + pfSense LAN"
+SSHEOF
+echo "    Bridges Cloud opérationnels."
 
 # --- Packer Ubuntu sur PVE2 ---
 # Le build se fait sur vmbr2 (DMZ 10.255.255.248/29) avec IP 10.255.255.250
@@ -264,10 +308,12 @@ TF_COMMON_VARS=(
   -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE_REMOTE}"
   -var "bastion_vm_id=${VM_ID_BASTION}"
   -var "website_vm_id=${VM_ID_WEBSITE}"
-  -var "storage_vm=${PROXMOX_STORAGE_VM_REMOTE:-local-lvm}"
+  -var "storage_vm=${PROXMOX_STORAGE_VM_REMOTE:-local}"
   -var "storage_iso=${PROXMOX_STORAGE_ISO_REMOTE:-local}"
-  -var "pfsense_wan_bridge=${PFSENSE_WAN_BRIDGE_REMOTE:-vmbr0}"
-  -var "pfsense_lan_bridge=${PFSENSE_LAN_BRIDGE_REMOTE:-vmbr1}"
+  -var "pfsense_wan_bridge=${PFSENSE_WAN_BRIDGE_REMOTE:-vmbr2}"
+  -var "pfsense_lan_bridge=${PFSENSE_LAN_BRIDGE_REMOTE:-vmbr4}"
+  -var "dmz_bridge=${DMZ_BRIDGE_REMOTE:-vmbr3}"
+  -var "lan_bridge=${LAN_BRIDGE_REMOTE:-vmbr4}"
 )
 
 cd "$REMOTE_DIR"
@@ -298,6 +344,9 @@ wait_for_agent "${VM_ID_WEBSITE}"  "website"
 
 inject_ssh_key "${VM_ID_BASTION}" "bastion"
 inject_ssh_key "${VM_ID_WEBSITE}"  "website"
+
+configure_network "${VM_ID_BASTION}" "bastion" "${BASTION_IP}/29" "10.255.255.254"
+configure_network "${VM_ID_WEBSITE}"  "website" "${WEBSITE_IP}/28" "192.168.255.254"
 
 wait_for_ssh "${BASTION_IP}" "bastion"
 wait_for_ssh "${WEBSITE_IP}"  "website"

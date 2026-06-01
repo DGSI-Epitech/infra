@@ -19,11 +19,11 @@ LAN: 172.16.0.240/28                                         DMZ: 10.255.255.248
    │  OpenVPN 10.3.3.0/29                                         │
    └──────────────────────────────────────────────────────────────┘
    │                                                           │
-   ├── 172.16.0.253  ops-vm                                  ├── 10.255.255.253  bastion
+   ├── 172.16.0.253  ops-vm                                  ├── 10.255.255.249  bastion
    │    Elasticsearch :9200                                    │    Kibana         :5601
    │    Vault         :8200                                    │    Filebeat
    │    Filebeat                                               │
-   │                                                           └── 192.168.255.253  web
+   │                                                           └── 192.168.255.243  website
    └── 172.16.0.241  services-vm (⚠️ hors ligne)                 Site web
 ```
 
@@ -39,26 +39,31 @@ LAN: 172.16.0.240/28                                         DMZ: 10.255.255.248
 | 2038 | ops-vm | 172.16.0.253/28 | Elasticsearch, Vault, Filebeat |
 | 3038 | services-vm | 172.16.0.241/28 | ⚠️ hors ligne |
 
-### PVE2 — Cloud (`ns3183326.ip-146-59-253.eu`, nœud `vm002`)
+### PVE2 — Cloud (même hôte que PVE1 : `51.75.128.134`, nœud `proxmox-site1`)
+
+> PVE2 est simulé sur le même Proxmox physique que PVE1. L'isolation réseau est assurée par les bridges dédiés `vmbr3` (DMZ) et `vmbr4` (LAN Cloud).
 
 | VMID | VM | IP | Services |
 |------|----|----|----------|
-| 106 | pfSense-Cloud | WAN: 5.196.50.52 | Firewall, VPN |
-| 2038 | bastion | 10.255.255.253/29 (DMZ) | Kibana, Filebeat |
-| 3038 | web | 192.168.255.253/28 (LAN) | Site web |
+| 3200 | pfsense-cloud-01 | WAN: 10.0.0.2 (vmbr2) / LAN: vmbr4 | Firewall Cloud |
+| 240 | bastion | 10.255.255.249/29 (DMZ — vmbr3) | Kibana, Filebeat |
+| 250 | website | 192.168.255.243/28 (LAN — vmbr4) | Site web |
 
 ---
 
 ## Accès SSH
 
-Toutes les VMs sont sur des réseaux privés. L'accès passe par un ProxyJump pfSense :
+Toutes les VMs sont sur des réseaux privés. L'accès passe par ProxyJump via l'hôte Proxmox (`51.75.128.134` — commun aux deux sites) :
 
 ```
 # PVE1 (ops-vm, services-vm)
-ssh -J admin@5.196.45.8 dgsi-op@172.16.0.253
+ssh -J root@51.75.128.134 ubuntu@172.16.0.x
 
-# PVE2 (bastion, web)
-ssh -J admin@5.196.50.52 dgsi-cloud@10.255.255.253
+# PVE2 (bastion)
+ssh -J root@51.75.128.134 ubuntu@10.255.255.249
+
+# PVE2 (website)
+ssh -J root@51.75.128.134 ubuntu@192.168.255.243
 ```
 
 Ansible utilise le script dynamique `inventory/onprem.py` qui configure automatiquement le ProxyJump depuis `config.env`.
@@ -95,7 +100,7 @@ Docker Compose file : `/opt/elk/docker-compose.yml`
 Config ES : `/opt/elk/elasticsearch/config/elasticsearch.yml`
 Certs : `/etc/ssl/internal/` monté en lecture seule dans les containers
 
-### bastion (10.255.255.253)
+### bastion (10.255.255.249)
 
 | Service | Container | Port | TLS |
 |---------|-----------|------|-----|
@@ -104,7 +109,7 @@ Certs : `/etc/ssl/internal/` monté en lecture seule dans les containers
 
 Kibana se connecte à Elasticsearch via HTTPS sur 172.16.0.253:9200 (via tunnel VPN).
 
-### web (192.168.255.253)
+### website (192.168.255.243)
 
 Site web uniquement. Pas de Docker installé.
 
