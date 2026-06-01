@@ -270,9 +270,11 @@ if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
   export PKR_VAR_proxmox_password="${PROXMOX_PASSWORD_REMOTE}"
   export PKR_VAR_proxmox_node="${PROXMOX_NODE_REMOTE}"
   export PKR_VAR_proxmox_host="${PROXMOX_HOST_REMOTE}"
-  export PKR_VAR_proxmox_storage_iso="local"
-  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM:-local-lvm}"
+  export PKR_VAR_proxmox_storage_iso="${PROXMOX_STORAGE_ISO_REMOTE:-local}"
+  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM_REMOTE:-local-lvm}"
   export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE_REMOTE}"
+  export PKR_VAR_iso_checksum="${UBUNTU_ISO_CHECKSUM}"
+  export PKR_VAR_iso_filename="${UBUNTU_ISO_FILENAME}"
   export PKR_VAR_build_username="${VM_USERNAME:-ubuntu}"
   export PKR_VAR_ssh_public_key="${SSH_PUBLIC_KEY}"
   export PKR_VAR_ssh_bastion_private_key_file="${SSH_PRIVATE_KEY_FILE}"
@@ -354,32 +356,41 @@ wait_for_ssh "${WEBSITE_IP}"  "website"
 extend_disk "${BASTION_IP}" "bastion"
 extend_disk "${WEBSITE_IP}"  "website"
 
-# --- DNAT Teleport — port forwarding Proxmox → bastion ---
-# Permet l'accès internet à Teleport (web proxy + SSH proxy)
+# --- DNAT — port forwarding Proxmox cloud → VMs internes ---
+# Les variables sont expansées localement avant envoi SSH (heredoc non-quoté)
 
 echo ""
-echo "==> Configuration DNAT Teleport sur hôte Proxmox..."
+echo "==> Configuration DNAT sur hôte Proxmox cloud (${PROXMOX_HOST_REMOTE})..."
 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "${SSH_KEY_FILE}" root@"${PROXMOX_HOST_REMOTE}" \
-  "bash -s" << 'DNATEOF'
-# Teleport Web Proxy : externe:3080 → bastion:443
-iptables -t nat -C PREROUTING -p tcp -d 51.75.128.134 --dport 3080 \
-  -j DNAT --to-destination 10.255.255.249:443 2>/dev/null \
-  || iptables -t nat -A PREROUTING -p tcp -d 51.75.128.134 --dport 3080 \
-     -j DNAT --to-destination 10.255.255.249:443
+  "bash -s" << DNATEOF
+dnat_rule() {
+  local proto="\$1" ext_port="\$2" dst_ip="\$3" dst_port="\$4"
+  iptables -t nat -C PREROUTING -p "\$proto" -d ${PROXMOX_HOST_REMOTE} --dport "\$ext_port" \
+    -j DNAT --to-destination "\$dst_ip:\$dst_port" 2>/dev/null \
+    || iptables -t nat -A PREROUTING -p "\$proto" -d ${PROXMOX_HOST_REMOTE} --dport "\$ext_port" \
+       -j DNAT --to-destination "\$dst_ip:\$dst_port"
+}
 
-# Teleport SSH Proxy : externe:3022 → bastion:3022
-iptables -t nat -C PREROUTING -p tcp -d 51.75.128.134 --dport 3022 \
-  -j DNAT --to-destination 10.255.255.249:3022 2>/dev/null \
-  || iptables -t nat -A PREROUTING -p tcp -d 51.75.128.134 --dport 3022 \
-     -j DNAT --to-destination 10.255.255.249:3022
+# Teleport Web Proxy  : ${PROXMOX_HOST_REMOTE}:3080 → ${BASTION_IP}:443
+dnat_rule tcp 3080 ${BASTION_IP} 443
 
-# Persister les règles DNAT dans /etc/network/interfaces (vmbr3 post-up)
+# Teleport SSH Proxy  : ${PROXMOX_HOST_REMOTE}:3022 → ${BASTION_IP}:3022
+dnat_rule tcp 3022 ${BASTION_IP} 3022
+
+# OpenVPN (pfSense-Cloud) : ${PROXMOX_HOST_REMOTE}:1194 UDP → ${PFSENSE_CLOUD_WAN_TRANSIT}:1194
+dnat_rule udp 1194 ${PFSENSE_CLOUD_WAN_TRANSIT} 1194
+
+# Persister dans /etc/network/interfaces (post-up vmbr3)
 if ! grep -q "dport 3080" /etc/network/interfaces 2>/dev/null; then
-  sed -i '/^#Cloud DMZ — bastion$/i\\tpost-up iptables -t nat -A PREROUTING -p tcp -d 51.75.128.134 --dport 3080 -j DNAT --to-destination 10.255.255.249:443\n\tpost-up iptables -t nat -A PREROUTING -p tcp -d 51.75.128.134 --dport 3022 -j DNAT --to-destination 10.255.255.249:3022\n\tpost-down iptables -t nat -D PREROUTING -p tcp -d 51.75.128.134 --dport 3080 -j DNAT --to-destination 10.255.255.249:443\n\tpost-down iptables -t nat -D PREROUTING -p tcp -d 51.75.128.134 --dport 3022 -j DNAT --to-destination 10.255.255.249:3022' \
+  sed -i '/^#Cloud DMZ — bastion$/i\\tpost-up iptables -t nat -A PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 3080 -j DNAT --to-destination ${BASTION_IP}:443\n\tpost-up iptables -t nat -A PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 3022 -j DNAT --to-destination ${BASTION_IP}:3022\n\tpost-down iptables -t nat -D PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 3080 -j DNAT --to-destination ${BASTION_IP}:443\n\tpost-down iptables -t nat -D PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 3022 -j DNAT --to-destination ${BASTION_IP}:3022' \
+    /etc/network/interfaces
+fi
+if ! grep -q "dport 1194" /etc/network/interfaces 2>/dev/null; then
+  sed -i '/^#Transit Proxmox→pfSense WAN$/i\\tpost-up iptables -t nat -A PREROUTING -p udp -d ${PROXMOX_HOST_REMOTE} --dport 1194 -j DNAT --to-destination ${PFSENSE_CLOUD_WAN_TRANSIT}:1194\n\tpost-down iptables -t nat -D PREROUTING -p udp -d ${PROXMOX_HOST_REMOTE} --dport 1194 -j DNAT --to-destination ${PFSENSE_CLOUD_WAN_TRANSIT}:1194' \
     /etc/network/interfaces
 fi
 DNATEOF
-echo "    DNAT Teleport configuré (3080→443, 3022→3022)."
+echo "    DNAT configuré — Teleport (3080→${BASTION_IP}:443, 3022→${BASTION_IP}:3022) + OpenVPN (1194→${PFSENSE_CLOUD_WAN_TRANSIT}:1194)."
 
 # --- Ansible — déploiement Teleport sur bastion ---
 
@@ -394,5 +405,5 @@ echo "==> Déploiement PVE2 complet."
 echo "    bastion  : ${BASTION_IP} (DMZ 10.255.255.248/29)"
 echo "    website  : ${WEBSITE_IP} (LAN Cloud 192.168.255.240/28)"
 echo ""
-echo "    Teleport Web UI : https://51.75.128.134:3080"
-echo "    Teleport SSH    : tsh login --proxy=51.75.128.134:3022 --user=<user>"
+echo "    Teleport Web UI : https://${PROXMOX_HOST_REMOTE}:3080"
+echo "    Teleport SSH    : tsh login --proxy=${PROXMOX_HOST_REMOTE}:3022 --user=<user>"
