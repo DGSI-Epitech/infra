@@ -12,27 +12,30 @@ gantt
     Bootstrap & Config Initiale :bootstrap, 2026-02-02, 2026-03-10
     
     section Phase 2
+    Formation outils & processus :training, 2026-03-11, 2026-04-20
+
+    section Phase 3
     Proxmox & Packer Setup :packer, 2026-04-21, 2026-04-27
     
-    section Phase 3
+    section Phase 4
     VM Deployment (On-prem) :vm_onprem, 2026-04-25, 2026-05-21
     
-    section Phase 4
+    section Phase 5
     pfSense & VPN Site-to-Site :pfsense, 2026-05-04, 2026-05-18
     
-    section Phase 5
+    section Phase 6
     Vault & SSH Keys :vault, 2026-04-29, 2026-05-04
     
-    section Phase 6
+    section Phase 7
     ELK Stack Complet :elk, 2026-05-03, 2026-05-25
     
-    section Phase 7
+    section Phase 8
     HTTPS/TLS Migration :https, 2026-05-27, 2026-05-31
     
-    section Phase 8
+    section Phase 9
     Cloud VMs & Teleport :cloud, 2026-05-23, 2026-06-01
     
-    section Phase 9
+    section Phase 10
     Documentation & Finalization :docs, 2026-05-27, 2026-06-01
 ```
 
@@ -57,7 +60,32 @@ Mise en place de base du projet d'infrastructure
 
 ---
 
-### Phase 2 : Proxmox & Packer Setup (Avril 2026)
+
+
+### Phase 2 : Formation — Outils et processus (Mars - Avril 2026)
+
+**Période : 11-03 au 20-04**
+
+Période dédiée à la montée en compétence sur les outils qui seront utilisés tout au long du projet. Objectif : homogénéiser les pratiques de l'équipe et réduire la courbe d'apprentissage avant les déploiements majeurs.
+
+| Jalons | Date | Détails |
+|--------|------|---------|
+| Formation Packer & images | 15-03 | Atelier pratique : templates Ubuntu et pfSense |
+| Introduction Terraform | 22-03 | Variables, modules, et planification d'état |
+| Ansible basics & roles | 29-03 | Playbooks, roles, inventory dynamique |
+| Proxmox & provisionning | 05-04 | Gestion des templates et cloud-init |
+| Docker & ELK quickstart | 12-04 | Déploiement local et configuration Fleet |
+| Vault & Teleport hands-on | 18-04 | Unseal/init Vault, Teleport access tests |
+
+**Résultats attendus :**
+
+- Processus standardisés pour build Packer → Terraform
+- Playbooks Ansible de base validés sur environnements de test
+- Règles de commit et workflow git partagées
+- Documentation de référence (cheatsheets, commandes fréquentes)
+
+---
+### Phase 3 : Proxmox & Packer Setup (Avril 2026)
 
 **Période : 21-04 au 27-04**
 
@@ -78,7 +106,7 @@ Configuration d'un environnement de template automatisé avec Packer pour les VM
 
 ---
 
-### Phase 3 : VM Deployment On-Prem (Avril - Mai 2026)
+### Phase 4 : VM Deployment On-Prem (Avril - Mai 2026)
 
 **Période : 25-04 au 21-05**
 
@@ -99,7 +127,7 @@ Déploiement initial des VMs sur Proxmox local (PVE1)
 
 ---
 
-### Phase 4 : pfSense & VPN Site-to-Site (Mai 2026)
+### Phase 5 : pfSense & VPN Site-to-Site (Mai 2026)
 
 **Période : 04-05 au 18-05**
 
@@ -123,7 +151,7 @@ Configuration complète du firewall dual-site et tunnel VPN
 
 ---
 
-### Phase 5 : Vault & SSH Keys (Avril - Mai 2026)
+### Phase 6 : Vault & SSH Keys (Avril - Mai 2026)
 
 **Période : 29-04 au 04-05**
 
@@ -144,7 +172,7 @@ Mise en place de la gestion des secrets et authentification SSH
 
 ---
 
-### Phase 6 : ELK Stack Complet (Mai 2026)
+### Phase 7 : ELK Stack Complet (Mai 2026)
 
 **Période : 03-05 au 25-05**
 
@@ -172,7 +200,7 @@ Déploiement de la stack de monitoring et logging (Elasticsearch, Kibana, Logsta
 
 ---
 
-### Phase 7 : HTTPS/TLS Migration (Mai 2026)
+### Phase 8 : HTTPS/TLS Migration (Mai 2026)
 
 **Période : 27-05 au 31-05**
 
@@ -200,7 +228,7 @@ Migration complète vers HTTPS avec certificats TLS internes
 
 ---
 
-### Phase 8 : Cloud VMs & Teleport (Mai - Juin 2026)
+### Phase 9 : Cloud VMs & Teleport (Mai - Juin 2026)
 
 **Période : 23-05 au 01-06**
 
@@ -225,7 +253,7 @@ Déploiement de l'infrastructure cloud et outils d'accès sécurisé
 
 ---
 
-### Phase 9 : Documentation & Finalisation (Mai - Juin 2026)
+### Phase 10 : Documentation & Finalisation (Mai - Juin 2026)
 
 **Période : 27-05 au 01-06**
 
@@ -247,7 +275,7 @@ Documentation complète et stabilisation de l'infrastructure
 | Métrique | Valeur |
 |----------|--------|
 | **Durée totale** | ~4 mois (02-02 au 01-06) |
-| **Nombre de phases** | 9 phases majeures |
+| **Nombre de phases** | 10 phases majeures |
 | **Phase la plus courte** | Vault setup (5 jours) |
 | **Phase la plus longue** | ELK Stack (22 jours) |
 | **Commits totaux** | 200+ commits |
@@ -256,17 +284,17 @@ Documentation complète et stabilisation de l'infrastructure
 ## Dépendances entre phases
 
 ```
-Bootstrap (Ph1) 
+Bootstrap (Ph1)
     ↓
-Packer Setup (Ph2) → VM Deployment (Ph3)
-                         ↓
-                    pfSense (Ph4)
-                         ↓
-Vault (Ph5) ────────────→ ELK Stack (Ph6)
-                             ↓
-                        HTTPS/TLS (Ph7) → Cloud VMs (Ph8)
-                             ↓
-Documentation & Finalization (Ph9)
+Formation (Ph2) → Packer Setup (Ph3) → VM Deployment (Ph4)
+                    ↓
+                pfSense (Ph5)
+                    ↓
+Vault (Ph6) ────────────→ ELK Stack (Ph7)
+                        ↓
+                    HTTPS/TLS (Ph8) → Cloud VMs (Ph9)
+                        ↓
+Documentation & Finalization (Ph10)
 ```
 
 ## Points critiques
