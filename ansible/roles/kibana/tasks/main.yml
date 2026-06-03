@@ -40,3 +40,122 @@
   delay: 15
   until: kibana_status.status == 200
   become: false
+
+## --- FLEET TOKEN → VAULT ---
+
+# Lire le root token Vault depuis ops-vm
+- name: Slurp vault-init.json from ops-vm
+  slurp:
+    src: /root/vault-init.json
+  become: true
+  delegate_to: "{{ groups['ops'][0] }}"
+  register: vault_init_raw_kibana
+  no_log: true
+
+- name: Set vault root token for Fleet
+  set_fact:
+    vault_root_token_kibana: "{{ (vault_init_raw_kibana.content | b64decode | from_json).root_token }}"
+  no_log: true
+
+# 200 = token déjà en Vault, 404 = absent → créer
+- name: Check if Fleet enrollment token already in Vault
+  uri:
+    url: "https://127.0.0.1:8200/v1/secret/data/elk/fleet-enrollment-token"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ vault_root_token_kibana }}"
+    ca_path: /etc/ssl/internal/ca.crt
+    status_code: [200, 404]
+  delegate_to: "{{ groups['ops'][0] }}"
+  register: vault_fleet_check
+  no_log: true
+
+- name: Setup Fleet in Kibana
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/setup"
+    method: POST
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    headers:
+      kbn-xsrf: "true"
+    status_code: [200, 204]
+  when: vault_fleet_check.status == 404
+
+- name: Get Fleet agent policies
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+    method: GET
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: fleet_policies
+  when: vault_fleet_check.status == 404
+
+# Fleet setup ne crée pas toujours de politique is_default:true → en créer une si la liste est vide
+- name: Create default Fleet agent policy if none exist
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "Default Policy"
+      namespace: "default"
+      monitoring_enabled: []
+    status_code: 200
+  register: fleet_policy_new
+  when: vault_fleet_check.status == 404 and fleet_policies is not skipped and fleet_policies.json['items'] | length == 0
+
+# Utiliser la politique créée, sinon prendre la première de la liste existante
+- name: Set default Fleet policy ID
+  set_fact:
+    fleet_default_policy_id: >-
+      {{ fleet_policy_new.json.item.id
+         if (fleet_policy_new is defined and fleet_policy_new is not skipped)
+         else (fleet_policies.json['items'] | first).id }}
+  when: vault_fleet_check.status == 404 and fleet_policies is not skipped
+
+- name: Create Fleet enrollment token
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/enrollment_api_keys"
+    method: POST
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "ansible-fleet-token"
+      policy_id: "{{ fleet_default_policy_id }}"
+    status_code: 200
+  register: fleet_token_create
+  when: vault_fleet_check.status == 404 and fleet_default_policy_id is defined
+  no_log: true
+
+# La tâche s'exécute sur ops-vm (delegate_to) → 127.0.0.1:8200 = Vault local
+- name: Store Fleet enrollment token in Vault
+  uri:
+    url: "https://127.0.0.1:8200/v1/secret/data/elk/fleet-enrollment-token"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_root_token_kibana }}"
+    body_format: json
+    body:
+      data:
+        value: "{{ fleet_token_create.json.item.api_key }}"
+    ca_path: /etc/ssl/internal/ca.crt
+    status_code: 200
+  delegate_to: "{{ groups['ops'][0] }}"
+  when: vault_fleet_check.status == 404 and fleet_default_policy_id is defined
+  no_log: true

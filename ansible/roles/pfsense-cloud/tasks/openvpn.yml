@@ -1,0 +1,15 @@
+---
+- name: Configurer serveur OpenVPN (site-to-site vers OP)
+  pfsensible.core.pfsense_openvpn_server:
+    name: "{{ openvpn_server.name }}"
+    mode: "{{ openvpn_server.mode }}"
+    protocol: "{{ openvpn_server.protocol }}"
+    interface: "{{ openvpn_server.interface }}"
+    local_port: "{{ openvpn_server.local_port }}"
+    tunnel_network: "{{ openvpn_server.tunnel_network }}"
+    remote_network: "{{ openvpn_server.remote_network }}"
+    shared_key: "{{ openvpn_shared_key }}"
+    data_ciphers: "{{ openvpn_server.data_ciphers }}"
+    compression: "{{ openvpn_server.compression }}"
+    state: present
+  tags: [configure, vpn]

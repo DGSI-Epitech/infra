@@ -40,6 +40,11 @@ variable "pfsense_template_id" {
   type        = number
 }
 
+variable "pfsense_cloud_template_id" {
+  description = "Proxmox VM ID du template pfSense Cloud sur PVE2"
+  type        = number
+}
+
 variable "template_ubuntu_vm_id" {
   description = "Proxmox VM ID of the Ubuntu template on PVE2"
   type        = number
@@ -74,13 +79,14 @@ variable "website_vm_id" {
 variable "pfsense_wan_bridge" {
   description = "Bridge WAN pour pfSense S2"
   type        = string
-  default     = "vmbr0"
+  default     = "CLOUD"
 }
 
 variable "pfsense_lan_bridge" {
   description = "Bridge LAN Cloud pour pfSense S2"
   type        = string
-  default     = "vmbr1"
+  # Ancien: default = "vmbr1"  ← conflit avec pfSense OP (même bridge L2 → VMs des deux sites se voyaient directement)
+  default     = "vmbr4"
 }
 
 # --- Réseau — valeurs fixes par design ---

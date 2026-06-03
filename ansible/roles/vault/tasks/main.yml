@@ -40,6 +40,11 @@
 
 ## --- DEPLOYMENT & READINESS ---
 
+# Force tous les handlers en attente (ex: Restart Docker du rôle base) à tourner
+# AVANT de démarrer Vault. Sans ça, le handler Docker tourne APRÈS l'unseal
+# et redémarre le container Vault → Vault repart sealed.
+- meta: flush_handlers
+
 - name: Run Vault container
   community.docker.docker_container:
     name: vault
@@ -81,8 +86,16 @@
   uri:
     url: "https://127.0.0.1:8200/v1/sys/init"
     method: GET
-    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
+    validate_certs: false
+   # ca_path: "{{ vault_tls_host_dir }}/ca.crt"
   register: vault_init_status
+
+# 2b. Capture la valeur avant que l'étape 4 (conditionnelle) puisse l'écraser
+# Quand une tâche avec `register` est skippée, Ansible écrase quand même la variable
+# avec {skipped: true}, ce qui efface vault_init_status.json.initialized
+- name: Capture vault_initialized fact
+  set_fact:
+    vault_initialized: "{{ vault_init_status.json.initialized | default(false) }}"
 
 # 3. Sécurité : Si Vault est initialisé mais qu'on n'a pas les clés, on reset tout
 - name: Force reset Vault data if keys are missing
@@ -91,8 +104,8 @@
     rm -rf {{ vault_data_dir }}/*
     docker start vault
   become: true
-  when: 
-    - vault_init_status.json.initialized | default(false)
+  when:
+    - vault_initialized | bool
     - not vault_init_file.stat.exists
   register: vault_reset
 
@@ -105,9 +118,16 @@
 # 4. On rafraîchit le statut APRES le reset potentiel
 - name: Re-check Vault init status
   uri:
-    url: "http://127.0.0.1:8200/v1/sys/init"
+    url: "https://127.0.0.1:8200/v1/sys/init"
     method: GET
+    validate_certs: false
   register: vault_init_status
+  when: vault_reset is changed
+
+# 4b. Après reset, Vault n'est plus initialisé
+- name: Update vault_initialized fact after reset
+  set_fact:
+    vault_initialized: false
   when: vault_reset is changed
 
 # 5. Initialisation réelle
@@ -122,7 +142,7 @@
     ca_path: "{{ vault_tls_host_dir }}/ca.crt"
     status_code: 200
   register: vault_init_output
-  when: not (vault_init_status.json.initialized | default(false))
+  when: not (vault_initialized | bool)
   changed_when: true
 
 - name: Save Vault init output on the server
@@ -162,8 +182,9 @@
 
 - name: Check Vault seal status
   uri:
-    url: "http://127.0.0.1:8200/v1/sys/seal-status"
+    url: "https://127.0.0.1:8200/v1/sys/seal-status"
     method: GET
+    validate_certs: false
   register: vault_seal_status
 
 - name: Unseal Vault (fresh init)
@@ -176,7 +197,46 @@
     ca_path: "{{ vault_tls_host_dir }}/ca.crt"
     status_code: 200
   loop: "{{ vault_keys[:3] }}"
-  when: 
+  when:
     - vault_keys is defined
     - vault_seal_status.json.sealed | default(false)
   no_log: true
+
+## --- SETUP DU MOTEUR KV ---
+
+# Capturer le root token (depuis l'init fraîche ou le fichier existant)
+- name: Set vault root token
+  set_fact:
+    vault_root_token: >-
+      {{ vault_init_output.json.root_token if (vault_init_output is changed)
+         else (slurped_vault_init.content | b64decode | from_json).root_token }}
+  when: vault_init_output is changed or (slurped_vault_init is defined and not (slurped_vault_init is skipped))
+  no_log: true
+
+# GET /v1/sys/mounts/secret → 200 si déjà monté, 400 si inexistant
+- name: Check if KV secrets engine is mounted
+  uri:
+    url: "https://127.0.0.1:8200/v1/sys/mounts/secret"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
+    status_code: [200, 400]
+  register: vault_kv_mount_check
+  when: vault_root_token is defined
+  no_log: true
+
+- name: Enable KV v2 secrets engine at secret/
+  uri:
+    url: "https://127.0.0.1:8200/v1/sys/mounts/secret"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      type: "kv"
+      options:
+        version: "2"
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
+    status_code: 204
+  when: vault_root_token is defined and vault_kv_mount_check is not skipped and vault_kv_mount_check.status != 200

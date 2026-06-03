@@ -1,0 +1,45 @@
+---
+- name: "[KILLSWITCH] Bloquer OpenVPN entrant sur WAN"
+  pfsensible.core.pfsense_rule:
+    name: "KILLSWITCH_OpenVPN_1194"
+    action: block
+    interface: wan
+    protocol: udp
+    source: any
+    destination: any
+    destination_port: "{{ vpn_port }}"
+    state: present
+  tags: [never, killswitch]
+
+- name: "[KILLSWITCH] Tuer le processus OpenVPN serveur"
+  ansible.builtin.raw: kill $(cat /var/run/openvpn_server1.pid 2>/dev/null) 2>/dev/null || pkill -f 'openvpn.*server1' 2>/dev/null; true
+  tags: [never, killswitch]
+
+- name: "[RESTORE] Supprimer la règle KILLSWITCH"
+  pfsensible.core.pfsense_rule:
+    name: "KILLSWITCH_OpenVPN_1194"
+    interface: wan
+    state: absent
+  tags: [never, restore]
+
+- name: "[RESTORE] Supprimer le serveur OpenVPN (forcer recréation)"
+  pfsensible.core.pfsense_openvpn_server:
+    name: "{{ openvpn_server.name }}"
+    state: absent
+  tags: [never, restore]
+
+- name: "[RESTORE] Recréer le serveur OpenVPN"
+  pfsensible.core.pfsense_openvpn_server:
+    name: "{{ openvpn_server.name }}"
+    mode: "{{ openvpn_server.mode }}"
+    protocol: "{{ openvpn_server.protocol }}"
+    interface: "{{ openvpn_server.interface }}"
+    local_port: "{{ openvpn_server.local_port }}"
+    tunnel_network: "{{ openvpn_server.tunnel_network }}"
+    remote_network: "{{ openvpn_server.remote_network }}"
+    shared_key: "{{ openvpn_shared_key }}"
+    data_ciphers: "{{ openvpn_server.data_ciphers }}"
+    compression: "{{ openvpn_server.compression }}"
+    disable: false
+    state: present
+  tags: [never, restore]

@@ -37,3 +37,5 @@ ansible/vars/openvpn_secrets.yml
 
 CLAUDE.md
 .claude/settings.local.json
+
+/logs
