@@ -197,7 +197,46 @@
     ca_path: "{{ vault_tls_host_dir }}/ca.crt"
     status_code: 200
   loop: "{{ vault_keys[:3] }}"
-  when: 
+  when:
     - vault_keys is defined
     - vault_seal_status.json.sealed | default(false)
   no_log: true
+
+## --- SETUP DU MOTEUR KV ---
+
+# Capturer le root token (depuis l'init fraîche ou le fichier existant)
+- name: Set vault root token
+  set_fact:
+    vault_root_token: >-
+      {{ vault_init_output.json.root_token if (vault_init_output is changed)
+         else (slurped_vault_init.content | b64decode | from_json).root_token }}
+  when: vault_init_output is changed or (slurped_vault_init is defined and not (slurped_vault_init is skipped))
+  no_log: true
+
+# GET /v1/sys/mounts/secret → 200 si déjà monté, 400 si inexistant
+- name: Check if KV secrets engine is mounted
+  uri:
+    url: "https://127.0.0.1:8200/v1/sys/mounts/secret"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
+    status_code: [200, 400]
+  register: vault_kv_mount_check
+  when: vault_root_token is defined
+  no_log: true
+
+- name: Enable KV v2 secrets engine at secret/
+  uri:
+    url: "https://127.0.0.1:8200/v1/sys/mounts/secret"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_root_token }}"
+    body_format: json
+    body:
+      type: "kv"
+      options:
+        version: "2"
+    ca_path: "{{ vault_tls_host_dir }}/ca.crt"
+    status_code: 204
+  when: vault_root_token is defined and vault_kv_mount_check is not skipped and vault_kv_mount_check.status != 200

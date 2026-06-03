@@ -1,7 +1,6 @@
 ---
 - name: Deploy Kibana on bastion (DMZ Cloud)
-  hosts: bastion
+  hosts: ops
   become: true
   roles:
-    - base
     - kibana
