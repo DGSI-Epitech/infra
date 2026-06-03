@@ -20,7 +20,7 @@ teleport_tls_cert: "{{ teleport_tls_dir }}/server.crt"
 teleport_tls_key: "{{ teleport_tls_dir }}/server.key"
 
 # Vault — join token stocké dans Vault KV (même pattern que Fleet enrollment token)
-vault_addr: "http://{{ hostvars[groups['ops'][0]]['ansible_host'] }}:8200"
+vault_addr: "https://{{ hostvars[groups['ops'][0]]['ansible_host'] }}:8200"
 teleport_vault_token_path: "secret/data/teleport/join-token"
 
 # Subnets autorisés à joindre le port auth interne (3025)
