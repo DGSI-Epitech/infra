@@ -87,7 +87,7 @@
   <text x="380" y="501" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">87%</text>
 
   <!-- ═══════════════════ PVE2 ═══════════════════ -->
-  <rect x="590" y="55" width="480" height="540" rx="10" fill="#f0f4ff" stroke="#4a90d9" stroke-width="2"/>
+  <rect x="590" y="55" width="480" height="560" rx="10" fill="#f0f4ff" stroke="#4a90d9" stroke-width="2"/>
   <text x="830" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#1a4a8a">PVE2 — Cloud  (ns3183326.ip-146-59-253.eu)</text>
 
   <!-- pfSense-Cloud -->
@@ -108,60 +108,92 @@
 
  
 <!-- bastion -->
-<rect x="615" y="220" width="430" height="200" rx="8" fill="#e8f4fd" stroke="#0066cc" stroke-width="1.5"/>
-<text x="830" y="242" text-anchor="middle" font-size="12" font-weight="bold" fill="#004085">
+<rect x="615" y="220" width="430" height="140" rx="8"
+      fill="#e8f4fd" stroke="#0066cc" stroke-width="1.5"/>
+
+<text x="830" y="242" text-anchor="middle"
+      font-size="12" font-weight="bold" fill="#004085">
   🖥️ bastion (VMID 2038) — 10.255.255.253 (DMZ)
 </text>
 
 <!-- Filebeat -->
-<rect x="633" y="260" width="390" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
-<text x="828" y="275" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">📦 Filebeat</text>
-<text x="828" y="290" text-anchor="middle" font-size="10" fill="#155724">
+<rect x="633" y="260" width="390" height="40" rx="6"
+      fill="#d4edda" stroke="#155724" stroke-width="1"/>
+<text x="828" y="275" text-anchor="middle"
+      font-size="11" font-weight="bold" fill="#155724">
+  📦 Filebeat
+</text>
+<text x="828" y="290" text-anchor="middle"
+      font-size="10" fill="#155724">
   → Elasticsearch HTTPS :9200 (via VPN)
 </text>
 
 <!-- Teleport -->
-<rect x="633" y="310" width="390" height="50" rx="6" fill="#e2e3ff" stroke="#5a5ad1" stroke-width="1"/>
-<text x="828" y="330" text-anchor="middle" font-size="11" font-weight="bold" fill="#3c3ca0">
+<rect x="633" y="305" width="390" height="45" rx="6"
+      fill="#e2e3ff" stroke="#5a5ad1" stroke-width="1"/>
+
+<text x="828" y="322" text-anchor="middle"
+      font-size="11" font-weight="bold" fill="#3c3ca0">
   🔐 Teleport
 </text>
-<text x="828" y="345" text-anchor="middle" font-size="10" fill="#3c3ca0">
+
+<text x="828" y="336" text-anchor="middle"
+      font-size="10" fill="#3c3ca0">
   Accès SSH sécurisé / Proxy / RBAC
 </text>
-<text x="828" y="358" text-anchor="middle" font-size="9" fill="#3c3ca0">
+
+<text x="828" y="348" text-anchor="middle"
+      font-size="9" fill="#3c3ca0">
   :3023 / :3080
 </text>
-
-  <!-- Disk legend bastion -->
   
-<rect x="615" y="430" width="430" height="80" rx="8" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
-<text x="830" y="448" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">
+  <!-- Disk legend bastion -->
+
+<rect x="615" y="375" width="430" height="80" rx="8"
+      fill="#f5f5f5" stroke="#999" stroke-width="1"/>
+
+<text x="830" y="393" text-anchor="middle"
+      font-size="11" font-weight="bold" fill="#333">
   💾 Disk — bastion (7.6G)
 </text>
 
-<rect x="633" y="455" width="390" height="16" rx="3" fill="#ddd"/>
-<rect x="633" y="455" width="285" height="16" rx="3" fill="#fd7e14"/>
-<text x="728" y="467" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">73%</text>
+<rect x="633" y="400" width="390" height="16" rx="3" fill="#ddd"/>
+<rect x="633" y="400" width="285" height="16" rx="3" fill="#fd7e14"/>
 
-<text x="633" y="485" font-size="10" fill="#555">
+<text x="728" y="412" text-anchor="middle"
+      font-size="9" fill="#fff" font-weight="bold">
+  73%
+</text>
+
+<text x="633" y="430" font-size="10" fill="#555">
   apt cache nettoyé: -1GB
 </text>
-<text x="633" y="498" font-size="10" fill="#fd7e14" font-weight="bold">
+
+<text x="633" y="443" font-size="10"
+      fill="#fd7e14" font-weight="bold">
   73% utilisé — 2.0GB libres
 </text>
 
-  <!-- web-vm -->
-  
-<rect x="615" y="520" width="430" height="95" rx="8" fill="#f0fff4" stroke="#28a745" stroke-width="1.5"/>
-<text x="830" y="542" text-anchor="middle" font-size="12" font-weight="bold" fill="#155724">
+<!-- web-vm -->
+
+<rect x="615" y="470" width="430" height="95" rx="8"
+      fill="#f0fff4" stroke="#28a745" stroke-width="1.5"/>
+
+<text x="830" y="492" text-anchor="middle"
+      font-size="12" font-weight="bold" fill="#155724">
   🌍 web (VMID 3038) — 192.168.255.253 (LAN)
 </text>
 
-<rect x="633" y="552" width="390" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
-<text x="828" y="567" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">
+<rect x="633" y="502" width="390" height="40" rx="6"
+      fill="#d4edda" stroke="#155724" stroke-width="1"/>
+
+<text x="828" y="517" text-anchor="middle"
+      font-size="11" font-weight="bold" fill="#155724">
   Site web :80/:443
 </text>
-<text x="828" y="582" text-anchor="middle" font-size="10" fill="#155724">
+
+<text x="828" y="532" text-anchor="middle"
+      font-size="10" fill="#155724">
   Docker non installé — 63% disk (2.7G libres)
 </text>
 
