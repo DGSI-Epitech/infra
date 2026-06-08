@@ -31,6 +31,24 @@
   <text x="367" y="267" text-anchor="middle" font-size="10" fill="#004085">:8200 HTTPS</text>
   <text x="367" y="281" text-anchor="middle" font-size="10" fill="#28a745">● initialized, unsealed</text>
 
+<rect x="140" y="260" width="240" height="60" rx="6"
+      fill="#cce5ff" stroke="#004085" stroke-width="1"/>
+
+<text x="260" y="280" text-anchor="middle"
+      font-size="11" font-weight="bold" fill="#004085">
+  📊 Kibana
+</text>
+
+<text x="260" y="295" text-anchor="middle"
+      font-size="10" fill="#004085">
+  :5601 HTTPS
+</text>
+
+<text x="260" y="310" text-anchor="middle"
+      font-size="10" fill="#004085">
+  → Elasticsearch local :9200
+</text>
+
   <rect x="75" y="305" width="385" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
   <text x="267" y="320" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">📦 Filebeat</text>
   <text x="267" y="335" text-anchor="middle" font-size="10" fill="#155724">→ Elasticsearch HTTPS :9200</text>
@@ -71,34 +89,64 @@
   <text x="829" y="177" text-anchor="middle" font-size="9" fill="#1a4a8a">bastion :5601</text>
   <text x="966" y="177" text-anchor="middle" font-size="9" fill="#1a4a8a">web :80/:443</text>
 
-  <!-- bastion -->
-  <rect x="615" y="220" width="430" height="160" rx="8" fill="#e8f4fd" stroke="#0066cc" stroke-width="1.5"/>
-  <text x="830" y="242" text-anchor="middle" font-size="12" font-weight="bold" fill="#004085">🖥️  bastion  (VMID 2038) — 10.255.255.253 (DMZ)</text>
+ 
+<!-- bastion -->
+<rect x="615" y="220" width="430" height="200" rx="8" fill="#e8f4fd" stroke="#0066cc" stroke-width="1.5"/>
+<text x="830" y="242" text-anchor="middle" font-size="12" font-weight="bold" fill="#004085">
+  🖥️ bastion (VMID 2038) — 10.255.255.253 (DMZ)
+</text>
 
-  <rect x="633" y="252" width="390" height="60" rx="6" fill="#cce5ff" stroke="#004085" stroke-width="1"/>
-  <text x="828" y="272" text-anchor="middle" font-size="11" font-weight="bold" fill="#004085">📊 Kibana</text>
-  <text x="828" y="287" text-anchor="middle" font-size="10" fill="#004085">:5601 HTTPS</text>
-  <text x="828" y="301" text-anchor="middle" font-size="10" fill="#28a745">● available  →  ES 172.16.0.253:9200 (VPN)</text>
+<!-- Filebeat -->
+<rect x="633" y="260" width="390" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
+<text x="828" y="275" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">📦 Filebeat</text>
+<text x="828" y="290" text-anchor="middle" font-size="10" fill="#155724">
+  → Elasticsearch HTTPS :9200 (via VPN)
+</text>
 
-  <rect x="633" y="325" width="390" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
-  <text x="828" y="340" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">📦 Filebeat</text>
-  <text x="828" y="355" text-anchor="middle" font-size="10" fill="#155724">→ Elasticsearch HTTPS :9200  (via VPN)</text>
+<!-- Teleport -->
+<rect x="633" y="310" width="390" height="50" rx="6" fill="#e2e3ff" stroke="#5a5ad1" stroke-width="1"/>
+<text x="828" y="330" text-anchor="middle" font-size="11" font-weight="bold" fill="#3c3ca0">
+  🔐 Teleport
+</text>
+<text x="828" y="345" text-anchor="middle" font-size="10" fill="#3c3ca0">
+  Accès SSH sécurisé / Proxy / RBAC
+</text>
+<text x="828" y="358" text-anchor="middle" font-size="9" fill="#3c3ca0">
+  :3023 / :3080
+</text>
 
   <!-- Disk legend bastion -->
-  <rect x="615" y="395" width="430" height="80" rx="8" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
-  <text x="830" y="413" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">💾 Disk — bastion (7.6G)</text>
-  <rect x="633" y="420" width="390" height="16" rx="3" fill="#ddd"/>
-  <rect x="633" y="420" width="285" height="16" rx="3" fill="#fd7e14"/><!-- 73% -->
-  <text x="633" y="452" font-size="10" fill="#555">Kibana image: 1.73GB   apt cache nettoyé: -1GB</text>
-  <text x="633" y="466" font-size="10" fill="#fd7e14" font-weight="bold">73% utilisé — 2.0GB libres</text>
-  <text x="728" y="431" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">73%</text>
+  
+<rect x="615" y="430" width="430" height="80" rx="8" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
+<text x="830" y="448" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">
+  💾 Disk — bastion (7.6G)
+</text>
+
+<rect x="633" y="455" width="390" height="16" rx="3" fill="#ddd"/>
+<rect x="633" y="455" width="285" height="16" rx="3" fill="#fd7e14"/>
+<text x="728" y="467" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">73%</text>
+
+<text x="633" y="485" font-size="10" fill="#555">
+  apt cache nettoyé: -1GB
+</text>
+<text x="633" y="498" font-size="10" fill="#fd7e14" font-weight="bold">
+  73% utilisé — 2.0GB libres
+</text>
 
   <!-- web-vm -->
-  <rect x="615" y="490" width="430" height="95" rx="8" fill="#f0fff4" stroke="#28a745" stroke-width="1.5"/>
-  <text x="830" y="512" text-anchor="middle" font-size="12" font-weight="bold" fill="#155724">🌍  web  (VMID 3038) — 192.168.255.253 (LAN)</text>
-  <rect x="633" y="522" width="390" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
-  <text x="828" y="537" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">Site web :80/:443</text>
-  <text x="828" y="552" text-anchor="middle" font-size="10" fill="#155724">Docker non installé — 63% disk (2.7G libres)</text>
+  
+<rect x="615" y="520" width="430" height="95" rx="8" fill="#f0fff4" stroke="#28a745" stroke-width="1.5"/>
+<text x="830" y="542" text-anchor="middle" font-size="12" font-weight="bold" fill="#155724">
+  🌍 web (VMID 3038) — 192.168.255.253 (LAN)
+</text>
+
+<rect x="633" y="552" width="390" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
+<text x="828" y="567" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">
+  Site web :80/:443
+</text>
+<text x="828" y="582" text-anchor="middle" font-size="10" fill="#155724">
+  Docker non installé — 63% disk (2.7G libres)
+</text>
 
   <!-- ═══════════════════ VPN INTER-SITES ═══════════════════ -->
   <line x1="510" y1="330" x2="590" y2="330" stroke="#e74c3c" stroke-width="3" stroke-dasharray="8,4"/>
@@ -160,8 +208,12 @@
 
   <!-- Flux Filebeat bastion → ES (via VPN) -->
   <path d="M 828 370 Q 828 400 700 380 Q 560 360 510 330" stroke="#27ae60" stroke-width="1.5" fill="none" stroke-dasharray="4,2" opacity="0.7"/>
-  <!-- Kibana → ES (via VPN) -->
-  <path d="M 700 280 Q 600 300 510 320" stroke="#0066cc" stroke-width="1.5" fill="none" stroke-dasharray="4,2" opacity="0.6"/>
+  
+<!-- Kibana → ES (local) -->
+<line x1="260" y1="260" x2="260" y2="220"
+      stroke="#0066cc" stroke-width="1.5"
+      stroke-dasharray="4,2" opacity="0.6"/>
+
 
   <!-- Dates -->
   <text x="1070" y="815" text-anchor="end" font-size="9" fill="#aaa">DGSI Epitech — 2026-05-27</text>
