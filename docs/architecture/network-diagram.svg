@@ -32,28 +32,44 @@
   <text x="367" y="267" text-anchor="middle" font-size="10" fill="#004085">:8200 HTTPS</text>
   <text x="367" y="281" text-anchor="middle" font-size="10" fill="#28a745">● initialized, unsealed</text>
 
-<rect x="145" y="305" width="230" height="60" rx="6"
+<!-- Kibana -->
+<rect x="75" y="305" width="185" height="60" rx="6"
       fill="#cce5ff" stroke="#004085" stroke-width="1"/>
 
-<text x="260" y="325" text-anchor="middle"
+<text x="167" y="325" text-anchor="middle"
       font-size="11" font-weight="bold" fill="#004085">
   📊 Kibana
 </text>
 
-<text x="260" y="340" text-anchor="middle"
+<text x="167" y="340" text-anchor="middle"
       font-size="10" fill="#004085">
   :5601 HTTPS
 </text>
 
-<text x="260" y="355" text-anchor="middle"
+<text x="167" y="355" text-anchor="middle"
       font-size="10" fill="#004085">
   → Elasticsearch local :9200
 </text>
 
-  <rect x="75" y="375" width="385" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
-  <text x="267" y="392" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">📦 Filebeat</text>
-  <text x="267" y="407" text-anchor="middle" font-size="10" fill="#155724">→ Elasticsearch HTTPS :9200</text>
+<!-- Filebeat -->
+<rect x="275" y="305" width="185" height="60" rx="6"
+      fill="#d4edda" stroke="#155724" stroke-width="1"/>
 
+<text x="367" y="325" text-anchor="middle"
+      font-size="11" font-weight="bold" fill="#155724">
+  📦 Filebeat
+</text>
+
+<text x="367" y="340" text-anchor="middle"
+      font-size="10" fill="#155724">
+  Agent de collecte
+</text>
+
+<text x="367" y="355" text-anchor="middle"
+      font-size="10" fill="#155724">
+  → Elasticsearch HTTPS :9200
+</text>
+  
   <!-- services-vm (offline) -->
   <rect x="55" y="385" width="430" height="65" rx="8" fill="#f8d7da" stroke="#842029" stroke-width="1.5" stroke-dasharray="6,3"/>
   <text x="270" y="408" text-anchor="middle" font-size="12" font-weight="bold" fill="#842029">⚠️  services-vm  (VMID 3038) — HORS LIGNE</text>
@@ -199,7 +215,9 @@
   <text x="762" y="734" font-size="10" fill="#333">Certificat TLS (CA interne)</text>
 
   <!-- Flux Filebeat ops → ES (flèche interne) -->
-  <line x1="267" y1="340" x2="267" y2="310" stroke="#27ae60" stroke-width="1.5" marker-end="url(#arrow_green)"/>
+  <line x1="367" y1="305" x2="367" y2="292"
+      stroke="#27ae60" stroke-width="1.5"
+      marker-end="url(#arrow_green)"/>
 
   <defs>
     <marker id="arrow_green" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
@@ -211,10 +229,9 @@
   <path d="M 828 370 Q 828 400 700 380 Q 560 360 510 330" stroke="#27ae60" stroke-width="1.5" fill="none" stroke-dasharray="4,2" opacity="0.7"/>
   
 <!-- Kibana → ES (local) -->
-<line x1="260" y1="260" x2="260" y2="220"
+<line x1="167" y1="305" x2="167" y2="292"
       stroke="#0066cc" stroke-width="1.5"
       stroke-dasharray="4,2" opacity="0.6"/>
-
 
   <!-- Dates -->
   <text x="1070" y="815" text-anchor="end" font-size="9" fill="#aaa">DGSI Epitech — 2026-06-08</text>
