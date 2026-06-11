@@ -8,8 +8,8 @@ terraform {
     }
     netbox = {
       source  = "e-breuninger/netbox"
-      version = "~> 3.11" 
+      version = "~> 3.11"
+    }
   }
-}
 }
 
