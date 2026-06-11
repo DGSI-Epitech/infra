@@ -13,6 +13,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
+# shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
 SSH_KEY_FILE="${SSH_PRIVATE_KEY_FILE/#\~/$HOME}"

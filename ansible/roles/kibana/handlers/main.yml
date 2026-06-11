@@ -1,5 +1,5 @@
 ---
-- name: restart kibana
+- name: Restart kibana
   command: docker compose restart kibana
   args:
     chdir: "{{ kibana_dir }}"

@@ -10,7 +10,7 @@ module "services_vm" {
 }
 
 module "ops_vm" {
-  source = "../../modules/ops-vm"
+  source            = "../../modules/ops-vm"
   proxmox_node      = var.proxmox_node
   template_vm_id    = var.template_ubuntu_vm_id
   vm_id             = var.ops_vm_id

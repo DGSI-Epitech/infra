@@ -15,6 +15,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
+# shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
 PROXMOX_API="https://${PROXMOX_HOST}:8006/api2/json"
@@ -350,7 +351,8 @@ if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
   # Password éphémère généré à la volée — utilisé uniquement pour le communicator Packer, jamais stocké
   _PACKER_PASS="$(openssl rand -base64 16 | tr -d '+/=' | head -c 20)"
   export PKR_VAR_build_password="${_PACKER_PASS}"
-  export PKR_VAR_build_password_hash="$(echo "${_PACKER_PASS}" | openssl passwd -6 -stdin)"
+  _PACKER_PASS_HASH="$(echo "${_PACKER_PASS}" | openssl passwd -6 -stdin)"
+  export PKR_VAR_build_password_hash="${_PACKER_PASS_HASH}"
   unset _PACKER_PASS
   packer init .
   packer build -on-error=abort ubuntu-22.04.pkr.hcl
@@ -448,7 +450,11 @@ ssh -f -N \
     root@"${PROXMOX_HOST}"
 
 TUNNEL_PID=$(pgrep -f "L ${NETBOX_LOCAL_PORT}:${SERVICES_IP}:8080" | head -1)
-trap "echo '==> Fermeture tunnel Netbox...'; kill ${TUNNEL_PID} 2>/dev/null || true" EXIT
+cleanup_tunnel() {
+  echo "==> Fermeture tunnel Netbox..."
+  kill "${TUNNEL_PID}" 2>/dev/null || true
+}
+trap cleanup_tunnel EXIT
 
 # Attente que le tunnel soit prêt
 until curl -s --max-time 2 "http://localhost:${NETBOX_LOCAL_PORT}/api/status/" > /dev/null 2>&1; do

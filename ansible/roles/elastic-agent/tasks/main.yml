@@ -30,10 +30,14 @@
   no_log: true
 
 # Installer elastic-agent via apt Elastic
-- name: Add Elastic GPG key (dearmored for apt signed-by)
-  shell: |
-    curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch \
-      | gpg --dearmor -o /usr/share/keyrings/elastic-archive-keyring.gpg
+- name: Download Elastic GPG key
+  ansible.builtin.get_url:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    dest: /tmp/elastic-gpg-key.asc
+    mode: "0644"
+
+- name: Dearmor Elastic GPG key (for apt signed-by)
+  ansible.builtin.command: gpg --dearmor -o /usr/share/keyrings/elastic-archive-keyring.gpg /tmp/elastic-gpg-key.asc
   args:
     creates: /usr/share/keyrings/elastic-archive-keyring.gpg
 

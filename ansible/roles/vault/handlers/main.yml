@@ -1,5 +1,5 @@
 ---
-- name: restart vault
+- name: Restart vault
   community.docker.docker_container:
     name: vault
     state: started
