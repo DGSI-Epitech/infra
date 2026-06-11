@@ -56,7 +56,7 @@ resource "proxmox_virtual_environment_vm" "ops_vm" {
 
   initialization {
     datastore_id = var.storage_iso
-    
+
     ip_config {
       ipv4 {
         address = "${netbox_available_ip_address.ops_vm_ip.ip_address},gw=${var.vm_gateway}"
@@ -73,10 +73,10 @@ resource "proxmox_virtual_environment_vm" "ops_vm" {
 # 4. Enregistrement de la VM dans l'inventaire NetBox
 resource "netbox_virtual_machine" "ops_vm_netbox" {
   name       = "ops-vm"
-  cluster_id = 1 
+  cluster_id = 1
   status     = "active"
   vcpus      = var.vm_cores
-  memory_mb  = var.vm_memory_mb 
+  memory_mb  = var.vm_memory_mb
 }
 
 # 5. Création de l'interface réseau de la VM dans NetBox

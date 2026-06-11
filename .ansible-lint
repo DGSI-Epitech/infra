@@ -1,0 +1,8 @@
+profile: basic
+
+exclude_paths:
+  - .cache/
+  - .github/
+  - terraform/
+  - packer/
+  - ansible/vault-init.json

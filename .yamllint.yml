@@ -1,0 +1,17 @@
+extends: default
+
+ignore: |
+  .terraform/
+  terraform/**/.terraform/
+  node_modules/
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+  truthy:
+    allowed-values: ["true", "false", "yes", "no"]
+  comments:
+    min-spaces-from-content: 1
+  braces:
+    max-spaces-inside: 1
