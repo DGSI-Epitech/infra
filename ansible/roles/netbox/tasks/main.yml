@@ -1,2 +1,5 @@
-- import_tasks: install_netbox.yml
-- import_tasks: sync_agent.yml
+- name: Install and bootstrap NetBox
+  import_tasks: install_netbox.yml
+
+- name: Deploy NetBox sync agent
+  import_tasks: sync_agent.yml

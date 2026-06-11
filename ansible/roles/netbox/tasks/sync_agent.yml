@@ -6,11 +6,11 @@
 
 - name: Lancer sync initial
   command: /usr/local/bin/netbox-sync.sh
-  register: sync_result
+  register: netbox_sync_result
 
 - name: Afficher résultat sync
   debug:
-    var: sync_result.stdout_lines
+    var: netbox_sync_result.stdout_lines
 
 - name: Planifier auto-sync NetBox toutes les heures
   cron:

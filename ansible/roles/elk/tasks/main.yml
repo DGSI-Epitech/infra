@@ -1,6 +1,6 @@
 ---
 - name: Set vm.max_map_count for Elasticsearch
-  sysctl:
+  ansible.posix.sysctl:
     name: vm.max_map_count
     value: "262144"
     state: present
@@ -12,9 +12,9 @@
     state: directory
     mode: "{{ item.mode }}"
   loop:
-    - { path: "{{ elk_dir }}",                      mode: "0755" }
+    - { path: "{{ elk_dir }}", mode: "0755" }
     - { path: "{{ elk_dir }}/elasticsearch/config", mode: "0755" }
-    - { path: "{{ elk_dir }}/elasticsearch/data",   mode: "0755" }
+    - { path: "{{ elk_dir }}/elasticsearch/data", mode: "0755" }
 
 - name: Set Elasticsearch data directory ownership
   file:
@@ -50,10 +50,10 @@
     force_basic_auth: true
     ca_path: "{{ elk_tls_host_dir }}/ca.crt"
     status_code: 200
-  register: es_health
+  register: elk_es_health
   retries: 20
   delay: 10
-  until: es_health.status == 200
+  until: elk_es_health.status == 200
 
 - name: Set kibana_system password in Elasticsearch
   uri:
@@ -67,10 +67,10 @@
     body:
       password: "{{ elk_kibana_system_password }}"
     status_code: 200
-  register: kibana_pw
+  register: elk_kibana_pw
   retries: 10
   delay: 15
-  until: kibana_pw.status == 200
+  until: elk_kibana_pw.status == 200
   no_log: true
 
 - name: Create Filebeat ILM policy
@@ -98,14 +98,13 @@
     status_code: 200
 
 - name: Allow Elasticsearch API
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ elk_es_port | string }}"
     proto: tcp
 
 - name: Allow Elasticsearch cluster
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ elk_es_cluster_port | string }}"
     proto: tcp
-

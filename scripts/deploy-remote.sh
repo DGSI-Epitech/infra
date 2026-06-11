@@ -15,6 +15,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
+# shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
 PROXMOX_HOST_REMOTE="${PROXMOX_NODE_ADDRESS_REMOTE}"
@@ -311,7 +312,8 @@ if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
   # Password éphémère — jamais stocké
   _PACKER_PASS="$(openssl rand -base64 16 | tr -d '+/=' | head -c 20)"
   export PKR_VAR_build_password="${_PACKER_PASS}"
-  export PKR_VAR_build_password_hash="$(echo "${_PACKER_PASS}" | openssl passwd -6 -stdin)"
+  _PACKER_PASS_HASH="$(echo "${_PACKER_PASS}" | openssl passwd -6 -stdin)"
+  export PKR_VAR_build_password_hash="${_PACKER_PASS_HASH}"
   unset _PACKER_PASS
   packer init .
   packer build -on-error=abort ubuntu-22.04.pkr.hcl
@@ -387,6 +389,7 @@ extend_disk "${WEBSITE_IP}"  "website"
 
 echo ""
 echo "==> Configuration DNAT sur hôte Proxmox cloud (${PROXMOX_HOST_REMOTE})..."
+# shellcheck disable=SC2087
 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "${SSH_KEY_FILE}" root@"${PROXMOX_HOST_REMOTE}" \
   "bash -s" << DNATEOF
 dnat_rule() {

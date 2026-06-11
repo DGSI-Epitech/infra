@@ -10,14 +10,14 @@
     dest: /etc/docker/daemon.json
     mode: '0644'
   become: true
-  register: docker_daemon_config
+  register: vault_docker_daemon_config
 
 - name: Restart Docker after DNS config change
   systemd:
     name: docker
     state: restarted
   become: true
-  when: docker_daemon_config.changed
+  when: vault_docker_daemon_config.changed
 
 - name: Create Vault directories
   file:
@@ -28,7 +28,7 @@
     group: "1000"
   loop:
     - { path: "{{ vault_config_dir }}", mode: '0755' }
-    - { path: "{{ vault_data_dir }}",   mode: '0700' }
+    - { path: "{{ vault_data_dir }}", mode: '0700' }
   become: true
 
 - name: Deploy Vault config
@@ -105,7 +105,7 @@
     docker start vault
   become: true
   when:
-    - vault_initialized | bool
+    - vault_init_status.json.initialized | bool
     - not vault_init_file.stat.exists
   register: vault_reset
 
@@ -168,16 +168,19 @@
 - name: Load existing Vault init output
   slurp:
     src: /root/vault-init.json
-  register: slurped_vault_init
+  register: vault_slurped_vault_init
   # On charge si le fichier existe (soit déjà là, soit créé à l'instant)
   when: vault_init_file.stat.exists or vault_init_output is changed
   become: true
 
 - name: Set Vault keys fact
   set_fact:
-    vault_keys: "{{ (vault_init_output.json.keys_base64) if vault_init_output is changed else (slurped_vault_init.content | b64decode | from_json).keys_base64 }}"
-  when: 
-    - vault_init_output is changed or (slurped_vault_init is not skipped)
+    vault_keys: >-
+      {{ (vault_init_output.json.keys_base64)
+         if vault_init_output is changed
+         else (vault_slurped_vault_init.content | b64decode | from_json).keys_base64 }}
+  when:
+    - vault_init_output is changed or (vault_slurped_vault_init is not skipped)
   no_log: true
 
 - name: Check Vault seal status

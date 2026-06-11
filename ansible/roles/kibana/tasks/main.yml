@@ -24,7 +24,7 @@
   changed_when: false
 
 - name: Allow Kibana port
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ kibana_port | string }}"
     proto: tcp

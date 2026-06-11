@@ -197,7 +197,7 @@
       Content-Type: application/json
     body_format: json
     body:
-      prefix: "{{ vm_lan_subnet }}"
+      prefix: "{{ netbox_vm_lan_subnet }}"
       description: "LAN pfSense"
       site:
         slug: onprem
@@ -242,8 +242,8 @@
         headers:
           Authorization: "Token {{ netbox_api_token }}"
           Content-Type: application/json
-      register: existing_interface
-    
+      register: netbox_existing_interface
+
     - name: Use existing interface if found, else create it
       uri:
         url: "http://127.0.0.1:{{ netbox_port }}/api/virtualization/interfaces/"
@@ -259,14 +259,14 @@
           enabled: true
         status_code: [201, 400]
       register: netbox_interface_res
-      when: existing_interface.json.results | length == 0
-    
+      when: netbox_existing_interface.json.results | length == 0
+
     - name: Set interface_res from existing if found
       set_fact:
         netbox_interface_res:
           json:
-            id: "{{ existing_interface.json.results[0].id }}"
-      when: existing_interface.json.results | length > 0
+            id: "{{ netbox_existing_interface.json.results[0].id }}"
+      when: netbox_existing_interface.json.results | length > 0
 
 - name: Bootstrap NetBox - assign static IP to NetBox VM
   uri:
@@ -277,7 +277,7 @@
       Content-Type: application/json
     body_format: json
     body:
-      address: "{{ vm_ip_services }}"
+      address: "{{ netbox_vm_ip_services }}"
       status: "active"
       description: "IP Statique de la VM NetBox/Services elle-meme"
       assigned_object_type: "virtualization.vminterface"
