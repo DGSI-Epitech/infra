@@ -46,16 +46,18 @@
 # =============================================================================
 
 - name: Add Teleport GPG key
-  shell: |
-    curl -fsSL https://apt.releases.teleport.dev/gpg \
-      -o /usr/share/keyrings/teleport-archive-keyring.asc
-  args:
-    creates: /usr/share/keyrings/teleport-archive-keyring.asc
+  ansible.builtin.get_url:
+    url: https://apt.releases.teleport.dev/gpg
+    dest: /usr/share/keyrings/teleport-archive-keyring.asc
+    mode: "0644"
   become: true
 
 - name: Add Teleport apt repository
   apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/ubuntu {{ ansible_distribution_release }} stable/v{{ teleport_version }}"
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc]
+      https://apt.releases.teleport.dev/ubuntu {{ ansible_distribution_release }}
+      stable/v{{ teleport_version }}
     state: present
     filename: teleport
   become: true

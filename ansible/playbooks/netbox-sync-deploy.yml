@@ -6,4 +6,5 @@
     netbox_api_token: "0123456789abcdef0123456789abcdef01234567"
     netbox_remote_url: "http://255.241:8080"
   tasks:
-    - import_tasks: ../roles/netbox/tasks/sync_agent.yml
+    - name: Deploy NetBox sync agent
+      import_tasks: ../roles/netbox/tasks/sync_agent.yml

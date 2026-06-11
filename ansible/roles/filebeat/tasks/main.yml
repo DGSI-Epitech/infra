@@ -24,7 +24,7 @@
     mode: "0600"
     owner: root
     group: root
-  notify: restart filebeat
+  notify: Restart filebeat
 
 - name: Enable and start Filebeat
   systemd:

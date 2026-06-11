@@ -9,9 +9,10 @@
     cache_valid_time: 3600
 
 - name: Upgrade packages
-  command: apt-get -y -o Dpkg::Options::="--force-confnew" dist-upgrade --fix-missing
+  command: apt-get -y -o Dpkg::Options::="--force-confnew" dist-upgrade --fix-missing  # noqa: command-instead-of-module
   environment:
     DEBIAN_FRONTEND: noninteractive
+  changed_when: true
 
 - name: Install base packages
   apt:
@@ -26,9 +27,9 @@
     state: started
 
 - name: Add authorized SSH key
-  authorized_key:
+  ansible.posix.authorized_key:
     user: "{{ ansible_user }}"
-    key: "{{ ssh_public_key }}"
+    key: "{{ base_ssh_public_key }}"
     state: present
 
 - name: Enable qemu-guest-agent
@@ -114,30 +115,30 @@
     state: present
 
 - name: Allow SSH
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "22"
     proto: tcp
 
 - name: Allow HTTP
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "80"
     proto: tcp
 
 - name: Allow HTTPS
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "443"
     proto: tcp
 
 - name: Enable UFW with default deny
-  ufw:
+  community.general.ufw:
     state: enabled
     policy: deny
 
 - name: Allow Vault port
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "8200"
     proto: tcp

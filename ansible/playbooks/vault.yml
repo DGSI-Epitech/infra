@@ -16,6 +16,7 @@
   tasks:
     # Ancien: import_tasks: ../roles/netbox/tasks/sync_agent.yml
     # → ne résolvait pas les templates/ du rôle (Ansible cherchait dans playbooks/)
-    - include_role:
+    - name: Deploy NetBox sync agent
+      include_role:
         name: netbox
         tasks_from: sync_agent

@@ -1,5 +1,5 @@
 ---
-- name: restart elk
+- name: Restart elk
   command: docker compose restart elasticsearch
   args:
     chdir: "{{ elk_dir }}"
