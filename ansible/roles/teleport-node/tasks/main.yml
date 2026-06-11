@@ -1,0 +1,109 @@
+---
+# =============================================================================
+# JOIN TOKEN — depuis Vault si ops-vm disponible, sinon depuis extra-var
+# =============================================================================
+
+- name: Resolve join token from Vault (si ops-vm disponible)
+  when:
+    - teleport_join_token is not defined or teleport_join_token == ''
+    - groups['ops'] | default([]) | length > 0
+  block:
+    - name: Slurp vault-init.json from ops-vm
+      slurp:
+        src: /root/vault-init.json
+      become: true
+      delegate_to: "{{ groups['ops'][0] }}"
+      register: vault_init_raw
+
+    - name: Set vault root token
+      set_fact:
+        vault_root_token: "{{ (vault_init_raw.content | b64decode | from_json).root_token }}"
+      no_log: true
+
+    - name: Read join token from Vault
+      uri:
+        url: "{{ vault_addr }}/v1/{{ teleport_vault_token_path }}"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ vault_root_token }}"
+        status_code: 200
+      register: vault_token_resp
+      delegate_to: "{{ groups['ops'][0] }}"
+      no_log: true
+
+    - name: Set join token fact from Vault
+      set_fact:
+        teleport_join_token: "{{ vault_token_resp.json.data.data.value }}"
+      no_log: true
+
+- name: Fail if join token still not defined
+  fail:
+    msg: "teleport_join_token non défini — passer via -e 'teleport_join_token=<token>'"
+  when: teleport_join_token is not defined or teleport_join_token == ''
+
+# =============================================================================
+# INSTALLATION — même repo apt que le rôle teleport
+# =============================================================================
+
+- name: Add Teleport GPG key
+  shell: |
+    curl -fsSL https://apt.releases.teleport.dev/gpg \
+      -o /usr/share/keyrings/teleport-archive-keyring.asc
+  args:
+    creates: /usr/share/keyrings/teleport-archive-keyring.asc
+  become: true
+
+- name: Add Teleport apt repository
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/ubuntu {{ ansible_distribution_release }} stable/v{{ teleport_version }}"
+    state: present
+    filename: teleport
+  become: true
+
+- name: Install Teleport
+  apt:
+    name: teleport
+    state: present
+    update_cache: true
+  become: true
+
+# =============================================================================
+# CONFIGURATION — ssh_service uniquement (pas d'auth ni de proxy)
+# =============================================================================
+
+- name: Create Teleport data directory
+  file:
+    path: "{{ teleport_data_dir }}"
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+  become: true
+
+- name: Deploy Teleport node config
+  template:
+    src: teleport.yaml.j2
+    dest: /etc/teleport.yaml
+    mode: "0600"
+    owner: root
+    group: root
+  become: true
+  notify: Restart Teleport node
+
+# =============================================================================
+# SERVICE
+# =============================================================================
+
+- name: Enable and start Teleport node
+  systemd:
+    name: teleport
+    enabled: true
+    state: started
+  become: true
+
+- name: Wait for Teleport node to be ready
+  wait_for:
+    path: "{{ teleport_data_dir }}/proc"
+    state: present
+    timeout: 60
+  ignore_errors: true

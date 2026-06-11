@@ -2,6 +2,56 @@
 
 ---
 
+## Teleport — Bastion SSH centralisé (PVE2 Cloud)
+
+**Date :** 2026-06-01
+
+### Contexte
+
+Le bastion Cloud (`10.255.255.249`, vmbr3) centralise tous les accès SSH à l'infrastructure. Teleport remplace les ProxyJump manuels (`-J root@51.75.128.134`) par un bastion avec audit log, RBAC et interface web.
+
+### Décisions
+
+**Install via apt (pas Docker)**
+
+Teleport a besoin d'accéder nativement au filesystem hôte pour l'audit SSH. Un container Docker nécessiterait de nombreux montages en lecture-only avec des permissions complexes. L'installation via le repo apt officiel (`stable/v16`) est plus simple et suit le pattern de elastic-agent.
+
+**Auth + Proxy + SSH sur le même nœud (bastion)**
+
+Pour un cluster de lab, les trois services Teleport tournent sur la même VM. Séparation possible ultérieurement si l'infra grandit (auth server dédié + N proxy servers).
+
+**TLS via la PKI interne existante**
+
+Le rôle `tls` génère des certs avec les SANs nécessaires (`IP:10.255.255.249`, `IP:51.75.128.134`, `DNS:teleport`, `DNS:bastion.cloud.local`). `IP:51.75.128.134` couvre la DNAT externe — les clients se connectent via `51.75.128.134:3080` mais le cert TLS répond `10.255.255.249`.
+
+**Join token stocké dans Vault KV**
+
+Même pattern que le Fleet enrollment token d'Elastic Agent. Le rôle `teleport` génère un token aléatoire au premier déploiement, le stocke dans `secret/data/teleport/join-token`. Le rôle `teleport-node` le lit depuis Vault pour enrôler les VMs on-prem (Phase 5).
+
+**Port forwarding DNAT sur Proxmox hôte**
+
+Le bastion est dans une DMZ privée (`10.255.255.248/29`). L'accès depuis internet passe par DNAT sur l'hôte Proxmox :
+- `51.75.128.134:3080` → `10.255.255.249:443` (Teleport Web UI)
+- `51.75.128.134:3022` → `10.255.255.249:3022` (Teleport SSH proxy)
+
+Règles persistées dans `/etc/network/interfaces` (`post-up`/`post-down` sur `vmbr3`).
+
+**Port auth 3025 restreint aux réseaux internes**
+
+UFW autorise 3025 uniquement depuis `10.255.255.248/29` (Cloud DMZ) et `172.16.0.0/24` (LAN on-prem). Ce port n'est jamais exposé à internet.
+
+### Scalabilité — rôle `teleport-node`
+
+Le rôle `teleport-node` permet d'enrôler n'importe quelle VM dans le cluster sans modifier son SSH :
+```yaml
+roles:
+  - teleport-node  # ajouter à n'importe quel playbook
+```
+
+Pour les VMs PVE1 (ops-vm, services-vm), le trafic vers `10.255.255.249:3025` transite via l'hôte Proxmox (qui route entre vmbr1 et vmbr3). Une route statique sur pfSense on-prem sera nécessaire.
+
+---
+
 ## Déploiement VMs Cloud PVE2 — bridges et réseau
 
 **Date :** 2026-06-01

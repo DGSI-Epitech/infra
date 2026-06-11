@@ -19,7 +19,7 @@
       name: "VPN_vers_Cloud"
       mode: p2p_shared_key
       protocol: UDP4
-      server_addr: "5.196.50.52"
+      server_addr: "{{ hostvars['pfsense-cloud']['ansible_host'] }}"
       server_port: "1194"
       tunnel_network: "10.3.3.0/30"
       remote_network: "192.168.255.240/28,10.255.255.248/29"
