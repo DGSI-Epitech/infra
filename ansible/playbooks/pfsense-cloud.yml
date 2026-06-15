@@ -1,0 +1,21 @@
+---
+# Configuration complète de pfSense Cloud (Site 2).
+#
+# Usage :
+#   ansible-playbook pfsense-cloud.yml                    # configuration complète
+#   ansible-playbook pfsense-cloud.yml --tags interface   # interfaces seulement
+#   ansible-playbook pfsense-cloud.yml --tags firewall    # règles firewall seulement
+#   ansible-playbook pfsense-cloud.yml --tags vpn         # OpenVPN seulement
+#   ansible-playbook pfsense-cloud.yml --tags killswitch  # couper le VPN (urgence)
+#   ansible-playbook pfsense-cloud.yml --tags restore     # rétablir le VPN
+
+- name: Configure pfSense Cloud
+  hosts: Pfsense_Cloud
+  gather_facts: false
+  collections:
+    - pfsensible.core
+  vars_files:
+    - ../vars/common.yml
+    - ../vars/openvpn_secrets.yml
+  roles:
+    - pfsense-cloud

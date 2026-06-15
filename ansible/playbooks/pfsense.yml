@@ -19,10 +19,14 @@
       name: "VPN_vers_Cloud"
       mode: p2p_shared_key
       protocol: UDP4
-      server_addr: "{{ hostvars['pfsense-cloud']['ansible_host'] }}"
-      server_port: "1194"
-      tunnel_network: "10.3.3.0/30"
-      remote_network: "192.168.255.240/28,10.255.255.248/29"
+      # Ancien: server_addr: "5.196.50.52"  ← IP hardcodée, utilise PFSENSE_CLOUD_WAN
+      server_addr: "{{ pfsense_cloud_wan }}"
+      # Ancien: server_port: "1194"  ← port hardcodé, utilise VPN_PORT
+      server_port: "{{ vpn_port }}"
+      # Ancien: tunnel_network: "10.3.3.0/30"  ← réseau hardcodé, utilise VPN_TUNNEL_NETWORK
+      tunnel_network: "{{ vpn_tunnel_network }}"
+      # Ancien: remote_network: "192.168.255.240/28,10.255.255.248/29"  ← IPs hardcodées
+      remote_network: "{{ vm_cloud_lan_subnet }},{{ vm_cloud_dmz_subnet }}"
       data_ciphers: []
       compression: ""
 
@@ -111,7 +115,8 @@
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
       with_items:
-        - "192.168.255.254"
+        # Ancien: "192.168.255.254"  ← IP hardcodée, utilise PFSENSE_CLOUD_LAN_IP
+        - "{{ pfsense_cloud_lan_ip }}"
         - "1.1.1.1"
         - "8.8.8.8"
       tags: [configure, dns]
@@ -195,202 +200,4 @@
       tags: [never, restore]
 
 
-- name: Configure pfSense Cloud
-  hosts: Pfsense_Cloud
-  gather_facts: false
-  collections:
-    - pfsensible.core
-  vars_files:
-    - ../vars/common.yml
-    - ../vars/openvpn_secrets.yml
-  vars:
-    openvpn_server:
-      name: "VPN_vers_OP"
-      mode: p2p_shared_key
-      protocol: UDP4
-      interface: wan
-      local_port: "1194"
-      tunnel_network: "10.3.3.0/30"
-      remote_network: "172.16.0.240/28"
-      data_ciphers: []
-      compression: ""
-
-  tasks:
-    - name: Configurer la clé SSH autorisée pour admin
-      pfsensible.core.pfsense_user:
-        name: admin
-        authorizedkeys: "{{ ssh_public_key }}"
-        state: present
-      tags: [configure, ssh]
-
-    - name: Bloquer DMZ vers LAN interne
-      pfsensible.core.pfsense_rule:
-        name: "Block DMZ to LAN"
-        action: block
-        interface: opt1
-        protocol: any
-        source: any
-        destination: "192.168.255.240/28"
-        state: present
-      tags: [configure, firewall]
-
-    - name: Autoriser Teleport (DMZ) vers noeuds LAN port 3022
-      pfsensible.core.pfsense_rule:
-        name: "Allow Teleport DMZ to LAN nodes"
-        action: pass
-        interface: opt1
-        protocol: tcp
-        source: any
-        destination: "192.168.255.240/28"
-        destination_port: "3022"
-        state: present
-      tags: [configure, firewall]
-
-    - name: Autoriser bastion (DMZ) vers LAN OP via VPN
-      pfsensible.core.pfsense_rule:
-        name: "Allow DMZ to OP LAN VPN"
-        action: pass
-        interface: opt1
-        protocol: any
-        source: "10.255.255.248/29"
-        destination: "172.16.0.240/28"
-        before: "Allow DMZ to ANY"
-        state: present
-      tags: [configure, firewall, vpn]
-
-    - name: Autoriser trafic DMZ vers internet
-      pfsensible.core.pfsense_rule:
-        name: "Allow DMZ to Internet"
-        action: pass
-        interface: opt1
-        protocol: any
-        source: any
-        destination: any
-        state: present
-      tags: [configure, firewall]
-
-    - name: Autoriser tout le trafic LAN vers ANY
-      pfsensible.core.pfsense_rule:
-        name: "Allow LAN to ANY"
-        action: pass
-        interface: lan
-        protocol: any
-        source: any
-        destination: any
-        state: present
-      tags: [configure, firewall]
-
-    - name: Autoriser SSH entrant sur WAN
-      pfsensible.core.pfsense_rule:
-        name: "Allow SSH WAN"
-        action: pass
-        interface: wan
-        protocol: tcp
-        source: any
-        destination: any
-        destination_port: "22"
-        state: present
-      tags: [configure, firewall]
-
-    - name: Autoriser HTTPS entrant sur WAN (webGUI)
-      pfsensible.core.pfsense_rule:
-        name: "Allow HTTPS WAN"
-        action: pass
-        interface: wan
-        protocol: tcp
-        source: any
-        destination: any
-        destination_port: "443"
-        state: present
-      tags: [configure, firewall]
-
-    - name: Autoriser port OpenVPN entrant (1194 UDP)
-      pfsensible.core.pfsense_rule:
-        name: "Allow OpenVPN 1194"
-        action: pass
-        interface: wan
-        protocol: udp
-        source: any
-        destination: any
-        destination_port: "1194"
-        state: present
-      tags: [configure, firewall, vpn]
-
-    - name: Autoriser trafic inter-sites sur interface OpenVPN
-      pfsensible.core.pfsense_rule:
-        name: "Allow OpenVPN inter-sites"
-        action: pass
-        interface: openvpn
-        protocol: any
-        source: any
-        destination: any
-        state: present
-      tags: [configure, firewall, vpn]
-
-    - name: Configurer serveur OpenVPN (site-to-site vers OP)
-      pfsensible.core.pfsense_openvpn_server:
-        name: "{{ openvpn_server.name }}"
-        mode: "{{ openvpn_server.mode }}"
-        protocol: "{{ openvpn_server.protocol }}"
-        interface: "{{ openvpn_server.interface }}"
-        local_port: "{{ openvpn_server.local_port }}"
-        tunnel_network: "{{ openvpn_server.tunnel_network }}"
-        remote_network: "{{ openvpn_server.remote_network }}"
-        shared_key: "{{ openvpn_shared_key }}"
-        data_ciphers: "{{ openvpn_server.data_ciphers }}"
-        compression: "{{ openvpn_server.compression }}"
-        state: present
-      tags: [configure, vpn]
-
-    - name: Configurer les DNS cibles (Forwarders)
-      pfsensible.core.pfsense_setup:
-        dns_addresses: "{{ item }}"
-      with_items:
-        - "172.16.0.254"
-        - "8.8.8.8"
-      tags: [configure, dns]
-
-    - name: "[KILLSWITCH] Bloquer OpenVPN 1194 entrant sur WAN"
-      pfsensible.core.pfsense_rule:
-        name: "KILLSWITCH_OpenVPN_1194"
-        action: block
-        interface: wan
-        protocol: udp
-        source: any
-        destination: any
-        destination_port: "1194"
-        state: present
-      tags: [never, killswitch]
-
-    - name: "[KILLSWITCH] Tuer le processus OpenVPN serveur"
-      ansible.builtin.raw: kill $(cat /var/run/openvpn_server1.pid 2>/dev/null) 2>/dev/null || pkill -f 'openvpn.*server1' 2>/dev/null; true
-      tags: [never, killswitch]
-
-    - name: "[RESTORE] Supprimer la règle KILLSWITCH"
-      pfsensible.core.pfsense_rule:
-        name: "KILLSWITCH_OpenVPN_1194"
-        interface: wan
-        state: absent
-      tags: [never, restore]
-
-    - name: "[RESTORE] Supprimer le serveur OpenVPN (forcer recréation)"
-      pfsensible.core.pfsense_openvpn_server:
-        name: "{{ openvpn_server.name }}"
-        state: absent
-      tags: [never, restore]
-
-    - name: "[RESTORE] Recréer le serveur OpenVPN"
-      pfsensible.core.pfsense_openvpn_server:
-        name: "{{ openvpn_server.name }}"
-        mode: "{{ openvpn_server.mode }}"
-        protocol: "{{ openvpn_server.protocol }}"
-        interface: "{{ openvpn_server.interface }}"
-        local_port: "{{ openvpn_server.local_port }}"
-        tunnel_network: "{{ openvpn_server.tunnel_network }}"
-        remote_network: "{{ openvpn_server.remote_network }}"
-        shared_key: "{{ openvpn_shared_key }}"
-        data_ciphers: "{{ openvpn_server.data_ciphers }}"
-        compression: "{{ openvpn_server.compression }}"
-        disable: false
-        state: present
-      tags: [never, restore]
+# pfSense Cloud est configuré dans playbooks/pfsense-cloud.yml (rôle pfsense-cloud)

@@ -1,0 +1,8 @@
+---
+- name: Configurer les DNS (Forwarders)
+  pfsensible.core.pfsense_setup:
+    dns_addresses: "{{ item }}"
+  with_items:
+    - "{{ vm_gateway }}"
+    - "8.8.8.8"
+  tags: [configure, dns]

@@ -38,6 +38,16 @@ resource "proxmox_virtual_environment_vm" "pfsense_vm" {
     model  = "virtio"
   }
 
+  # --- Interface DMZ/opt1 (optionnelle — uniquement pfSense Cloud) ---
+  # Ancien: pas d'interface DMZ → pfSense Cloud ne pouvait pas router vers bastion (vmbr3)
+  dynamic "network_device" {
+    for_each = var.dmz_bridge != "" ? [var.dmz_bridge] : []
+    content {
+      bridge = network_device.value
+      model  = "virtio"
+    }
+  }
+
   # On désactive l'agent QEMU car pfSense ne l'a pas par défaut
   agent {
     enabled = false

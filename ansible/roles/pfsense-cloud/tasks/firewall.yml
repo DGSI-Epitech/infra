@@ -1,0 +1,110 @@
+---
+# --- Règles DMZ (OPT1) ---
+
+- name: Bloquer DMZ vers LAN Cloud
+  pfsensible.core.pfsense_rule:
+    name: "Block DMZ to LAN"
+    action: block
+    interface: opt1
+    protocol: any
+    source: any
+    destination: "{{ vm_cloud_lan_subnet }}"
+    state: present
+  tags: [configure, firewall]
+
+- name: Autoriser Teleport (DMZ) vers noeuds LAN port 3022
+  pfsensible.core.pfsense_rule:
+    name: "Allow Teleport DMZ to LAN nodes"
+    action: pass
+    interface: opt1
+    protocol: tcp
+    source: any
+    destination: "{{ vm_cloud_lan_subnet }}"
+    destination_port: "3022"
+    state: present
+  tags: [configure, firewall]
+
+- name: Autoriser bastion (DMZ) vers LAN OP via VPN
+  pfsensible.core.pfsense_rule:
+    name: "Allow DMZ to OP LAN VPN"
+    action: pass
+    interface: opt1
+    protocol: any
+    source: "{{ vm_cloud_dmz_subnet }}"
+    destination: "{{ vm_lan_subnet }}"
+    before: "Allow DMZ to ANY"
+    state: present
+  tags: [configure, firewall, vpn]
+
+- name: Autoriser trafic DMZ vers internet
+  pfsensible.core.pfsense_rule:
+    name: "Allow DMZ to Internet"
+    action: pass
+    interface: opt1
+    protocol: any
+    source: any
+    destination: any
+    state: present
+  tags: [configure, firewall]
+
+# --- Règles LAN ---
+
+- name: Autoriser tout le trafic LAN vers ANY
+  pfsensible.core.pfsense_rule:
+    name: "Allow LAN to ANY"
+    action: pass
+    interface: lan
+    protocol: any
+    source: any
+    destination: any
+    state: present
+  tags: [configure, firewall]
+
+# --- Règles WAN ---
+
+- name: Autoriser SSH entrant sur WAN
+  pfsensible.core.pfsense_rule:
+    name: "Allow SSH WAN"
+    action: pass
+    interface: wan
+    protocol: tcp
+    source: any
+    destination: any
+    destination_port: "22"
+    state: present
+  tags: [configure, firewall]
+
+- name: Autoriser HTTPS entrant sur WAN (webGUI)
+  pfsensible.core.pfsense_rule:
+    name: "Allow HTTPS WAN"
+    action: pass
+    interface: wan
+    protocol: tcp
+    source: any
+    destination: any
+    destination_port: "443"
+    state: present
+  tags: [configure, firewall]
+
+- name: Autoriser port OpenVPN entrant sur WAN
+  pfsensible.core.pfsense_rule:
+    name: "Allow OpenVPN 1194"
+    action: pass
+    interface: wan
+    protocol: udp
+    source: any
+    destination: any
+    destination_port: "{{ vpn_port }}"
+    state: present
+  tags: [configure, firewall, vpn]
+
+- name: Autoriser trafic inter-sites sur interface OpenVPN
+  pfsensible.core.pfsense_rule:
+    name: "Allow OpenVPN inter-sites"
+    action: pass
+    interface: openvpn
+    protocol: any
+    source: any
+    destination: any
+    state: present
+  tags: [configure, firewall, vpn]

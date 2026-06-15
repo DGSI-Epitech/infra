@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REMOTE_DIR="$REPO_ROOT/terraform/envs/remote"
 PACKER_DIR_UBUNTU="$REPO_ROOT/packer/ubuntu-22.04"
+PACKER_DIR_PFSENSE_CLOUD="$REPO_ROOT/packer/pfsense-cloud"
 CONFIG_FILE="$REPO_ROOT/config.env"
 
 # --- Vérifications ---
@@ -253,6 +254,30 @@ add_bridge "vmbr4" "192.168.255.254/28" "Cloud LAN — website + pfSense LAN"
 SSHEOF
 echo "    Bridges Cloud opérationnels."
 
+# --- Packer pfSense Cloud sur PVE2 ---
+
+echo ""
+PFSENSE_CLOUD_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
+  "${PROXMOX_API_REMOTE}/nodes/${PROXMOX_NODE_REMOTE}/qemu/${VM_ID_PFSENSE_TEMPLATE_REMOTE}/status/current" 2>/dev/null | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
+
+if [[ "$PFSENSE_CLOUD_TEMPLATE_STATUS" == "notfound" ]]; then
+  echo "==> Template pfSense Cloud (${VM_ID_PFSENSE_TEMPLATE_REMOTE}) absent — build Packer..."
+  cd "$PACKER_DIR_PFSENSE_CLOUD"
+  export PKR_VAR_proxmox_url="${PROXMOX_ENDPOINT_REMOTE}/api2/json"
+  export PKR_VAR_proxmox_username="${PROXMOX_USER:-root@pam}"
+  export PKR_VAR_proxmox_password="${PROXMOX_PASSWORD_REMOTE}"
+  export PKR_VAR_proxmox_node="${PROXMOX_NODE_REMOTE}"
+  export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM_REMOTE:-local}"
+  export PKR_VAR_template_vm_id="${VM_ID_PFSENSE_TEMPLATE_REMOTE}"
+  export PKR_VAR_pfsense_admin_ssh_public_key="${SSH_PUBLIC_KEY}"
+  packer init .
+  packer build pfsense-cloud.pkr.hcl
+  echo "    Template pfSense Cloud créé."
+else
+  echo "==> Template pfSense Cloud (${VM_ID_PFSENSE_TEMPLATE_REMOTE}) déjà présent, Packer sauté."
+fi
+
 # --- Packer Ubuntu sur PVE2 ---
 # Le build se fait sur vmbr2 (DMZ 10.255.255.248/29) avec IP 10.255.255.250
 # pour éviter le conflit DHCP sur le LAN Cloud 192.168.255.240/28 (trop petit)
@@ -306,6 +331,7 @@ TF_COMMON_VARS=(
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}"
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE_REMOTE}"
+  -var "pfsense_cloud_template_id=${VM_ID_PFSENSE_TEMPLATE_REMOTE}"
   -var "pfsense_vm_id=${VM_ID_PFSENSE_REMOTE}"
   -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE_REMOTE}"
   -var "bastion_vm_id=${VM_ID_BASTION}"
