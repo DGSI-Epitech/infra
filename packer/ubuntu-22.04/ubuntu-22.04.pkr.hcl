@@ -32,6 +32,16 @@ variable "proxmox_storage_iso" {
   default = "local"
 }
 
+variable "iso_checksum" {
+  type        = string
+  description = "SHA256 de l'ISO Ubuntu 22.04 (depuis config.env UBUNTU_ISO_CHECKSUM)"
+}
+
+variable "iso_filename" {
+  type        = string
+  description = "Nom du fichier ISO sur le storage Proxmox (téléchargé en amont par deploy.sh)"
+}
+
 variable "proxmox_storage_vm" {
   type    = string
   default = "local-lvm"
@@ -111,9 +121,8 @@ source "proxmox-iso" "ubuntu-2204" {
   vm_name              = "ubuntu-22.04-template"
   template_description = "Ubuntu 22.04 LTS — built with Packer on ${formatdate("YYYY-MM-DD", timestamp())}"
 
-  iso_storage_pool = var.proxmox_storage_iso
   boot_iso {
-    iso_file = "local:iso/c968bbbeb22702b3f10a07276c8ca06720e80c4c.iso"
+    iso_file = "${var.proxmox_storage_iso}:iso/${var.iso_filename}"
     unmount  = true
   }
 
@@ -123,7 +132,7 @@ source "proxmox-iso" "ubuntu-2204" {
 
   disks {
     type         = "virtio"
-    disk_size    = "20G"
+    disk_size    = "8G"
     storage_pool = var.proxmox_storage_vm
     discard      = true
   }

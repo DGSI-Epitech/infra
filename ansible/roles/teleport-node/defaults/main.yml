@@ -1,0 +1,15 @@
+---
+teleport_version: "16"
+teleport_data_dir: /var/lib/teleport
+
+# Adresse de l'auth server Teleport sur bastion (Cloud DMZ)
+teleport_auth_server: "10.255.255.249:3025"
+teleport_proxy_server: "10.255.255.249:443"
+
+# Vault — join token lu depuis le même chemin que le rôle teleport
+vault_addr: "https://{{ hostvars[groups['ops'][0]]['ansible_host'] }}:8200"
+teleport_vault_token_path: "secret/data/teleport/join-token"
+
+# Labels spécifiques au nœud — à surcharger dans host_vars
+teleport_labels:
+  site: onprem

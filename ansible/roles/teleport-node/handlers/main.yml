@@ -1,0 +1,6 @@
+---
+- name: Restart Teleport node
+  systemd:
+    name: teleport
+    state: restarted
+  become: true

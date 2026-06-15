@@ -1,0 +1,23 @@
+version: v3
+teleport:
+  nodename: {{ inventory_hostname }}
+  data_dir: {{ teleport_data_dir }}
+  auth_token: "{{ teleport_join_token }}"
+  auth_servers:
+    - "{{ teleport_auth_server }}"
+  log:
+    output: stderr
+    severity: INFO
+
+auth_service:
+  enabled: "no"
+
+proxy_service:
+  enabled: "no"
+
+ssh_service:
+  enabled: "yes"
+  labels:
+{% for key, value in teleport_labels.items() %}
+    {{ key }}: {{ value }}
+{% endfor %}

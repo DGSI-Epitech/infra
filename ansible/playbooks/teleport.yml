@@ -1,0 +1,8 @@
+---
+- name: Deploy Teleport Auth+Proxy Server on bastion
+  hosts: bastion
+  become: true
+  roles:
+    - base
+    - tls
+    - teleport

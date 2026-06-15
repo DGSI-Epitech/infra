@@ -333,6 +333,20 @@ UBUNTU_TEMPLATE_STATUS=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
   python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('status','notfound'))" 2>/dev/null || echo "notfound")
 
 if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
+  # Télécharger l'ISO Ubuntu directement sur Proxmox si absente (évite le transit par la machine locale)
+  ISO_PATH="/var/lib/vz/template/iso/${UBUNTU_ISO_FILENAME}"
+  ISO_EXISTS=$(ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "${SSH_KEY_FILE}" root@"${PROXMOX_HOST}" \
+    "test -f '${ISO_PATH}' && echo yes || echo no" 2>/dev/null || echo "no")
+  if [[ "$ISO_EXISTS" == "no" ]]; then
+    echo "==> Téléchargement ISO Ubuntu sur Proxmox (${PROXMOX_HOST})..."
+    ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "${SSH_KEY_FILE}" root@"${PROXMOX_HOST}" \
+      "wget -q --show-progress -O '${ISO_PATH}' '${UBUNTU_ISO_URL}' 2>&1" \
+      && echo "    ISO téléchargée." \
+      || { echo "Erreur : téléchargement ISO échoué."; exit 1; }
+  else
+    echo "==> ISO Ubuntu déjà présente sur Proxmox, skip download."
+  fi
+
   echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) absent — build Packer..."
   cd "$PACKER_DIR_UBUNTU"
   export PKR_VAR_proxmox_url="https://${PROXMOX_HOST}:8006/api2/json"
@@ -340,9 +354,11 @@ if [[ "$UBUNTU_TEMPLATE_STATUS" == "notfound" ]]; then
   export PKR_VAR_proxmox_password="${TF_VAR_proxmox_password}"
   export PKR_VAR_proxmox_node="${PROXMOX_NODE}"
   export PKR_VAR_proxmox_host="${PROXMOX_HOST}"
-  export PKR_VAR_proxmox_storage_iso="local"
+  export PKR_VAR_proxmox_storage_iso="${PROXMOX_STORAGE_ISO}"
   export PKR_VAR_proxmox_storage_vm="${PROXMOX_STORAGE_VM}"
   export PKR_VAR_template_vm_id="${VM_ID_UBUNTU_TEMPLATE}"
+  export PKR_VAR_iso_checksum="${UBUNTU_ISO_CHECKSUM}"
+  export PKR_VAR_iso_filename="${UBUNTU_ISO_FILENAME}"
   export PKR_VAR_build_username="${VM_USERNAME}"
   export PKR_VAR_ssh_public_key="${SSH_PUBLIC_KEY}"
   export PKR_VAR_ssh_bastion_private_key_file="${SSH_PRIVATE_KEY_FILE}"
@@ -373,12 +389,12 @@ terraform apply -input=false -auto-approve \
   -var "proxmox_node=${PROXMOX_NODE}" \
   -var "proxmox_node_address=${PROXMOX_HOST}" \
   -var "storage_vm=${PROXMOX_STORAGE_VM}" \
-  -var "netbox_api_token=${NETBOX_API_TOKEN}" \
+  -var "netbox_api_token=${NETBOX_API_TOKEN:-}" \
   -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
   -var "services_vm_id=${VM_ID_SERVICES}" \
   -var "ops_vm_id=${VM_ID_OPS}" \
-  -var "vm_ip_address=${VM_IP_SERVICES}" \
+  -var "vm_ip_address=${VM_IP_SERVICES:-}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
@@ -470,7 +486,7 @@ terraform apply -input=false -auto-approve \
   -var "proxmox_node_address=${PROXMOX_HOST}" \
   -var "storage_vm=${PROXMOX_STORAGE_VM}" \
   -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
-  -var "netbox_api_token=${NETBOX_API_TOKEN}" \
+  -var "netbox_api_token=${NETBOX_API_TOKEN:-}" \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
   -var "vm_gateway=${VM_GATEWAY}" \
   -var "ops_vm_id=${VM_ID_OPS}" \

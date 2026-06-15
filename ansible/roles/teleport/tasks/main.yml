@@ -1,0 +1,194 @@
+---
+# =============================================================================
+# JOIN TOKEN — depuis Vault si ops-vm disponible, sinon depuis extra-var
+# Passer -e "teleport_join_token=<token>" pour bypasser Vault (PVE1 absent)
+# =============================================================================
+
+- name: Resolve join token from Vault (si ops-vm disponible)
+  when:
+    - teleport_join_token is not defined or teleport_join_token == ''
+    - groups['ops'] | default([]) | length > 0
+  block:
+    - name: Slurp vault-init.json from ops-vm
+      slurp:
+        src: /root/vault-init.json
+      become: true
+      delegate_to: "{{ groups['ops'][0] }}"
+      register: vault_init_raw
+
+    - name: Set vault root token
+      set_fact:
+        vault_root_token: "{{ (vault_init_raw.content | b64decode | from_json).root_token }}"
+      no_log: true
+
+    - name: Check if join token already exists in Vault
+      uri:
+        url: "{{ vault_addr }}/v1/{{ teleport_vault_token_path }}"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ vault_root_token }}"
+        status_code: [200, 404]
+      register: vault_token_check
+      delegate_to: "{{ groups['ops'][0] }}"
+      no_log: true
+
+    - name: Generate and store join token in Vault (premier déploiement uniquement)
+      uri:
+        url: "{{ vault_addr }}/v1/{{ teleport_vault_token_path }}"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ vault_root_token }}"
+        body_format: json
+        body:
+          data:
+            value: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=32') }}"
+        status_code: 200
+      delegate_to: "{{ groups['ops'][0] }}"
+      when: vault_token_check.status == 404
+      no_log: true
+
+    - name: Read join token from Vault
+      uri:
+        url: "{{ vault_addr }}/v1/{{ teleport_vault_token_path }}"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ vault_root_token }}"
+        status_code: 200
+      register: vault_token_resp
+      delegate_to: "{{ groups['ops'][0] }}"
+      no_log: true
+
+    - name: Set join token fact from Vault
+      set_fact:
+        teleport_join_token: "{{ vault_token_resp.json.data.data.value }}"
+      no_log: true
+
+- name: Fail if join token still not defined
+  fail:
+    msg: |
+      teleport_join_token non défini.
+      Si ops-vm (Vault) n'est pas disponible, passer le token via :
+        ansible-playbook ... -e "teleport_join_token=<token>"
+  when: teleport_join_token is not defined or teleport_join_token == ''
+
+# =============================================================================
+# INSTALLATION — via repo apt officiel Teleport
+# =============================================================================
+
+- name: Add Teleport GPG key
+  shell: |
+    curl -fsSL https://apt.releases.teleport.dev/gpg \
+      -o /usr/share/keyrings/teleport-archive-keyring.asc
+  args:
+    creates: /usr/share/keyrings/teleport-archive-keyring.asc
+  become: true
+
+- name: Add Teleport apt repository
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/ubuntu {{ ansible_distribution_release }} stable/v{{ teleport_version }}"
+    state: present
+    filename: teleport
+  become: true
+
+- name: Install Teleport
+  apt:
+    name: teleport
+    state: present
+    update_cache: true
+  become: true
+
+# =============================================================================
+# CA INTERNE — Teleport v16 valide la chaîne TLS au démarrage
+# =============================================================================
+
+- name: Add internal CA to system trust store
+  copy:
+    src: "{{ teleport_tls_dir }}/ca.crt"
+    dest: /usr/local/share/ca-certificates/dgsi-internal-ca.crt
+    remote_src: true
+    mode: "0644"
+  become: true
+  notify: Update CA certificates
+
+- name: Set SSL_CERT_FILE for Teleport service
+  copy:
+    content: "SSL_CERT_FILE={{ teleport_tls_dir }}/ca.crt\n"
+    dest: /etc/default/teleport
+    mode: "0644"
+  become: true
+  notify: Restart Teleport
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+- name: Create Teleport data directory
+  file:
+    path: "{{ teleport_data_dir }}"
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+  become: true
+
+- name: Deploy Teleport config
+  template:
+    src: teleport.yaml.j2
+    dest: /etc/teleport.yaml
+    mode: "0600"
+    owner: root
+    group: root
+  become: true
+  notify: Restart Teleport
+
+# =============================================================================
+# FIREWALL — règles UFW spécifiques Teleport (443 déjà ouvert par le rôle base)
+# =============================================================================
+
+- name: Allow Teleport SSH proxy port (3022)
+  ufw:
+    rule: allow
+    port: "{{ teleport_proxy_ssh_port | string }}"
+    proto: tcp
+  become: true
+
+- name: Allow Teleport auth port from Cloud DMZ ({{ teleport_dmz_cidr }})
+  ufw:
+    rule: allow
+    port: "{{ teleport_auth_port | string }}"
+    proto: tcp
+    src: "{{ teleport_dmz_cidr }}"
+  become: true
+
+- name: Allow Teleport auth port from on-prem LAN ({{ teleport_onprem_cidr }})
+  ufw:
+    rule: allow
+    port: "{{ teleport_auth_port | string }}"
+    proto: tcp
+    src: "{{ teleport_onprem_cidr }}"
+  become: true
+
+# =============================================================================
+# SERVICE
+# =============================================================================
+
+- name: Enable and start Teleport
+  systemd:
+    name: teleport
+    enabled: true
+    state: started
+  become: true
+
+- name: Wait for Teleport auth service (3025)
+  wait_for:
+    port: "{{ teleport_auth_port }}"
+    host: 127.0.0.1
+    delay: 5
+    timeout: 60
+
+- name: Wait for Teleport proxy web service (443)
+  wait_for:
+    port: 443
+    host: 127.0.0.1
+    delay: 5
+    timeout: 60

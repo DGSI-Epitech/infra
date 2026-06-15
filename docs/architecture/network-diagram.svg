@@ -1,168 +1,139 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 820" font-family="'Segoe UI', Arial, sans-serif">
-  <!-- Background -->
-  <rect width="1100" height="820" fill="#f8f9fa" rx="12"/>
-  <text x="550" y="36" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a2e">Infrastructure DGSI Epitech — Plan Réseau</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 735" font-family="'Segoe UI', Arial, sans-serif">
 
-  <!-- ═══════════════════ PVE1 ═══════════════════ -->
-  <rect x="30" y="55" width="480" height="540" rx="10" fill="#fff8e7" stroke="#f0a500" stroke-width="2"/>
-  <text x="270" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#c07800">PVE1 — On-Premise  (ns3050272.ip-51-255-76.eu)</text>
+  <!-- Background -->
+  <rect width="1100" height="735" fill="#f1f5f9" rx="12"/>
+  <text x="550" y="34" text-anchor="middle" font-size="20" font-weight="bold" fill="#1e293b">Infrastructure DGSI Epitech — Plan Réseau</text>
+
+  <!-- ═══════════════════ PVE1 — On-Premise ═══════════════════ -->
+  <rect x="30" y="55" width="505" height="470" rx="12" fill="#fdf6e8" stroke="#e8a33d" stroke-width="2"/>
+  <text x="282" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#92400e">PVE1 — On-Premise  (ns3050272.ip-51-255-76.eu)</text>
 
   <!-- pfSense-OP -->
-  <rect x="55" y="90" width="430" height="90" rx="8" fill="#fff3cd" stroke="#f0a500" stroke-width="1.5"/>
-  <text x="270" y="110" text-anchor="middle" font-size="12" font-weight="bold" fill="#856404">🛡️  pfSense-OP  (VMID 125)</text>
-  <rect x="75" y="118" width="175" height="48" rx="6" fill="#ffc107" fill-opacity="0.3" stroke="#ffc107" stroke-width="1"/>
-  <text x="162" y="136" text-anchor="middle" font-size="11" font-weight="bold" fill="#664d03">WAN</text>
-  <text x="162" y="152" text-anchor="middle" font-size="11" fill="#664d03">5.196.45.8</text>
-  <rect x="265" y="118" width="200" height="48" rx="6" fill="#ffc107" fill-opacity="0.3" stroke="#ffc107" stroke-width="1"/>
-  <text x="365" y="136" text-anchor="middle" font-size="11" font-weight="bold" fill="#664d03">LAN</text>
-  <text x="365" y="152" text-anchor="middle" font-size="11" fill="#664d03">172.16.0.240/28</text>
+  <rect x="50" y="95" width="465" height="90" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="70" y="118" font-size="12" font-weight="bold" fill="#475569">🛡️ pfSense-OP — VMID 125</text>
+  <rect x="70" y="130" width="210" height="42" rx="6" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="175" y="145" text-anchor="middle" font-size="11" font-weight="bold" fill="#475569">WAN</text>
+  <text x="175" y="161" text-anchor="middle" font-size="11" fill="#475569">5.196.45.8</text>
+  <rect x="290" y="130" width="205" height="42" rx="6" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="393" y="145" text-anchor="middle" font-size="11" font-weight="bold" fill="#475569">LAN</text>
+  <text x="393" y="161" text-anchor="middle" font-size="11" fill="#475569">172.16.0.240/28</text>
 
   <!-- ops-vm -->
-  <rect x="55" y="200" width="430" height="160" rx="8" fill="#e8f4fd" stroke="#0066cc" stroke-width="1.5"/>
-  <text x="270" y="222" text-anchor="middle" font-size="12" font-weight="bold" fill="#004085">🖥️  ops-vm  (VMID 2038) — 172.16.0.253</text>
+  <rect x="50" y="200" width="465" height="210" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="70" y="223" font-size="12" font-weight="bold" fill="#1e3a8a">🖥️ ops-vm — VMID 2038 — 172.16.0.253</text>
 
-  <rect x="75" y="232" width="185" height="60" rx="6" fill="#cce5ff" stroke="#004085" stroke-width="1"/>
-  <text x="167" y="252" text-anchor="middle" font-size="11" font-weight="bold" fill="#004085">🔍 Elasticsearch</text>
-  <text x="167" y="267" text-anchor="middle" font-size="10" fill="#004085">:9200 HTTPS  :9300 cluster</text>
-  <text x="167" y="281" text-anchor="middle" font-size="10" fill="#28a745">● healthy (yellow)</text>
+  <rect x="70" y="235" width="215" height="70" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+  <text x="178" y="255" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e3a8a">🔍 Elasticsearch</text>
+  <text x="178" y="271" text-anchor="middle" font-size="10" fill="#1e3a8a">:9200 HTTPS · :9300 cluster</text>
+  <text x="178" y="287" text-anchor="middle" font-size="10" fill="#ca8a04">● healthy (yellow)</text>
 
-  <rect x="275" y="232" width="185" height="60" rx="6" fill="#cce5ff" stroke="#004085" stroke-width="1"/>
-  <text x="367" y="252" text-anchor="middle" font-size="11" font-weight="bold" fill="#004085">🔐 Vault</text>
-  <text x="367" y="267" text-anchor="middle" font-size="10" fill="#004085">:8200 HTTPS</text>
-  <text x="367" y="281" text-anchor="middle" font-size="10" fill="#28a745">● initialized, unsealed</text>
+  <rect x="295" y="235" width="220" height="70" rx="6" fill="#f5f3ff" stroke="#ddd6fe" stroke-width="1"/>
+  <text x="405" y="255" text-anchor="middle" font-size="11" font-weight="bold" fill="#5b21b6">🔐 Vault</text>
+  <text x="405" y="271" text-anchor="middle" font-size="10" fill="#5b21b6">:8200 HTTPS</text>
+  <text x="405" y="287" text-anchor="middle" font-size="10" fill="#16a34a">● initialized, unsealed</text>
 
-  <rect x="75" y="305" width="385" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
-  <text x="267" y="320" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">📦 Filebeat</text>
-  <text x="267" y="335" text-anchor="middle" font-size="10" fill="#155724">→ Elasticsearch HTTPS :9200</text>
+  <rect x="70" y="315" width="445" height="70" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="292" y="343" text-anchor="middle" font-size="11" font-weight="bold" fill="#166534">📦 Filebeat</text>
+  <text x="292" y="361" text-anchor="middle" font-size="10" fill="#166534">Agent de collecte → Elasticsearch HTTPS :9200</text>
 
-  <!-- services-vm (offline) -->
-  <rect x="55" y="385" width="430" height="65" rx="8" fill="#f8d7da" stroke="#842029" stroke-width="1.5" stroke-dasharray="6,3"/>
-  <text x="270" y="408" text-anchor="middle" font-size="12" font-weight="bold" fill="#842029">⚠️  services-vm  (VMID 3038) — HORS LIGNE</text>
-  <text x="270" y="428" text-anchor="middle" font-size="11" fill="#842029">172.16.0.241 — inaccessible (réseau KO)</text>
-  <text x="270" y="443" text-anchor="middle" font-size="10" fill="#842029">Netbox bloqué (PR #72) — en attente</text>
+  <!-- services-vm (hors ligne) -->
+  <rect x="50" y="425" width="465" height="70" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="70" y="447" font-size="12" font-weight="bold" fill="#b91c1c">⚠️ services-vm — VMID 3038 — HORS LIGNE</text>
+  <text x="70" y="465" font-size="11" fill="#b91c1c">172.16.0.241 — inaccessible (réseau KO sur PVE1)</text>
+  <text x="70" y="481" font-size="10" fill="#b91c1c">Netbox bloqué (PR #72) — en attente</text>
 
-  <!-- Disk legend PVE1 -->
-  <rect x="55" y="465" width="430" height="110" rx="8" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
-  <text x="270" y="483" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">💾 Disk — ops-vm (7.6G)</text>
-  <rect x="75" y="490" width="390" height="16" rx="3" fill="#ddd"/>
-  <rect x="75" y="490" width="333" height="16" rx="3" fill="#dc3545"/><!-- 87% -->
-  <text x="75" y="522" font-size="10" fill="#555">ES image: 1.88GB   Vault image: 612MB   Données: ~10MB</text>
-  <text x="75" y="537" font-size="10" fill="#555">ILM: rollover 1GB/7j • Delete 30j • Log Docker 10MB/3 fichiers</text>
-  <text x="75" y="552" font-size="10" fill="#dc3545" font-weight="bold">87% utilisé — 991MB libres</text>
-  <text x="380" y="501" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">87%</text>
-
-  <!-- ═══════════════════ PVE2 ═══════════════════ -->
-  <rect x="590" y="55" width="480" height="540" rx="10" fill="#f0f4ff" stroke="#4a90d9" stroke-width="2"/>
-  <text x="830" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#1a4a8a">PVE2 — Cloud  (ns3183326.ip-146-59-253.eu)</text>
+  <!-- ═══════════════════ PVE2 — Cloud ═══════════════════ -->
+  <rect x="565" y="55" width="505" height="470" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="2"/>
+  <text x="817" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#1d4ed8">PVE2 — Cloud  (ns3183326.ip-146-59-253.eu)</text>
 
   <!-- pfSense-Cloud -->
-  <rect x="615" y="90" width="430" height="110" rx="8" fill="#e8eeff" stroke="#4a90d9" stroke-width="1.5"/>
-  <text x="830" y="110" text-anchor="middle" font-size="12" font-weight="bold" fill="#1a4a8a">🛡️  pfSense-Cloud  (VMID 106)</text>
-  <rect x="633" y="118" width="120" height="68" rx="6" fill="#b8d0f5" stroke="#4a90d9" stroke-width="1"/>
-  <text x="693" y="138" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a4a8a">WAN</text>
-  <text x="693" y="154" text-anchor="middle" font-size="10" fill="#1a4a8a">5.196.50.52</text>
-  <rect x="767" y="118" width="125" height="68" rx="6" fill="#b8d0f5" stroke="#4a90d9" stroke-width="1"/>
-  <text x="829" y="138" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a4a8a">DMZ</text>
-  <text x="829" y="154" text-anchor="middle" font-size="10" fill="#1a4a8a">10.255.255.248/29</text>
-  <rect x="906" y="118" width="120" height="68" rx="6" fill="#b8d0f5" stroke="#4a90d9" stroke-width="1"/>
-  <text x="966" y="138" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a4a8a">LAN</text>
-  <text x="966" y="154" text-anchor="middle" font-size="10" fill="#1a4a8a">192.168.255.240/28</text>
-  <text x="693" y="177" text-anchor="middle" font-size="9" fill="#1a4a8a">SSH :22 direct</text>
-  <text x="829" y="177" text-anchor="middle" font-size="9" fill="#1a4a8a">bastion :5601</text>
-  <text x="966" y="177" text-anchor="middle" font-size="9" fill="#1a4a8a">web :80/:443</text>
+  <rect x="585" y="95" width="465" height="110" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="605" y="118" font-size="12" font-weight="bold" fill="#475569">🛡️ pfSense-Cloud — VMID 106</text>
+  <rect x="605" y="130" width="135" height="66" rx="6" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="672" y="148" text-anchor="middle" font-size="11" font-weight="bold" fill="#475569">WAN</text>
+  <text x="672" y="164" text-anchor="middle" font-size="10" fill="#475569">5.196.50.52</text>
+  <text x="672" y="180" text-anchor="middle" font-size="9" fill="#64748b">SSH :22 direct</text>
+  <rect x="750" y="130" width="135" height="66" rx="6" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="817" y="148" text-anchor="middle" font-size="11" font-weight="bold" fill="#475569">DMZ</text>
+  <text x="817" y="164" text-anchor="middle" font-size="10" fill="#475569">10.255.255.248/29</text>
+  <text x="817" y="180" text-anchor="middle" font-size="9" fill="#64748b">bastion :5601</text>
+  <rect x="895" y="130" width="135" height="66" rx="6" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="962" y="148" text-anchor="middle" font-size="11" font-weight="bold" fill="#475569">LAN</text>
+  <text x="962" y="164" text-anchor="middle" font-size="10" fill="#475569">192.168.255.240/28</text>
+  <text x="962" y="180" text-anchor="middle" font-size="9" fill="#64748b">web :80/:443</text>
 
   <!-- bastion -->
-  <rect x="615" y="220" width="430" height="160" rx="8" fill="#e8f4fd" stroke="#0066cc" stroke-width="1.5"/>
-  <text x="830" y="242" text-anchor="middle" font-size="12" font-weight="bold" fill="#004085">🖥️  bastion  (VMID 2038) — 10.255.255.253 (DMZ)</text>
+  <rect x="585" y="215" width="465" height="210" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="605" y="238" font-size="12" font-weight="bold" fill="#1e3a8a">🖥️ bastion — VMID 2038 — 10.255.255.253 (DMZ)</text>
 
-  <rect x="633" y="252" width="390" height="60" rx="6" fill="#cce5ff" stroke="#004085" stroke-width="1"/>
-  <text x="828" y="272" text-anchor="middle" font-size="11" font-weight="bold" fill="#004085">📊 Kibana</text>
-  <text x="828" y="287" text-anchor="middle" font-size="10" fill="#004085">:5601 HTTPS</text>
-  <text x="828" y="301" text-anchor="middle" font-size="10" fill="#28a745">● available  →  ES 172.16.0.253:9200 (VPN)</text>
+  <rect x="605" y="250" width="215" height="70" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+  <text x="713" y="270" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e3a8a">📊 Kibana</text>
+  <text x="713" y="286" text-anchor="middle" font-size="10" fill="#1e3a8a">:5601 HTTPS → ES (ops-vm, VPN)</text>
 
-  <rect x="633" y="325" width="390" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
-  <text x="828" y="340" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">📦 Filebeat</text>
-  <text x="828" y="355" text-anchor="middle" font-size="10" fill="#155724">→ Elasticsearch HTTPS :9200  (via VPN)</text>
+  <rect x="830" y="250" width="220" height="70" rx="6" fill="#f5f3ff" stroke="#ddd6fe" stroke-width="1"/>
+  <text x="940" y="270" text-anchor="middle" font-size="11" font-weight="bold" fill="#5b21b6">🔐 Teleport</text>
+  <text x="940" y="286" text-anchor="middle" font-size="10" fill="#5b21b6">SSH sécurisé / Proxy / RBAC · :3023 / :3080</text>
 
-  <!-- Disk legend bastion -->
-  <rect x="615" y="395" width="430" height="80" rx="8" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
-  <text x="830" y="413" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">💾 Disk — bastion (7.6G)</text>
-  <rect x="633" y="420" width="390" height="16" rx="3" fill="#ddd"/>
-  <rect x="633" y="420" width="285" height="16" rx="3" fill="#fd7e14"/><!-- 73% -->
-  <text x="633" y="452" font-size="10" fill="#555">Kibana image: 1.73GB   apt cache nettoyé: -1GB</text>
-  <text x="633" y="466" font-size="10" fill="#fd7e14" font-weight="bold">73% utilisé — 2.0GB libres</text>
-  <text x="728" y="431" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">73%</text>
+  <rect x="605" y="330" width="445" height="70" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="827" y="358" text-anchor="middle" font-size="11" font-weight="bold" fill="#166534">📦 Filebeat</text>
+  <text x="827" y="376" text-anchor="middle" font-size="10" fill="#166534">→ Elasticsearch HTTPS :9200 (via VPN)</text>
 
-  <!-- web-vm -->
-  <rect x="615" y="490" width="430" height="95" rx="8" fill="#f0fff4" stroke="#28a745" stroke-width="1.5"/>
-  <text x="830" y="512" text-anchor="middle" font-size="12" font-weight="bold" fill="#155724">🌍  web  (VMID 3038) — 192.168.255.253 (LAN)</text>
-  <rect x="633" y="522" width="390" height="40" rx="6" fill="#d4edda" stroke="#155724" stroke-width="1"/>
-  <text x="828" y="537" text-anchor="middle" font-size="11" font-weight="bold" fill="#155724">Site web :80/:443</text>
-  <text x="828" y="552" text-anchor="middle" font-size="10" fill="#155724">Docker non installé — 63% disk (2.7G libres)</text>
+  <!-- web -->
+  <rect x="585" y="435" width="465" height="70" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="605" y="460" font-size="12" font-weight="bold" fill="#166534">🌍 web — VMID 3038 — 192.168.255.253 (LAN)</text>
+  <text x="605" y="481" font-size="11" fill="#15803d">Site web :80/:443 — Docker non installé</text>
 
-  <!-- ═══════════════════ VPN INTER-SITES ═══════════════════ -->
-  <line x1="510" y1="330" x2="590" y2="330" stroke="#e74c3c" stroke-width="3" stroke-dasharray="8,4"/>
-  <polygon points="583,324 595,330 583,336" fill="#e74c3c"/>
-  <polygon points="517,324 505,330 517,336" fill="#e74c3c"/>
-  <rect x="495" y="305" width="110" height="38" rx="6" fill="#ffeeba" stroke="#e74c3c" stroke-width="1.5"/>
-  <text x="550" y="320" text-anchor="middle" font-size="10" font-weight="bold" fill="#c0392b">OpenVPN</text>
-  <text x="550" y="333" text-anchor="middle" font-size="9" fill="#c0392b">10.3.3.0/29</text>
+  <!-- ═══════════════════ VPN inter-sites ═══════════════════ -->
+  <rect x="495" y="263" width="110" height="54" rx="6" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="550" y="285" text-anchor="middle" font-size="10" font-weight="bold" fill="#c2410c">🔗 OpenVPN</text>
+  <text x="550" y="301" text-anchor="middle" font-size="9" fill="#c2410c">10.3.3.0/29</text>
+  <line x1="495" y1="290" x2="450" y2="290" stroke="#ea580c" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow_orange)"/>
+  <line x1="605" y1="290" x2="650" y2="290" stroke="#ea580c" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow_orange)"/>
 
-  <!-- ═══════════════════ PKI / CA ═══════════════════ -->
-  <rect x="395" y="615" width="310" height="75" rx="10" fill="#f3e5ff" stroke="#8e44ad" stroke-width="2"/>
-  <text x="550" y="638" text-anchor="middle" font-size="12" font-weight="bold" fill="#6c3483">🔑 PKI — DGSI Internal CA</text>
-  <text x="550" y="655" text-anchor="middle" font-size="10" fill="#6c3483">~/.ansible-tls/ca.crt  (controller Ansible)</text>
-  <text x="550" y="670" text-anchor="middle" font-size="10" fill="#6c3483">Signe: Elasticsearch • Vault • Kibana</text>
-  <text x="550" y="685" text-anchor="middle" font-size="10" fill="#6c3483">Déploiement: /etc/ssl/internal/ sur chaque VM</text>
+  <!-- Flux Filebeat ops-vm → ES (local) -->
+  <line x1="178" y1="315" x2="178" y2="305" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow_green)"/>
 
-  <!-- CA → ES -->
-  <line x1="467" y1="615" x2="270" y2="360" stroke="#8e44ad" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.6"/>
-  <!-- CA → Vault -->
-  <line x1="467" y1="615" x2="367" y2="360" stroke="#8e44ad" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.6"/>
-  <!-- CA → Kibana -->
-  <line x1="633" y1="650" x2="828" y2="375" stroke="#8e44ad" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.6"/>
+  <!-- ═══════════════════ Accès opérateur (SSH tunnels) ═══════════════════ -->
+  <rect x="30" y="545" width="340" height="150" rx="10" fill="#f0fdfa" stroke="#0d9488" stroke-width="2"/>
+  <text x="50" y="568" font-size="12" font-weight="bold" fill="#0f766e">🔒 Accès Opérateur (SSH Tunnels)</text>
+  <text x="50" y="589" font-size="10" font-weight="bold" fill="#0f766e">PVE1 (via pfSense-OP 5.196.45.8) :</text>
+  <text x="50" y="604" font-size="10" font-family="monospace" fill="#0f766e">ssh -fNL 9200:172.16.0.253:9200 \</text>
+  <text x="50" y="617" font-size="10" font-family="monospace" fill="#0f766e">     -L 8200:172.16.0.253:8200 \</text>
+  <text x="50" y="630" font-size="10" font-family="monospace" fill="#0f766e">  -J admin@5.196.45.8 dgsi-op@…</text>
+  <text x="50" y="651" font-size="10" font-weight="bold" fill="#0f766e">PVE2 (via pfSense-Cloud 5.196.50.52) :</text>
+  <text x="50" y="666" font-size="10" font-family="monospace" fill="#0f766e">ssh -fNL 5601:10.255.255.253:5601 \</text>
+  <text x="50" y="679" font-size="10" font-family="monospace" fill="#0f766e">  -J admin@5.196.50.52 dgsi-cloud@…</text>
 
-  <!-- ═══════════════════ ACCÈS OPÉRATEUR ═══════════════════ -->
-  <rect x="30" y="615" width="350" height="130" rx="10" fill="#e8fff0" stroke="#27ae60" stroke-width="2"/>
-  <text x="205" y="636" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e8449">🔒 Accès Opérateur (SSH Tunnels)</text>
-  <text x="50" y="655" font-size="10" fill="#1e8449" font-weight="bold">PVE1 (via pfSense-OP 5.196.45.8) :</text>
-  <text x="50" y="669" font-size="10" fill="#1e8449" font-family="monospace">ssh -fNL 9200:172.16.0.253:9200 \</text>
-  <text x="50" y="682" font-size="10" fill="#1e8449" font-family="monospace">       -L 8200:172.16.0.253:8200 \</text>
-  <text x="50" y="695" font-size="10" fill="#1e8449" font-family="monospace">    -J admin@5.196.45.8 dgsi-op@…</text>
-  <text x="50" y="712" font-size="10" fill="#1e8449" font-weight="bold">PVE2 (via pfSense-Cloud 5.196.50.52) :</text>
-  <text x="50" y="726" font-size="10" fill="#1e8449" font-family="monospace">ssh -fNL 5601:10.255.255.253:5601 \</text>
-  <text x="50" y="739" font-size="10" fill="#1e8449" font-family="monospace">    -J admin@5.196.50.52 dgsi-cloud@…</text>
+  <!-- ═══════════════════ PKI ═══════════════════ -->
+  <rect x="390" y="545" width="320" height="150" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+  <text x="550" y="572" text-anchor="middle" font-size="12" font-weight="bold" fill="#5b21b6">🔑 PKI — DGSI Internal CA</text>
+  <text x="550" y="608" text-anchor="middle" font-size="11" fill="#5b21b6">~/.ansible-tls/ca.crt (controller Ansible)</text>
+  <text x="550" y="635" text-anchor="middle" font-size="11" fill="#5b21b6">Signe : Elasticsearch • Vault • Kibana</text>
+  <text x="550" y="662" text-anchor="middle" font-size="11" fill="#5b21b6">Déployé dans /etc/ssl/internal/ sur chaque VM</text>
 
-  <!-- ═══════════════════ LÉGENDE ═══════════════════ -->
-  <rect x="720" y="615" width="350" height="130" rx="10" fill="#fff" stroke="#ccc" stroke-width="1.5"/>
-  <text x="895" y="636" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Légende</text>
-  <rect x="740" y="645" width="16" height="10" rx="2" fill="#fff8e7" stroke="#f0a500" stroke-width="1.5"/>
-  <text x="762" y="655" font-size="10" fill="#333">PVE1 — On-Premise</text>
-  <rect x="740" y="661" width="16" height="10" rx="2" fill="#f0f4ff" stroke="#4a90d9" stroke-width="1.5"/>
-  <text x="762" y="671" font-size="10" fill="#333">PVE2 — Cloud</text>
-  <rect x="740" y="677" width="16" height="10" rx="2" fill="#cce5ff" stroke="#004085" stroke-width="1"/>
-  <text x="762" y="687" font-size="10" fill="#333">Service Docker actif</text>
-  <rect x="740" y="693" width="16" height="10" rx="2" fill="#f8d7da" stroke="#842029" stroke-width="1" />
-  <text x="762" y="703" font-size="10" fill="#333">Service hors ligne</text>
-  <line x1="740" y1="714" x2="756" y2="714" stroke="#e74c3c" stroke-width="2.5" stroke-dasharray="5,3"/>
-  <text x="762" y="718" font-size="10" fill="#333">Tunnel VPN inter-sites</text>
-  <line x1="740" y1="730" x2="756" y2="730" stroke="#8e44ad" stroke-width="1.5" stroke-dasharray="4,3"/>
-  <text x="762" y="734" font-size="10" fill="#333">Certificat TLS (CA interne)</text>
-
-  <!-- Flux Filebeat ops → ES (flèche interne) -->
-  <line x1="267" y1="340" x2="267" y2="310" stroke="#27ae60" stroke-width="1.5" marker-end="url(#arrow_green)"/>
+  <!-- ═══════════════════ Légende ═══════════════════ -->
+  <rect x="730" y="545" width="340" height="150" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="900" y="568" text-anchor="middle" font-size="12" font-weight="bold" fill="#334155">Légende</text>
+  <rect x="750" y="581" width="18" height="11" rx="2" fill="#fdf6e8" stroke="#e8a33d" stroke-width="1.5"/>
+  <text x="775" y="590" font-size="10" fill="#334155">PVE1 — On-Premise</text>
+  <rect x="750" y="604" width="18" height="11" rx="2" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="775" y="613" font-size="10" fill="#334155">PVE2 — Cloud</text>
+  <rect x="750" y="627" width="18" height="11" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+  <text x="775" y="636" font-size="10" fill="#334155">Service actif</text>
+  <rect x="750" y="650" width="18" height="11" rx="2" fill="#fef2f2" stroke="#fca5a5" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="775" y="659" font-size="10" fill="#334155">Service hors ligne</text>
+  <line x1="750" y1="676" x2="768" y2="676" stroke="#ea580c" stroke-width="2.5" stroke-dasharray="5,3"/>
+  <text x="775" y="679" font-size="10" fill="#334155">Tunnel VPN inter-sites</text>
 
   <defs>
     <marker id="arrow_green" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-      <path d="M0,0 L0,8 L8,4 z" fill="#27ae60"/>
+      <path d="M0,0 L0,8 L8,4 z" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow_orange" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L8,4 z" fill="#ea580c"/>
     </marker>
   </defs>
 
-  <!-- Flux Filebeat bastion → ES (via VPN) -->
-  <path d="M 828 370 Q 828 400 700 380 Q 560 360 510 330" stroke="#27ae60" stroke-width="1.5" fill="none" stroke-dasharray="4,2" opacity="0.7"/>
-  <!-- Kibana → ES (via VPN) -->
-  <path d="M 700 280 Q 600 300 510 320" stroke="#0066cc" stroke-width="1.5" fill="none" stroke-dasharray="4,2" opacity="0.6"/>
-
-  <!-- Dates -->
-  <text x="1070" y="815" text-anchor="end" font-size="9" fill="#aaa">DGSI Epitech — 2026-05-27</text>
+  <!-- Date -->
+  <text x="1070" y="722" text-anchor="end" font-size="9" fill="#94a3b8">DGSI Epitech — 2026-06-15</text>
 </svg>
