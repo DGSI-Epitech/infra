@@ -1,0 +1,6 @@
+---
+- name: Restart intranet container
+  community.docker.docker_container:
+    name: intranet
+    state: started
+    restart: true

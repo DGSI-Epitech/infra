@@ -1,0 +1,3 @@
+---
+intranet_port: 80
+intranet_dir: /opt/intranet

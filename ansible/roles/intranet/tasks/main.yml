@@ -1,0 +1,24 @@
+---
+- name: Create intranet directory
+  file:
+    path: "{{ intranet_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy intranet HTML
+  template:
+    src: index.html.j2
+    dest: "{{ intranet_dir }}/index.html"
+    mode: "0644"
+  notify: Restart intranet container
+
+- name: Run intranet container
+  community.docker.docker_container:
+    name: intranet
+    image: nginx:alpine
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "{{ intranet_port }}:80"
+    volumes:
+      - "{{ intranet_dir }}:/usr/share/nginx/html:ro"
