@@ -30,7 +30,6 @@
         status_code: [200, 404]
       register: vault_token_check
       delegate_to: "{{ groups['ops'][0] }}"
-      no_log: true
 
     - name: Generate and store join token in Vault (premier déploiement uniquement)
       uri:
