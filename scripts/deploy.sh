@@ -301,8 +301,11 @@ fi
 # pfSense doit tourner avant le build Ubuntu pour router le trafic de vmbr1 vers internet
 
 echo ""
-echo "==> Déploiement pfSense (phase 1)..."
+echo "==> Nettoyage cache Terraform (providers supprimés / mis à jour)..."
 cd "$ONPREM_DIR"
+
+echo ""
+echo "==> Déploiement pfSense (phase 1)..."
 terraform init -input=false -upgrade
 terraform apply -input=false -auto-approve \
   -target=module.pfsense \
@@ -498,6 +501,7 @@ terraform apply -input=false -auto-approve \
   -var "netbox_api_token=${NETBOX_API_TOKEN:-}" \
   -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
   -var "vm_gateway=${VM_GATEWAY}" \
+  -var "vm_ip_address=${VM_IP_OPS:-172.16.0.241/28}" \
   -var "ops_vm_id=${VM_ID_OPS}" \
   -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \

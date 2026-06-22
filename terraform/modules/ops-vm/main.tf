@@ -1,16 +1,19 @@
 # 1. Recherche du sous-réseau dans NetBox
-data "netbox_prefix" "lan" {
-  prefix = "172.16.0.240/28"
-}
+# Commenté : NetBox doit tourner avant ops-vm, or Vault (sur ops-vm) doit tourner avant NetBox.
+# L'IP est maintenant passée en variable statique (var.vm_ip_address).
+# data "netbox_prefix" "lan" {
+#   prefix = "172.16.0.240/28"
+# }
 
 # 2. Réservation de la première IP libre liée à l'interface eth0 (déclarée plus bas)
-resource "netbox_available_ip_address" "ops_vm_ip" {
-  prefix_id                    = data.netbox_prefix.lan.id
-  status                       = "active"
-  dns_name                     = "ops-vm.local"
-  description                  = "IP allouée dynamiquement par Terraform pour la VM Ops"
-  virtual_machine_interface_id = netbox_interface.ops_vm_eth0.id
-}
+# Commenté : remplacé par var.vm_ip_address (IP statique depuis config.env → VM_IP_OPS)
+# resource "netbox_available_ip_address" "ops_vm_ip" {
+#   prefix_id                    = data.netbox_prefix.lan.id
+#   status                       = "active"
+#   dns_name                     = "ops-vm.local"
+#   description                  = "IP allouée dynamiquement par Terraform pour la VM Ops"
+#   virtual_machine_interface_id = netbox_interface.ops_vm_eth0.id
+# }
 
 # 3. Création de la machine virtuelle dans Proxmox
 resource "proxmox_virtual_environment_vm" "ops_vm" {
@@ -59,7 +62,7 @@ resource "proxmox_virtual_environment_vm" "ops_vm" {
 
     ip_config {
       ipv4 {
-        address = "${netbox_available_ip_address.ops_vm_ip.ip_address},gw=${var.vm_gateway}"
+        address = "${var.vm_ip_address},gw=${var.vm_gateway}"
       }
     }
 
@@ -71,17 +74,20 @@ resource "proxmox_virtual_environment_vm" "ops_vm" {
 }
 
 # 4. Enregistrement de la VM dans l'inventaire NetBox
-resource "netbox_virtual_machine" "ops_vm_netbox" {
-  name       = "ops-vm"
-  cluster_id = 1
-  status     = "active"
-  vcpus      = var.vm_cores
-  memory_mb  = var.vm_memory_mb
-}
+# Commenté : NetBox n'existe pas encore au moment du déploiement ops-vm.
+# À ré-activer après que services-vm soit déployé et NetBox opérationnel.
+# resource "netbox_virtual_machine" "ops_vm_netbox" {
+#   name       = "ops-vm"
+#   cluster_id = 1
+#   status     = "active"
+#   vcpus      = var.vm_cores
+#   memory_mb  = var.vm_memory_mb
+# }
 
 # 5. Création de l'interface réseau de la VM dans NetBox
-resource "netbox_interface" "ops_vm_eth0" {
-  name               = "eth0"
-  virtual_machine_id = netbox_virtual_machine.ops_vm_netbox.id
-}
+# Commenté : dépend de netbox_virtual_machine.ops_vm_netbox (voir ci-dessus)
+# resource "netbox_interface" "ops_vm_eth0" {
+#   name               = "eth0"
+#   virtual_machine_id = netbox_virtual_machine.ops_vm_netbox.id
+# }
 
