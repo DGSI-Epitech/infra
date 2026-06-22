@@ -43,7 +43,8 @@
 # Force tous les handlers en attente (ex: Restart Docker du rôle base) à tourner
 # AVANT de démarrer Vault. Sans ça, le handler Docker tourne APRÈS l'unseal
 # et redémarre le container Vault → Vault repart sealed.
-- meta: flush_handlers
+- name: Flush pending handlers
+  meta: flush_handlers
 
 - name: Run Vault container
   community.docker.docker_container:

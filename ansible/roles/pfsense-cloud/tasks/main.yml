@@ -6,8 +6,17 @@
     state: present
   tags: [configure, ssh]
 
-- import_tasks: interfaces.yml
-- import_tasks: firewall.yml
-- import_tasks: openvpn.yml
-- import_tasks: dns.yml
-- import_tasks: killswitch.yml
+- name: Configure interfaces
+  import_tasks: interfaces.yml
+
+- name: Configure firewall rules
+  import_tasks: firewall.yml
+
+- name: Configure OpenVPN
+  import_tasks: openvpn.yml
+
+- name: Configure DNS
+  import_tasks: dns.yml
+
+- name: Configure killswitch
+  import_tasks: killswitch.yml
