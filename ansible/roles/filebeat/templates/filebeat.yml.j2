@@ -18,7 +18,7 @@ filebeat.inputs:
           overwrite_keys: true
 
 output.elasticsearch:
-  hosts: ["https://{{ elk_elasticsearch_host }}:{{ elk_elasticsearch_port }}"]
+  hosts: ["https://{{ filebeat_elasticsearch_host }}:{{ filebeat_elasticsearch_port }}"]
   username: elastic
-  password: "{{ elk_elastic_password }}"
+  password: "{{ filebeat_elastic_password }}"
   ssl.certificate_authorities: ["{{ filebeat_tls_ca_path }}"]

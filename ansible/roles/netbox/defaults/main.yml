@@ -8,6 +8,6 @@ netbox_api_token: "0123456789abcdef0123456789abcdef01234567"
 netbox_secret_key: KcBiGa54ukQEia6PrYW2700KkwPg23YohziX1Fh4mZfVtb-rUPeHwhk74CoOneZHeEhrF5YYfla5oK0r
 # Ancien: VM_IP_SERVICES: 172.16.0.241/28  ← variable config.env copiée dans les defaults (incorrect)
 # Ces variables lisent config.env via lookup ou l'inventaire dynamique
-vm_lan_subnet: "{{ lookup('env', 'VM_LAN_SUBNET') | default('172.16.0.240/28', true) }}"
-vm_ip_services: "{{ lookup('env', 'VM_IP_SERVICES') | default(ansible_host + '/28', true) }}"
+netbox_vm_lan_subnet: "{{ lookup('env', 'VM_LAN_SUBNET') | default('172.16.0.240/28', true) }}"
+netbox_vm_ip_services: "{{ lookup('env', 'VM_IP_SERVICES') | default(ansible_host + '/28', true) }}"
 netbox_remote_url: "http://{{ ansible_host }}:{{ netbox_port }}"

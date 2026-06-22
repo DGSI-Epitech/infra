@@ -24,7 +24,7 @@
   changed_when: false
 
 - name: Allow Kibana port
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ kibana_port | string }}"
     proto: tcp
@@ -49,12 +49,12 @@
     src: /root/vault-init.json
   become: true
   delegate_to: "{{ groups['ops'][0] }}"
-  register: vault_init_raw_kibana
+  register: kibana_vault_init_raw
   no_log: true
 
 - name: Set vault root token for Fleet
   set_fact:
-    vault_root_token_kibana: "{{ (vault_init_raw_kibana.content | b64decode | from_json).root_token }}"
+    kibana_vault_root_token: "{{ (kibana_vault_init_raw.content | b64decode | from_json).root_token }}"
   no_log: true
 
 # 200 = token déjà en Vault, 404 = absent → créer
@@ -63,11 +63,11 @@
     url: "https://127.0.0.1:8200/v1/secret/data/elk/fleet-enrollment-token"
     method: GET
     headers:
-      X-Vault-Token: "{{ vault_root_token_kibana }}"
+      X-Vault-Token: "{{ kibana_vault_root_token }}"
     ca_path: /etc/ssl/internal/ca.crt
     status_code: [200, 404]
   delegate_to: "{{ groups['ops'][0] }}"
-  register: vault_fleet_check
+  register: kibana_vault_fleet_check
   no_log: true
 
 - name: Setup Fleet in Kibana
@@ -81,7 +81,7 @@
     headers:
       kbn-xsrf: "true"
     status_code: [200, 204]
-  when: vault_fleet_check.status == 404
+  when: kibana_vault_fleet_check.status == 404
 
 - name: Get Fleet agent policies
   uri:
@@ -92,8 +92,8 @@
     force_basic_auth: true
     validate_certs: false
     status_code: 200
-  register: fleet_policies
-  when: vault_fleet_check.status == 404
+  register: kibana_fleet_policies
+  when: kibana_vault_fleet_check.status == 404
 
 # Fleet setup ne crée pas toujours de politique is_default:true → en créer une si la liste est vide
 - name: Create default Fleet agent policy if none exist
@@ -112,17 +112,17 @@
       namespace: "default"
       monitoring_enabled: []
     status_code: 200
-  register: fleet_policy_new
-  when: vault_fleet_check.status == 404 and fleet_policies is not skipped and fleet_policies.json['items'] | length == 0
+  register: kibana_fleet_policy_new
+  when: kibana_vault_fleet_check.status == 404 and kibana_fleet_policies is not skipped and kibana_fleet_policies.json['items'] | length == 0
 
 # Utiliser la politique créée, sinon prendre la première de la liste existante
 - name: Set default Fleet policy ID
   set_fact:
-    fleet_default_policy_id: >-
-      {{ fleet_policy_new.json.item.id
-         if (fleet_policy_new is defined and fleet_policy_new is not skipped)
-         else (fleet_policies.json['items'] | first).id }}
-  when: vault_fleet_check.status == 404 and fleet_policies is not skipped
+    kibana_fleet_default_policy_id: >-
+      {{ kibana_fleet_policy_new.json.item.id
+         if (kibana_fleet_policy_new is defined and kibana_fleet_policy_new is not skipped)
+         else (kibana_fleet_policies.json['items'] | first).id }}
+  when: kibana_vault_fleet_check.status == 404 and kibana_fleet_policies is not skipped
 
 - name: Create Fleet enrollment token
   uri:
@@ -137,10 +137,10 @@
     body_format: json
     body:
       name: "ansible-fleet-token"
-      policy_id: "{{ fleet_default_policy_id }}"
+      policy_id: "{{ kibana_fleet_default_policy_id }}"
     status_code: 200
-  register: fleet_token_create
-  when: vault_fleet_check.status == 404 and fleet_default_policy_id is defined
+  register: kibana_fleet_token_create
+  when: kibana_vault_fleet_check.status == 404 and kibana_fleet_default_policy_id is defined
   no_log: true
 
 # La tâche s'exécute sur ops-vm (delegate_to) → 127.0.0.1:8200 = Vault local
@@ -149,13 +149,13 @@
     url: "https://127.0.0.1:8200/v1/secret/data/elk/fleet-enrollment-token"
     method: POST
     headers:
-      X-Vault-Token: "{{ vault_root_token_kibana }}"
+      X-Vault-Token: "{{ kibana_vault_root_token }}"
     body_format: json
     body:
       data:
-        value: "{{ fleet_token_create.json.item.api_key }}"
+        value: "{{ kibana_fleet_token_create.json.item.api_key }}"
     ca_path: /etc/ssl/internal/ca.crt
     status_code: 200
   delegate_to: "{{ groups['ops'][0] }}"
-  when: vault_fleet_check.status == 404 and fleet_default_policy_id is defined
+  when: kibana_vault_fleet_check.status == 404 and kibana_fleet_default_policy_id is defined
   no_log: true

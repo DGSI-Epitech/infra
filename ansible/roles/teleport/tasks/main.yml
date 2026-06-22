@@ -14,52 +14,52 @@
         src: /root/vault-init.json
       become: true
       delegate_to: "{{ groups['ops'][0] }}"
-      register: vault_init_raw
+      register: teleport_vault_init_raw
 
     - name: Set vault root token
       set_fact:
-        vault_root_token: "{{ (vault_init_raw.content | b64decode | from_json).root_token }}"
+        teleport_vault_root_token: "{{ (teleport_vault_init_raw.content | b64decode | from_json).root_token }}"
       no_log: true
 
     - name: Check if join token already exists in Vault
       uri:
-        url: "{{ vault_addr }}/v1/{{ teleport_vault_token_path }}"
+        url: "{{ teleport_vault_addr }}/v1/{{ teleport_vault_token_path }}"
         method: GET
         headers:
-          X-Vault-Token: "{{ vault_root_token }}"
+          X-Vault-Token: "{{ teleport_vault_root_token }}"
         status_code: [200, 404]
-      register: vault_token_check
+      register: teleport_vault_token_check
       delegate_to: "{{ groups['ops'][0] }}"
 
     - name: Generate and store join token in Vault (premier déploiement uniquement)
       uri:
-        url: "{{ vault_addr }}/v1/{{ teleport_vault_token_path }}"
+        url: "{{ teleport_vault_addr }}/v1/{{ teleport_vault_token_path }}"
         method: POST
         headers:
-          X-Vault-Token: "{{ vault_root_token }}"
+          X-Vault-Token: "{{ teleport_vault_root_token }}"
         body_format: json
         body:
           data:
             value: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=32') }}"
         status_code: 200
       delegate_to: "{{ groups['ops'][0] }}"
-      when: vault_token_check.status == 404
+      when: teleport_vault_token_check.status == 404
       no_log: true
 
     - name: Read join token from Vault
       uri:
-        url: "{{ vault_addr }}/v1/{{ teleport_vault_token_path }}"
+        url: "{{ teleport_vault_addr }}/v1/{{ teleport_vault_token_path }}"
         method: GET
         headers:
-          X-Vault-Token: "{{ vault_root_token }}"
+          X-Vault-Token: "{{ teleport_vault_root_token }}"
         status_code: 200
-      register: vault_token_resp
+      register: teleport_vault_token_resp
       delegate_to: "{{ groups['ops'][0] }}"
       no_log: true
 
     - name: Set join token fact from Vault
       set_fact:
-        teleport_join_token: "{{ vault_token_resp.json.data.data.value }}"
+        teleport_join_token: "{{ teleport_vault_token_resp.json.data.data.value }}"
       no_log: true
 
 - name: Fail if join token still not defined
@@ -75,16 +75,18 @@
 # =============================================================================
 
 - name: Add Teleport GPG key
-  shell: |
-    curl -fsSL https://apt.releases.teleport.dev/gpg \
-      -o /usr/share/keyrings/teleport-archive-keyring.asc
-  args:
-    creates: /usr/share/keyrings/teleport-archive-keyring.asc
+  ansible.builtin.get_url:
+    url: https://apt.releases.teleport.dev/gpg
+    dest: /usr/share/keyrings/teleport-archive-keyring.asc
+    mode: "0644"
   become: true
 
 - name: Add Teleport apt repository
   apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/ubuntu {{ ansible_distribution_release }} stable/v{{ teleport_version }}"
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc]
+      https://apt.releases.teleport.dev/ubuntu {{ ansible_distribution_release }}
+      stable/v{{ teleport_version }}
     state: present
     filename: teleport
   become: true
@@ -145,14 +147,14 @@
 # =============================================================================
 
 - name: Allow Teleport SSH proxy port (3022)
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ teleport_proxy_ssh_port | string }}"
     proto: tcp
   become: true
 
 - name: Allow Teleport auth port from Cloud DMZ ({{ teleport_dmz_cidr }})
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ teleport_auth_port | string }}"
     proto: tcp
@@ -160,7 +162,7 @@
   become: true
 
 - name: Allow Teleport auth port from on-prem LAN ({{ teleport_onprem_cidr }})
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ teleport_auth_port | string }}"
     proto: tcp
