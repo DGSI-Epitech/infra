@@ -2,6 +2,6 @@
   hosts: services
   become: true
   roles:
-   # - base
-   # - netbox
+    - base
+    - netbox
     - intranet
