@@ -63,7 +63,7 @@
   delegate_to: "{{ groups['ops'][0] }}"
   loop:
     - { name: "pfsense", version: "{{ fleet_pfsense_package_version }}" }
-    - { name: "log", version: "{{ fleet_log_package_version }}" }
+    - { name: "teleport", version: "{{ fleet_teleport_package_version }}" }
   loop_control:
     label: "{{ item.name }}-{{ item.version }}"
   register: fi_package_lookup
@@ -159,7 +159,7 @@
   delegate_to: "{{ groups['ops'][0] }}"
   register: fi_teleport_existing
 
-- name: Create Teleport audit log package policy (Custom Logs)
+- name: Create Teleport audit log package policy (Elastic "teleport" integration)
   uri:
     url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
     method: POST
@@ -174,19 +174,21 @@
       name: "{{ fleet_teleport_integration_name }}"
       policy_id: "{{ fi_target_policy_id }}"
       package:
-        name: "log"
-        version: "{{ fleet_log_package_version }}"
+        name: "teleport"
+        version: "{{ fleet_teleport_package_version }}"
       inputs:
-        logfile-logfile:
+        # NOTE : nom d'input/stream non confirmé contre le manifeste réel du
+        # package "teleport" 1.6.2 (pas d'accès direct à epr.elastic.co depuis
+        # cet environnement). Pattern standard "filestream" attendu pour un
+        # package d'ingestion type "File". À vérifier via Kibana ->
+        # Integrations -> Teleport -> Add -> "Preview API request".
+        teleport-filestream:
           enabled: true
           streams:
-            log.logs:
+            teleport.audit:
               enabled: true
               vars:
                 paths: "{{ fleet_teleport_log_paths }}"
-                data_stream.dataset: "teleport.audit"
-                tags:
-                  - "teleport-audit"
     status_code: [200, 201]
   delegate_to: "{{ groups['ops'][0] }}"
   when: fi_teleport_existing.json['items'] | length == 0

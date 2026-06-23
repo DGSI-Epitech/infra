@@ -6,6 +6,10 @@ teleport:
     output: stderr
     severity: INFO
 
+    storage:
+      type: dir
+      audit_events_uri: ["file://{{ teleport_data_dir }}/log"]
+
 auth_service:
   enabled: "yes"
   cluster_name: {{ teleport_cluster_name }}
