@@ -115,19 +115,6 @@
 				<any></any>
 			</destination>
 		</rule>
-		<rule>
-			<type>pass</type>
-			<ipprotocol>inet</ipprotocol>
-			<descr><![CDATA[Default allow DMZ to any rule]]></descr>
-			<interface>opt1</interface>
-			<tracker>0100000102</tracker>
-			<source>
-				<network>opt1</network>
-			</source>
-			<destination>
-				<any></any>
-			</destination>
-		</rule>
 	</filter>
 	<gateways>
 		<gateway_item>

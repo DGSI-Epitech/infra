@@ -73,15 +73,21 @@
         state: present
       tags: [configure, firewall]
 
-    - name: Autoriser port OpenVPN sur WAN
+    - name: Supprimer la règle OpenVPN sur WAN (client OP)
       pfsensible.core.pfsense_rule:
         name: "Allow OpenVPN 1194"
-        action: pass
         interface: wan
-        protocol: udp
+        state: absent
+      tags: [configure, firewall, vpn]
+
+    - name: Autoriser trafic inter-sites sur interface OpenVPN
+      pfsensible.core.pfsense_rule:
+        name: "Allow OpenVPN inter-sites"
+        action: pass
+        interface: openvpn
+        protocol: any
         source: any
         destination: any
-        destination_port: "1194"
         state: present
       tags: [configure, firewall, vpn]
 
@@ -100,17 +106,6 @@
         state: present
       tags: [configure, vpn]
 
-    - name: Autoriser trafic inter-sites sur interface OpenVPN
-      pfsensible.core.pfsense_rule:
-        name: "Allow OpenVPN inter-sites"
-        action: pass
-        interface: openvpn
-        protocol: any
-        source: any
-        destination: any
-        state: present
-      tags: [configure, firewall, vpn]
-
     - name: Configurer les serveurs DNS (Forwarders)
       pfsensible.core.pfsense_setup:
         dns_addresses: "{{ item }}"
@@ -121,58 +116,11 @@
         - "8.8.8.8"
       tags: [configure, dns]
 
-    - name: Créer l'Autorité de Certification (CAPfsense)
-      pfsensible.core.pfsense_ca:
-        name: "CA Interne pour Vault TLS"
-        method: "internal"
-        keytype: "RSA"
-        keylen: 4096
-        digest_alg: "sha256"
-        lifetime: 3650
-        dn_country: "FR"
-        dn_state: "Ile-de-France"
-        dn_city: "Paris"
-        dn_organization: "Projet Cloud"
-        dn_commonname: "CAPfsense"
-        state: present
-      register: ca_result
-      tags: [configure, ca]
-
-    - name: Sauvegarder le certificat public CA en local
-      ansible.builtin.copy:
-        content: "{{ ca_result.ca.crt }}"
-        dest: "./CAPfsense.crt"
-      delegate_to: localhost
-      when: ca_result.ca is defined
-      tags: [configure, ca]
-
-    - name: "[KILLSWITCH] Bloquer OpenVPN 1194 sur WAN"
-      pfsensible.core.pfsense_rule:
-        name: "KILLSWITCH_OpenVPN_1194"
-        action: block
-        interface: wan
-        protocol: udp
-        source: any
-        destination: "{{ openvpn_client.server_addr }}"
-        destination_port: "1194"
-        state: present
-      tags: [never, killswitch]
-
-    - name: "[KILLSWITCH] Tuer le processus OpenVPN client"
-      ansible.builtin.raw: kill $(cat /var/run/openvpn_client1.pid 2>/dev/null) 2>/dev/null || pkill -f 'openvpn.*client1' 2>/dev/null; true
-      tags: [never, killswitch]
-
-    - name: "[RESTORE] Supprimer la règle KILLSWITCH"
-      pfsensible.core.pfsense_rule:
-        name: "KILLSWITCH_OpenVPN_1194"
-        interface: wan
-        state: absent
-      tags: [never, restore]
-
-    - name: "[RESTORE] Supprimer le client OpenVPN (forcer recréation)"
+    - name: "[KILLSWITCH] Désactiver le client OpenVPN"
       pfsensible.core.pfsense_openvpn_client:
         name: "{{ openvpn_client.name }}"
         mode: "{{ openvpn_client.mode }}"
+        protocol: "{{ openvpn_client.protocol }}"
         server_addr: "{{ openvpn_client.server_addr }}"
         server_port: "{{ openvpn_client.server_port }}"
         tunnel_network: "{{ openvpn_client.tunnel_network }}"
@@ -180,10 +128,18 @@
         shared_key: "{{ openvpn_shared_key }}"
         data_ciphers: "{{ openvpn_client.data_ciphers }}"
         compression: "{{ openvpn_client.compression }}"
+        disable: true
+        state: present
+      tags: [never, killswitch]
+
+    - name: "[RESTORE] Supprimer la règle KILLSWITCH si présente"
+      pfsensible.core.pfsense_rule:
+        name: "KILLSWITCH_OpenVPN_1194"
+        interface: wan
         state: absent
       tags: [never, restore]
 
-    - name: "[RESTORE] Recréer le client OpenVPN"
+    - name: "[RESTORE] Rétablir/Activer le client OpenVPN"
       pfsensible.core.pfsense_openvpn_client:
         name: "{{ openvpn_client.name }}"
         mode: "{{ openvpn_client.mode }}"
@@ -199,5 +155,10 @@
         state: present
       tags: [never, restore]
 
-
-# pfSense Cloud est configuré dans playbooks/pfsense-cloud.yml (rôle pfsense-cloud)
+    - name: Activer le remote syslog VPN vers le collecteur
+      pfsensible.core.pfsense_log_settings:
+        enable: true
+        remoteserver: "{{ ops_collector_ip }}:5140"
+        logformat: rfc5424
+        vpn: true
+      tags: [configure, logging, vpn]
