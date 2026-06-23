@@ -1,15 +1,11 @@
 ---
 # --- Règles DMZ (OPT1) ---
 
-- name: Bloquer DMZ vers LAN Cloud
+- name: Supprimer la règle DMZ par défaut vers ANY
   pfsensible.core.pfsense_rule:
-    name: "Block DMZ to LAN"
-    action: block
+    name: "Default allow DMZ to any rule"
     interface: opt1
-    protocol: any
-    source: any
-    destination: "{{ vm_cloud_lan_subnet }}"
-    state: present
+    state: absent
   tags: [configure, firewall]
 
 - name: Autoriser Teleport (DMZ) vers noeuds LAN port 3022
@@ -21,6 +17,18 @@
     source: any
     destination: "{{ vm_cloud_lan_subnet }}"
     destination_port: "3022"
+    before: "Block DMZ to LAN"
+    state: present
+  tags: [configure, firewall]
+
+- name: Bloquer DMZ vers LAN Cloud
+  pfsensible.core.pfsense_rule:
+    name: "Block DMZ to LAN"
+    action: block
+    interface: opt1
+    protocol: any
+    source: any
+    destination: "{{ vm_cloud_lan_subnet }}"
     state: present
   tags: [configure, firewall]
 
@@ -32,6 +40,7 @@
     protocol: any
     source: "{{ vm_cloud_dmz_subnet }}"
     destination: "{{ vm_lan_subnet }}"
+    before: "Allow DMZ to Internet"
     state: present
   tags: [configure, firewall, vpn]
 

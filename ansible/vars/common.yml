@@ -19,3 +19,6 @@ pfsense_cloud_wan: "{{ lookup('env', 'PFSENSE_CLOUD_WAN') | default('', true) }}
 # OpenVPN
 vpn_port: "{{ lookup('env', 'VPN_PORT') | default('1194', true) }}"
 vpn_tunnel_network: "{{ lookup('env', 'VPN_TUNNEL_NETWORK') | default('10.3.3.0/30', true) }}"
+
+# Collecteur de logs : remote syslog pfSense -> Filebeat (input syslog) sur ops-vm
+ops_collector_ip: "{{ lookup('env', 'OPS_COLLECTOR_IP') | default('172.16.0.253', true) }}"

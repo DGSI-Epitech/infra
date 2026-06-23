@@ -18,6 +18,16 @@ filebeat.inputs:
           keys_under_root: true
           overwrite_keys: true
 
+{% if inventory_hostname in groups['ops'] %}
+  - type: syslog
+    enabled: true
+    format: rfc5424
+    protocol.udp:
+      host: "0.0.0.0:5140"
+    fields: { source_type: pfsense }
+    fields_under_root: true
+{% endif %}
+
 output.elasticsearch:
   hosts: ["https://{{ filebeat_elasticsearch_host }}:{{ filebeat_elasticsearch_port }}"]
   username: elastic
