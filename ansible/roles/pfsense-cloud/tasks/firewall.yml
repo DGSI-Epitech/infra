@@ -96,4 +96,3 @@
     destination_port: "{{ vpn_port }}"
     state: present
   tags: [configure, firewall, vpn]
-  
