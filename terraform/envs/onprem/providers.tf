@@ -14,7 +14,7 @@ provider "proxmox" {
     }
   }
 }
-provider "netbox" {
-  server_url = "http://localhost:8000"
-  api_token  = var.netbox_api_token
-}
+#provider "netbox" {
+#  server_url = "http://localhost:8000"
+# api_token  = var.netbox_api_token
+#}

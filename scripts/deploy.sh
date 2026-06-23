@@ -301,8 +301,11 @@ fi
 # pfSense doit tourner avant le build Ubuntu pour router le trafic de vmbr1 vers internet
 
 echo ""
-echo "==> Déploiement pfSense (phase 1)..."
+echo "==> Nettoyage cache Terraform (providers supprimés / mis à jour)..."
 cd "$ONPREM_DIR"
+
+echo ""
+echo "==> Déploiement pfSense (phase 1)..."
 terraform init -input=false -upgrade
 terraform apply -input=false -auto-approve \
   -target=module.pfsense \
@@ -380,12 +383,45 @@ else
   echo "==> Template Ubuntu (${VM_ID_UBUNTU_TEMPLATE}) déjà présent, build Packer sauté."
 fi
 
-# Terraform - déploiement VMs services + ops ---
-
-# --- Terraform - déploiement de la vm netbox ---
+# --- ÉTAPE 4 : ops-vm — Vault en premier ---
 
 echo ""
-echo "==> Déploiement VM Netbox..."
+echo "==> Déploiement VM ops (Vault en premier)..."
+cd "$ONPREM_DIR"
+terraform apply -input=false -auto-approve \
+  -target=module.ops_vm \
+  -var "proxmox_endpoint=https://${PROXMOX_HOST}:8006" \
+  -var "proxmox_username=${PROXMOX_USER}" \
+  -var "proxmox_node=${PROXMOX_NODE}" \
+  -var "proxmox_node_address=${PROXMOX_HOST}" \
+  -var "storage_vm=${PROXMOX_STORAGE_VM}" \
+  -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
+  -var "netbox_api_token=${NETBOX_API_TOKEN:-}" \
+  -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
+  -var "vm_gateway=${VM_GATEWAY}" \
+  -var "vm_ip_address=${VM_IP_OPS:-172.16.0.241/28}" \
+  -var "ops_vm_id=${VM_ID_OPS}" \
+  -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
+  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
+  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
+
+wait_for_agent "${VM_ID_OPS}" "ops-vm"
+inject_ssh_key  "${VM_ID_OPS}" "ops-vm"
+OPS_IP=$(get_vm_ip "${VM_ID_OPS}" "ops-vm")
+export OPS_IP
+wait_for_ssh "${OPS_IP}" "ops-vm"
+extend_disk  "${OPS_IP}" "ops-vm"
+
+echo ""
+echo "==> Ansible — TLS + Vault (ops-vm)..."
+cd "$REPO_ROOT/ansible"
+ansible-playbook playbooks/tls.yml   -i inventory/onprem.py --limit ops
+ansible-playbook playbooks/vault.yml -i inventory/onprem.py
+
+# --- ÉTAPE 5 : services-vm — NetBox ---
+
+echo ""
+echo "==> Déploiement VM services (NetBox)..."
 cd "$ONPREM_DIR"
 terraform apply -input=false -auto-approve \
   -target=module.services_vm \
@@ -404,7 +440,6 @@ terraform apply -input=false -auto-approve \
   -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
   -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
 
-#Injection cle SSH dans services-vm + Ansible Netbox
 wait_for_agent "${VM_ID_SERVICES}" "services-vm"
 inject_ssh_key  "${VM_ID_SERVICES}" "services-vm"
 SERVICES_IP=$(get_vm_ip "${VM_ID_SERVICES}" "services-vm")
@@ -413,11 +448,11 @@ wait_for_ssh "${SERVICES_IP}" "services-vm"
 extend_disk  "${SERVICES_IP}" "services-vm"
 
 echo ""
-echo "==> Lancement Ansible Netbox..."
+echo "==> Ansible — NetBox (services-vm)..."
 cd "$REPO_ROOT/ansible"
 ansible-playbook playbooks/services-vm.yml -i inventory/onprem.py
 
-# --- Attente Netbox (IPAM) opérationnel avant de continuer ---
+# --- Attente NetBox opérationnel ---
 
 wait_for_netbox() {
   local ip="$1"
@@ -452,12 +487,12 @@ wait_for_netbox() {
 
 wait_for_netbox "${SERVICES_IP}"
 
-# --- Tunnel SSH vers Netbox pour Terraform ---
+# --- Tunnel SSH vers NetBox (pour Terraform netbox provider si besoin) ---
 
 NETBOX_LOCAL_PORT=8000
 
 echo ""
-echo "==> Ouverture tunnel SSH vers Netbox pour Terraform..."
+echo "==> Ouverture tunnel SSH vers Netbox..."
 ssh -f -N \
     -o StrictHostKeyChecking=no \
     -o BatchMode=yes \
@@ -474,7 +509,6 @@ cleanup_tunnel() {
 }
 trap cleanup_tunnel EXIT
 
-# Attente que le tunnel soit prêt
 until curl -s --max-time 2 "http://localhost:${NETBOX_LOCAL_PORT}/api/status/" > /dev/null 2>&1; do
   sleep 2
 done
@@ -482,40 +516,11 @@ echo "    Tunnel prêt (localhost:${NETBOX_LOCAL_PORT})."
 
 export NETBOX_SERVER="http://localhost:${NETBOX_LOCAL_PORT}"
 
-# --- Terraform - déploiement du reste des VMs ---
+# --- ÉTAPE 6 : ELK + Fleet ---
 
 echo ""
-echo "==> Déploiement VM ops (phase 2 — Netbox prêt)..."
-cd "$ONPREM_DIR"
-terraform apply -input=false -auto-approve \
-  -target=module.ops_vm \
-  -var "proxmox_endpoint=https://${PROXMOX_HOST}:8006" \
-  -var "proxmox_username=${PROXMOX_USER}" \
-  -var "proxmox_node=${PROXMOX_NODE}" \
-  -var "proxmox_node_address=${PROXMOX_HOST}" \
-  -var "storage_vm=${PROXMOX_STORAGE_VM}" \
-  -var "template_ubuntu_vm_id=${VM_ID_UBUNTU_TEMPLATE}" \
-  -var "netbox_api_token=${NETBOX_API_TOKEN:-}" \
-  -var "pfsense_template_id=${VM_ID_PFSENSE_TEMPLATE}" \
-  -var "vm_gateway=${VM_GATEWAY}" \
-  -var "ops_vm_id=${VM_ID_OPS}" \
-  -var "pfsense_vm_id=${VM_ID_PFSENSE}" \
-  -var "vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
-  -var "proxmox_ssh_private_key=${SSH_PRIVATE_KEY_FILE}"
-
-# --- Injection clé SSH + Ansible pour ops-vm ---
-wait_for_agent "${VM_ID_OPS}" "ops-vm"
-inject_ssh_key  "${VM_ID_OPS}" "ops-vm"
-OPS_IP=$(get_vm_ip "${VM_ID_OPS}" "ops-vm")
-export OPS_IP
-wait_for_ssh "${OPS_IP}" "ops-vm"
-extend_disk  "${OPS_IP}" "ops-vm"
-
-echo ""
-echo "==> Lancement Ansible..."
+echo "==> Ansible — ELK + Fleet (ops-vm)..."
 cd "$REPO_ROOT/ansible"
-ansible-playbook playbooks/tls.yml          -i inventory/onprem.py
-ansible-playbook playbooks/vault.yml         -i inventory/onprem.py
 ansible-playbook playbooks/elk.yml           -i inventory/onprem.py
 ansible-playbook playbooks/kibana.yml        -i inventory/onprem.py  # ← crée le token Fleet dans Vault
 ansible-playbook playbooks/filebeat.yml      -i inventory/onprem.py

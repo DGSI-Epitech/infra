@@ -55,3 +55,9 @@ variable "vm_gateway" {
   type        = string
   default     = "172.16.0.254"
 }
+
+variable "vm_ip_address" {
+  description = "Static IP address for ops-vm in CIDR notation (e.g. 172.16.0.241/28)"
+  type        = string
+  default     = "172.16.0.241/28"
+}
