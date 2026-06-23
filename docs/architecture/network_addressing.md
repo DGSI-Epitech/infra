@@ -13,7 +13,7 @@ Internet
     │                       ├── 172.16.0.241  services-vm  (Netbox, website)
     │                       └── 172.16.0.242  ops-vm       (Vault + ELK)
     │
-    └── PVE2 (Cloud)       IP publique: 5.196.50.52
+    └── PVE2 (Cloud)       IP publique: 192.168.255.254
             │
             └── pfSense S2 (cloud.local)
                     ├── DMZ: 10.255.255.248/29

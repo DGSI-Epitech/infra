@@ -12,7 +12,7 @@ teleport_proxy_ssh_listen: "0.0.0.0:3022"
 teleport_proxy_ssh_port: 3022
 
 # Adresse publique exposée aux clients — via DNAT Proxmox (51.75.128.134:3080 → bastion:443)
-teleport_public_addr: "51.75.128.134:3080"
+teleport_public_addr: "192.99.62.116:3080"
 
 # TLS — certs générés par le rôle tls, déployés dans /etc/ssl/internal/
 teleport_tls_dir: /etc/ssl/internal
@@ -22,6 +22,10 @@ teleport_tls_key: "{{ teleport_tls_dir }}/server.key"
 # Vault — join token stocké dans Vault KV (même pattern que Fleet enrollment token)
 teleport_vault_addr: "https://{{ hostvars[groups['ops'][0]]['ansible_host'] }}:8200"
 teleport_vault_token_path: "secret/data/teleport/join-token"
+
+# Token de fallback utilisé quand Vault n'est pas accessible (VPN absent)
+# À remplacer par le vrai token une fois Vault opérationnel
+teleport_join_token: "PLACEHOLDER_REPLACE_WITH_VAULT_TOKEN"
 
 # Subnets autorisés à joindre le port auth interne (3025)
 teleport_dmz_cidr: "10.255.255.248/29"

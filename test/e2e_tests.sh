@@ -11,7 +11,7 @@ CA_CERT="$HOME/.ansible-tls/ca.crt"
 OPS_VM="ubuntu@172.16.0.242"
 BASTION_VM="ubuntu@10.255.255.249"
 
-JUMP_OP="admin@5.196.45.8"
+JUMP_OP="admin@192.168.255.254"
 JUMP_CLOUD="root@51.75.128.134"
 
 WEBSITE_IP="192.168.255.243"
@@ -135,7 +135,7 @@ fi
 
 echo "== Website external security =="
 
-WEB_EXTERNAL=$(curl -s -o /dev/null -w '%{http_code}' http://5.196.50.52)
+WEB_EXTERNAL=$(curl -s -o /dev/null -w '%{http_code}' http://192.168.255.254)
 
 if [[ "$WEB_EXTERNAL" == "000" || "$WEB_EXTERNAL" == "403" ]]; then
     ok "Website NOT exposed externally"

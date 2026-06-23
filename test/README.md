@@ -5,7 +5,7 @@ This document provides a step-by-step guide to execute the network and security 
 ## Quick Start
 
 ### Prerequisites
-1. **SSH Access**: Ensure SSH keys are configured for pfSense-OP (`5.196.45.8`)
+1. **SSH Access**: Ensure SSH keys are configured for pfSense-OP (`192.168.255.254`)
 2. **nmap**: Install on test host (`apt-get install nmap` or `choco install nmap`)
 3. **CA Certificate**: Retrieve `~/.ansible-tls/ca.crt` for HTTPS testing
 4. **Workspace**: Clone the infra repo and navigate to the workspace root
@@ -32,13 +32,13 @@ bash scripts/run_network_security_tests.sh firewall_nmap
 ### Phase 1: Pre-flight Checks
 ```bash
 # 1. Verify SSH access to pfSense-OP (jump host)
-ssh admin@5.196.45.8 "echo 'SSH OK'"
+ssh admin@192.168.255.254 "echo 'SSH OK'"
 
 # 2. Verify SSH to ops-vm via ProxyJump
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.253 "echo 'SSH OK'"
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.253 "echo 'SSH OK'"
 
 # 3. Verify ops-vm has connectivity to web-vm
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.253 "ping -c 1 192.168.255.243"
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.253 "ping -c 1 192.168.255.243"
 
 # 4. Check nmap is installed locally
 nmap --version
@@ -82,25 +82,25 @@ Follow the steps in [NETWORK_SECURITY_TESTS.md § 2](./NETWORK_SECURITY_TESTS.md
 
 1. **Baseline**: Ping ops-vm → web-vm (expect success)
    ```bash
-   ssh -J admin@5.196.45.8 ubuntu@172.16.0.253 "ping -c 10 192.168.255.243"
+   ssh -J admin@192.168.255.254 ubuntu@172.16.0.253 "ping -c 10 192.168.255.243"
    ```
 
 2. **Disable VPN**: Access pfSense-OP UI or CLI
    ```bash
-   ssh admin@5.196.45.8
+   ssh admin@192.168.255.254
    # Menu: Status > IPsec > Disable Tunnel
    # Or CLI: ipsecctl -D
    ```
 
 3. **Verify Outage**: Ping should fail or timeout
    ```bash
-   ssh -J admin@5.196.45.8 ubuntu@172.16.0.253 "ping -c 10 192.168.255.243"
+   ssh -J admin@192.168.255.254 ubuntu@172.16.0.253 "ping -c 10 192.168.255.243"
    # Expected: 100% packet loss or timeout
    ```
 
 4. **Re-enable VPN**: pfSense-OP UI or CLI
    ```bash
-   ssh admin@5.196.45.8
+   ssh admin@192.168.255.254
    # Menu: Status > IPsec > Enable Tunnel
    # Or CLI: ipsecctl -f
    sleep 5
@@ -108,7 +108,7 @@ Follow the steps in [NETWORK_SECURITY_TESTS.md § 2](./NETWORK_SECURITY_TESTS.md
 
 5. **Verify Recovery**: Ping should succeed again
    ```bash
-   ssh -J admin@5.196.45.8 ubuntu@172.16.0.253 "ping -c 10 192.168.255.243"
+   ssh -J admin@192.168.255.254 ubuntu@172.16.0.253 "ping -c 10 192.168.255.243"
    # Expected: 0% packet loss
    ```
 
@@ -119,13 +119,13 @@ Follow the steps in [NETWORK_SECURITY_TESTS.md § 3](./NETWORK_SECURITY_TESTS.md
 
 1. **Check Teleport Service**: On bastion
    ```bash
-   ssh -J admin@5.196.45.8 ubuntu@10.255.255.249 "systemctl status teleport"
+   ssh -J admin@192.168.255.254 ubuntu@10.255.255.249 "systemctl status teleport"
    ```
 
 2. **If Running**: Setup SSH tunnel
    ```bash
    # Terminal 1: Create tunnel
-   ssh -J admin@5.196.45.8 -L 3080:10.255.255.249:3080 ubuntu@10.255.255.249
+   ssh -J admin@192.168.255.254 -L 3080:10.255.255.249:3080 ubuntu@10.255.255.249
    
    # Terminal 2: Open browser
    open https://localhost:3080  # or firefox, chrome, etc.
@@ -198,10 +198,10 @@ Example:
 ### SSH ProxyJump Fails
 ```bash
 # Test jump host directly
-ssh -v admin@5.196.45.8
+ssh -v admin@192.168.255.254
 
 # Test with explicit key
-ssh -i ~/.ssh/infra_key admin@5.196.45.8
+ssh -i ~/.ssh/infra_key admin@192.168.255.254
 
 # Check key permissions
 ls -la ~/.ssh/infra_key*
@@ -214,7 +214,7 @@ ls -la ~/.ssh/infra_key*
 ### Ping Timeout or No Route
 ```bash
 # Check VPN tunnel status on pfSense-OP
-ssh admin@5.196.45.8
+ssh admin@192.168.255.254
 # Status > IPsec > Active Tunnel (should show green)
 
 # If tunnel is down, check logs
@@ -227,7 +227,7 @@ tail -f /var/log/charon.log
 ### DNS Resolution NXDOMAIN
 ```bash
 # Check pfSense Unbound config
-ssh admin@5.196.45.8
+ssh admin@192.168.255.254
 # Services > DNS > Resolver > Forward Zones
 
 # Test nameserver directly

@@ -3,17 +3,17 @@
 ## Endpoints & Credentials
 
 ### Site 1 (PVE1 @ 51.75.128.134)
-- **pfSense-OP** (gateway): `5.196.45.8` (admin)
+- **pfSense-OP** (gateway): `192.168.255.254` (admin)
 - **ops-vm** (internal): `172.16.0.253` (ubuntu)
 - **Services**: Vault (8200), Elasticsearch (9200), Filebeat
-- **SSH ProxyJump**: `-J admin@5.196.45.8`
+- **SSH ProxyJump**: `-J admin@192.168.255.254`
 
 ### Site 2 (PVE2 @ 51.75.128.134)
-- **pfSense-Cloud** (gateway): `5.196.50.52` (admin)
+- **pfSense-Cloud** (gateway): `192.168.255.254` (admin)
 - **bastion** (DMZ): `10.255.255.249` (ubuntu)
 - **web** (LAN): `192.168.255.243` (via web project)
 - **Services**: Kibana (5601), Filebeat
-- **SSH ProxyJump**: `-J admin@5.196.45.8` (via PVE1 then cross-VPN)
+- **SSH ProxyJump**: `-J admin@192.168.255.254` (via PVE1 then cross-VPN)
 
 ### Planned (Currently Offline)
 - **services-vm** (S1 DMZ): `172.16.0.241` (dgsi-cloud)
@@ -53,7 +53,7 @@ curl --cacert /path/to/ca.crt https://172.16.0.253:9200/
 
 ### Verify VPN Health
 ```bash
-ssh admin@5.196.45.8
+ssh admin@192.168.255.254
 
 # pfSense CLI equivalent
 # ipsecctl -sa          # List all SAs
@@ -155,8 +155,8 @@ tsh proxy ssh -L 8200:vault.internal:8200 ubuntu@ops-vm
 
 | Service | Protocol | Host | Port | Status | Notes |
 |---------|----------|------|------|--------|-------|
-| pfSense-OP | SSH | 5.196.45.8 | 22 | ✅ | External admin access |
-| pfSense-Cloud | SSH | 5.196.50.52 | 22 | ✅ | External admin access |
+| pfSense-OP | SSH | 192.168.255.254 | 22 | ✅ | External admin access |
+| pfSense-Cloud | SSH | 192.168.255.254 | 22 | ✅ | External admin access |
 | ops-vm SSH | SSH | 172.16.0.253 | 22 | ✅ | Via ProxyJump through pfSense |
 | bastion SSH | SSH | 10.255.255.249 | 22 | ✅ | Via ProxyJump through pfSense |
 | Vault | HTTPS | 172.16.0.253 | 8200 | ✅ | ops-vm, CA cert required |
@@ -175,18 +175,18 @@ tsh proxy ssh -L 8200:vault.internal:8200 ubuntu@ops-vm
 ### SSH Troubleshooting
 ```bash
 # Verbose SSH (debug connection)
-ssh -vvv -J admin@5.196.45.8 ubuntu@172.16.0.253
+ssh -vvv -J admin@192.168.255.254 ubuntu@172.16.0.253
 
 # Check SSH key permissions
 ssh-keygen -l -f ~/.ssh/id_rsa
 
 # Test key-based auth
-ssh -i ~/.ssh/id_rsa -J admin@5.196.45.8 ubuntu@172.16.0.253 "echo OK"
+ssh -i ~/.ssh/id_rsa -J admin@192.168.255.254 ubuntu@172.16.0.253 "echo OK"
 ```
 
 ### VPN Troubleshooting (pfSense)
 ```bash
-ssh admin@5.196.45.8
+ssh admin@192.168.255.254
 
 # Check IPsec status (pfSense CLI)
 ipsecctl -sa

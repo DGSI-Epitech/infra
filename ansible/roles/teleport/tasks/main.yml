@@ -4,71 +4,74 @@
 # Passer -e "teleport_join_token=<token>" pour bypasser Vault (PVE1 absent)
 # =============================================================================
 
-- name: Resolve join token from Vault (si ops-vm disponible)
-  when:
-    - teleport_join_token is not defined or teleport_join_token == ''
-    - groups['ops'] | default([]) | length > 0
-  block:
-    - name: Slurp vault-init.json from ops-vm
-      slurp:
-        src: /root/vault-init.json
-      become: true
-      delegate_to: "{{ groups['ops'][0] }}"
-      register: teleport_vault_init_raw
-
-    - name: Set vault root token
-      set_fact:
-        teleport_vault_root_token: "{{ (teleport_vault_init_raw.content | b64decode | from_json).root_token }}"
-      no_log: true
-
-    - name: Check if join token already exists in Vault
-      uri:
-        url: "{{ teleport_vault_addr }}/v1/{{ teleport_vault_token_path }}"
-        method: GET
-        headers:
-          X-Vault-Token: "{{ teleport_vault_root_token }}"
-        status_code: [200, 404]
-      register: teleport_vault_token_check
-      delegate_to: "{{ groups['ops'][0] }}"
-
-    - name: Generate and store join token in Vault (premier déploiement uniquement)
-      uri:
-        url: "{{ teleport_vault_addr }}/v1/{{ teleport_vault_token_path }}"
-        method: POST
-        headers:
-          X-Vault-Token: "{{ teleport_vault_root_token }}"
-        body_format: json
-        body:
-          data:
-            value: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=32') }}"
-        status_code: 200
-      delegate_to: "{{ groups['ops'][0] }}"
-      when: teleport_vault_token_check.status == 404
-      no_log: true
-
-    - name: Read join token from Vault
-      uri:
-        url: "{{ teleport_vault_addr }}/v1/{{ teleport_vault_token_path }}"
-        method: GET
-        headers:
-          X-Vault-Token: "{{ teleport_vault_root_token }}"
-        status_code: 200
-      register: teleport_vault_token_resp
-      delegate_to: "{{ groups['ops'][0] }}"
-      no_log: true
-
-    - name: Set join token fact from Vault
-      set_fact:
-        teleport_join_token: "{{ teleport_vault_token_resp.json.data.data.value }}"
-      no_log: true
-
-- name: Fail if join token still not defined
-  fail:
-    msg: |
-      teleport_join_token non défini.
-      Si ops-vm (Vault) n'est pas disponible, passer le token via :
-        ansible-playbook ... -e "teleport_join_token=<token>"
-  when: teleport_join_token is not defined or teleport_join_token == ''
+# VAULT BLOCK TEMPORAIREMENT DÉSACTIVÉ — VPN non opérationnel, Vault inaccessible
+# Réactiver une fois le VPN site-to-site fonctionnel et Vault déployé
+#
+# - name: Resolve join token from Vault (si ops-vm disponible)
+#   when:
+#     - teleport_join_token is not defined or teleport_join_token == ''
+#     - groups['ops'] | default([]) | length > 0
+#   block:
+#     - name: Slurp vault-init.json from ops-vm
+#       slurp:
+#         src: /root/vault-init.json
+#       become: true
+#       delegate_to: "{{ groups['ops'][0] }}"
+#       register: teleport_vault_init_raw
+#
+#     - name: Set vault root token
+#       set_fact:
+#         teleport_vault_root_token: "{{ (teleport_vault_init_raw.content | b64decode | from_json).root_token }}"
+#       no_log: true
+#
+#     - name: Check if join token already exists in Vault
+#       uri:
+#         url: "{{ teleport_vault_addr }}/v1/{{ teleport_vault_token_path }}"
+#         method: GET
+#         headers:
+#           X-Vault-Token: "{{ teleport_vault_root_token }}"
+#         status_code: [200, 404]
+#       register: teleport_vault_token_check
+#       delegate_to: "{{ groups['ops'][0] }}"
+#
+#     - name: Generate and store join token in Vault (premier déploiement uniquement)
+#       uri:
+#         url: "{{ teleport_vault_addr }}/v1/{{ teleport_vault_token_path }}"
+#         method: POST
+#         headers:
+#           X-Vault-Token: "{{ teleport_vault_root_token }}"
+#         body_format: json
+#         body:
+#           data:
+#             value: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=32') }}"
+#         status_code: 200
+#       delegate_to: "{{ groups['ops'][0] }}"
+#       when: teleport_vault_token_check.status == 404
+#       no_log: true
+#
+#     - name: Read join token from Vault
+#       uri:
+#         url: "{{ teleport_vault_addr }}/v1/{{ teleport_vault_token_path }}"
+#         method: GET
+#         headers:
+#           X-Vault-Token: "{{ teleport_vault_root_token }}"
+#         status_code: 200
+#       register: teleport_vault_token_resp
+#       delegate_to: "{{ groups['ops'][0] }}"
+#       no_log: true
+#
+#     - name: Set join token fact from Vault
+#       set_fact:
+#         teleport_join_token: "{{ teleport_vault_token_resp.json.data.data.value }}"
+#       no_log: true
+#
+# - name: Fail if join token still not defined
+#   fail:
+#     msg: |
+#       teleport_join_token non défini.
+#       Si ops-vm (Vault) n'est pas disponible, passer le token via :
+#         ansible-playbook ... -e "teleport_join_token=<token>"
+#   when: teleport_join_token is not defined or teleport_join_token == ''
 
 # =============================================================================
 # INSTALLATION — via repo apt officiel Teleport

@@ -30,8 +30,8 @@ Les variables suivantes doivent être renseignées dans `config.env` :
 
 | Variable | Valeur | Description |
 |---|---|---|
-| `PFSENSE_OP_WAN` | `5.196.45.8` | IP WAN routable pfSense OP |
-| `PFSENSE_CLOUD_WAN` | `5.196.50.52` | IP WAN routable pfSense Cloud |
+| `PFSENSE_OP_WAN` | `192.168.255.254` | IP WAN routable pfSense OP |
+| `PFSENSE_CLOUD_WAN` | `192.168.255.254` | IP WAN routable pfSense Cloud |
 | `PFSENSE_PASSWORD` | `pfsense` | Mot de passe compte `admin` pfSense |
 | `VM_GATEWAY` | `172.16.0.254` | Gateway LAN PVE1 (pfSense OP) |
 | `VM_GATEWAY2` | `192.168.255.254` | Gateway LAN PVE2 (pfSense Cloud) |
@@ -70,7 +70,7 @@ Ansible se connecte directement sur les IPs WAN avec le compte `admin` en authen
 | Règle HTTPS WAN | Autorise HTTPS entrant sur le WAN (port 443) — accès webGUI |
 | Règle OpenVPN 1194 | Autorise UDP 1194 sur WAN |
 | Règle OpenVPN interface | Autorise tout le trafic inter-sites sur l'interface OpenVPN |
-| Client OpenVPN | Connexion vers pfSense Cloud (`5.196.50.52:1194`) — tunnel `10.3.3.0/30` |
+| Client OpenVPN | Connexion vers pfSense Cloud (`192.168.255.254:1194`) — tunnel `10.3.3.0/30` |
 | DNS Forwarders | `192.168.255.254` (Cloud via VPN) + `1.1.1.1` + `8.8.8.8` |
 
 ### pfSense Cloud — Site cloud (cloud.local)
@@ -93,13 +93,13 @@ Ansible se connecte directement sur les IPs WAN avec le compte `admin` en authen
 ```
 Internet
     │
-    ├── PVE1 (OP)  5.196.45.8
+    ├── PVE1 (OP)  192.168.255.254
     │       └── pfSense S1 (op.local)
     │               ├── WAN  vmbr0
     │               └── LAN  vmbr1  172.16.0.240/28  GW 172.16.0.254
     │                           └── vault-vm  172.16.0.253
     │
-    └── PVE2 (Cloud)  5.196.50.52
+    └── PVE2 (Cloud)  192.168.255.254
             └── pfSense S2 (cloud.local)
                     ├── WAN  vmbr0
                     ├── DMZ  vmbr134  10.255.255.248/29   GW 10.255.255.254
@@ -120,8 +120,8 @@ Le webGUI est accessible directement depuis un navigateur via les IPs WAN — la
 
 | pfSense | URL | Login |
 |---|---|---|
-| OP (on-premise) | https://5.196.45.8 | `admin` / `PFSENSE_PASSWORD` (config.env) |
-| Cloud | https://5.196.50.52 | `admin` / `PFSENSE_PASSWORD` (config.env) |
+| OP (on-premise) | https://192.168.255.254 | `admin` / `PFSENSE_PASSWORD` (config.env) |
+| Cloud | https://192.168.255.254 | `admin` / `PFSENSE_PASSWORD` (config.env) |
 
 Accepter le certificat auto-signé lors de la première connexion.
 

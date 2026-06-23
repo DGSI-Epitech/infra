@@ -1,6 +1,7 @@
 ---
 - name: Deploy Filebeat
-  hosts: ops:bastion:web
+  hosts: ops:bastion:web:services
   become: true
   roles:
+    - tls
     - filebeat
