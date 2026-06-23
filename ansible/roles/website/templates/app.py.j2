@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+import re
+import subprocess
+import os
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+STATIC_DIR = "{{ website_static_dir }}"
+IP_RE = re.compile(r'^(\d{1,3}\.){3}\d{1,3}$')
+
+
+def valid_ip(ip):
+    if not IP_RE.match(ip):
+        return False
+    return all(0 <= int(p) <= 255 for p in ip.split('.'))
+
+
+@app.route('/')
+def index():
+    with open(os.path.join(STATIC_DIR, 'index.html')) as f:
+        return f.read()
+
+
+@app.route('/ping', methods=['POST'])
+def ping():
+    data = request.get_json(silent=True) or {}
+    ip = data.get('ip', '').strip()
+    if not valid_ip(ip):
+        return jsonify({'error': 'Adresse IP invalide'}), 400
+    try:
+        result = subprocess.run(
+            ['ping', '-c', '4', '-W', '2', ip],
+            capture_output=True,
+            text=True,
+            timeout=15
+        )
+        return jsonify({
+            'output': result.stdout or result.stderr,
+            'success': result.returncode == 0
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Timeout (>15s)'}), 504
+    except Exception:
+        app.logger.exception("ping error")
+        return jsonify({'error': 'Internal error'}), 500

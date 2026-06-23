@@ -1,0 +1,7 @@
+---
+- name: Deploy website on web-vm
+  hosts: web
+  become: true
+  roles:
+    - tls
+    - website

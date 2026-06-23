@@ -1,0 +1,7 @@
+---
+tls_san:
+  - "IP:{{ ansible_host }}"
+  - "IP:127.0.0.1"
+  - "DNS:web-vm"
+  - "DNS:website"
+  - "DNS:localhost"

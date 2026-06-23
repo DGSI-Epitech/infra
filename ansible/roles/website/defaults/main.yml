@@ -1,0 +1,6 @@
+---
+website_app_dir: /opt/website
+website_static_dir: /var/www/website
+website_port: 5000
+website_user: website
+website_group: website

@@ -1,0 +1,19 @@
+[Unit]
+Description=DGSI Network Website
+After=network.target
+
+[Service]
+User={{ website_user }}
+Group={{ website_group }}
+WorkingDirectory={{ website_app_dir }}
+ExecStart=/usr/bin/python3 -m gunicorn \
+    --bind 127.0.0.1:{{ website_port }} \
+    --workers 2 \
+    --timeout 20 \
+    app:app
+Restart=always
+RestartSec=5
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
