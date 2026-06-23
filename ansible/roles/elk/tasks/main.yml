@@ -111,3 +111,6 @@
 
 - name: Deploy ingest pipelines
   import_tasks: pipelines.yml
+
+- name: Deploy fleet configuration
+  import_tasks: fleet.yml

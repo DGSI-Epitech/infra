@@ -19,3 +19,22 @@ elk_ingest_pipelines:
   - teleport
   - openvpn
   - auth
+
+fleet_policies:
+  - name: "Ubuntu Servers"
+    namespace: "default"
+    monitoring_enabled:
+      - logs
+      - metrics
+
+  - name: "Teleport"
+    namespace: "default"
+    monitoring_enabled:
+      - logs
+      - metrics
+
+  - name: "pfSense"
+    namespace: "default"
+    monitoring_enabled:
+      - logs
+      - metrics

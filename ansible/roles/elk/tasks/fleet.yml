@@ -1,0 +1,35 @@
+---
+- name: Get existing Fleet policies
+  uri:
+    url: "{{ kibana_url }}/api/fleet/agent_policies"
+    method: GET
+    user: elastic
+    password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+  register: existing_policies
+
+- name: Create missing Fleet policies
+  uri:
+    url: "{{ kibana_url }}/api/fleet/agent_policies"
+    method: POST
+    user: elastic
+    password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "{{ item.name }}"
+      namespace: "{{ item.namespace }}"
+      monitoring_enabled: "{{ item.monitoring_enabled }}"
+    status_code:
+      - 200
+      - 201
+  loop: "{{ fleet_policies }}"
+  when: item.name not in (
+          existing_policies.json.items
+          | map(attribute='name')
+          | list
+        )
