@@ -417,6 +417,7 @@ echo "==> Ansible — TLS + Vault (ops-vm)..."
 cd "$REPO_ROOT/ansible"
 ansible-playbook playbooks/tls.yml   -i inventory/onprem.py --limit ops
 ansible-playbook playbooks/vault.yml -i inventory/onprem.py
+ansible-playbook playbooks/secrets-init.yml -i inventory/onprem.py
 
 # --- ÉTAPE 5 : services-vm — NetBox ---
 
@@ -516,6 +517,13 @@ echo "    Tunnel prêt (localhost:${NETBOX_LOCAL_PORT})."
 
 export NETBOX_SERVER="http://localhost:${NETBOX_LOCAL_PORT}"
 
+# --- Enregistrement ops-vm dans NetBox ---
+
+echo ""
+echo "==> Ansible — Sync agent NetBox (ops-vm + services-vm)..."
+cd "$REPO_ROOT/ansible"
+ansible-playbook playbooks/netbox-sync-deploy.yml -i inventory/onprem.py
+
 # --- ÉTAPE 6 : ELK + Fleet ---
 
 echo ""
@@ -523,7 +531,7 @@ echo "==> Ansible — ELK + Fleet (ops-vm)..."
 cd "$REPO_ROOT/ansible"
 ansible-playbook playbooks/elk.yml           -i inventory/onprem.py
 ansible-playbook playbooks/kibana.yml        -i inventory/onprem.py  # ← crée le token Fleet dans Vault
-ansible-playbook playbooks/filebeat.yml      -i inventory/onprem.py
+ansible-playbook playbooks/filebeat.yml      -i inventory/onprem.py --limit ops
 ansible-playbook playbooks/elastic-agent.yml -i inventory/onprem.py  # ← lit le token depuis Vault
 
 echo ""

@@ -25,7 +25,9 @@ else
 fi
 
 # --- IPAM : interfaces physiques (exclut lo, docker, br-, veth) ---
-ip -o addr show | awk '$3=="inet" && $2!~/^(lo|docker|br-|veth)/ {print $2, $4}' | while read IFACE CIDR; do
+# Utilise process substitution pour conserver FIRST_IP_ID hors du sous-shell
+FIRST_IP_ID=""
+while read -r IFACE CIDR; do
   IFACE_ID=$(nb_get "/api/virtualization/interfaces/?virtual_machine_id=$VM_ID&name=$IFACE" | nb_id)
   if [ -z "$IFACE_ID" ]; then
     IFACE_ID=$(nb_post "/api/virtualization/interfaces/" \
@@ -35,13 +37,22 @@ ip -o addr show | awk '$3=="inet" && $2!~/^(lo|docker|br-|veth)/ {print $2, $4}'
   fi
   IP_ID=$(nb_get "/api/ipam/ip-addresses/?address=$CIDR&assigned_object_id=$IFACE_ID" | nb_id)
   if [ -z "$IP_ID" ]; then
-    nb_post "/api/ipam/ip-addresses/" \
-      "{\"address\": \"$CIDR\", \"status\": \"active\", \"assigned_object_type\": \"virtualization.vminterface\", \"assigned_object_id\": $IFACE_ID}" > /dev/null
+    IP_ID=$(nb_post "/api/ipam/ip-addresses/" \
+      "{\"address\": \"$CIDR\", \"status\": \"active\", \"assigned_object_type\": \"virtualization.vminterface\", \"assigned_object_id\": $IFACE_ID}" | \
+      python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
     echo "$(date) [IPAM] created IP $CIDR on $IFACE ($HOSTNAME)"
   else
     echo "$(date) [IPAM] IP $CIDR on $IFACE already up-to-date"
   fi
-done
+  [ -z "$FIRST_IP_ID" ] && FIRST_IP_ID="$IP_ID"
+done < <(ip -o addr show | awk '$3=="inet" && $2!~/^(lo|docker|br-|veth)/ {print $2, $4}')
+
+# --- Définir primary_ip4 sur la VM ---
+if [ -n "$FIRST_IP_ID" ] && [ -n "$VM_ID" ]; then
+  nb_patch "/api/virtualization/virtual-machines/$VM_ID/" \
+    "{\"primary_ip4\": $FIRST_IP_ID}" > /dev/null
+  echo "$(date) [DCIM] set primary_ip4 (id=$FIRST_IP_ID) on $HOSTNAME"
+fi
 
 # --- IPAM : IPs Docker (label: docker:<container> on <vm>) ---
 if command -v docker &>/dev/null && docker ps &>/dev/null 2>&1; then
