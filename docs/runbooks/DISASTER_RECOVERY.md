@@ -337,7 +337,7 @@ ansible all -m ping        # depuis ansible/
 1. **Diagnostic de joignabilité pfSense :**
    ```bash
    ssh admin@192.168.255.254 echo "pfSense-OP OK"
-   ssh admin@5.196.50.52 echo "pfSense-Cloud OK"
+   ssh admin@192.168.255.254 echo "pfSense-Cloud OK"
    ```
 
 2. **Si le kill-switch a été activé** (coupure d'urgence volontaire), rétablir le VPN — le tag `restore` supprime la règle KILLSWITCH et recrée le client OpenVPN :
@@ -375,7 +375,7 @@ Après toute reprise, vérifier que **chaque exigence client** est de nouveau re
 | 1 | Site on-prem accessible uniquement en interne | Tentative d'accès direct externe aux VMs PVE1 | Refusé (réseaux privés derrière pfSense-OP) |
 | 2 | Site distant accessible en externe via bastion | Accès Teleport/SSH au bastion depuis internet | OK via `51.75.128.134:3080` / ProxyJump |
 | 3 | VPN site-to-site actif | Kibana (bastion) joint ES (ops-vm) | Logs Kibana « ready », pas d'erreur ES |
-| 4 | Firewalls effectifs (séparation de trafic) | `ssh admin@192.168.255.254` / `admin@5.196.50.52` ; règles présentes | SSH OK, règles appliquées |
+| 4 | Firewalls effectifs (séparation de trafic) | `ssh admin@192.168.255.254` / `admin@192.168.255.254` ; règles présentes | SSH OK, règles appliquées |
 | 5 | DNS forwarding entre sites | Résolution croisée des zones internes | Réponses correctes |
 | 6 | IPAM (NetBox) à jour | NetBox accessible et synchronisé | Préfixes/devices présents |
 | 7 | Observabilité (logs centralisés) | `_cat/indices` Filebeat sur ES | `docs.count` > 0 |

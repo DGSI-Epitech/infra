@@ -241,13 +241,13 @@ HTTP 200
 #### Action
 
 ```bash
-curl http://5.196.50.52
+curl http://192.168.255.254
 ```
 
 ou
 
 ```bash
-nmap -p 80,443 5.196.50.52
+nmap -p 80,443 192.168.255.254
 ```
 
 #### Attendu

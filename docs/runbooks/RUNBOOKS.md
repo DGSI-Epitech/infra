@@ -255,7 +255,7 @@ ansible ops:bastion -m shell -a "docker images"
 
 ```bash
 ssh admin@192.168.255.254 echo "pfSense-OP OK"
-ssh admin@5.196.50.52 echo "pfSense-Cloud OK"
+ssh admin@192.168.255.254 echo "pfSense-Cloud OK"
 ```
 
 ### Tester l'accès à une VM via ProxyJump
@@ -272,7 +272,7 @@ ssh -J root@51.75.128.134 ubuntu@10.255.255.249 echo "bastion OK"
 
 Vérifier dans le webGUI pfSense que SSH est bien activé :
 - pfSense-OP : https://192.168.255.254 (admin / `PFSENSE_PASSWORD`)
-- pfSense-Cloud : https://5.196.50.52
+- pfSense-Cloud : https://192.168.255.254
 
 Menu : System > Advanced > Admin Access > Secure Shell = Enabled.
 
@@ -339,5 +339,5 @@ Vérifier que pfSense est joignable :
 
 ```bash
 ssh admin@192.168.255.254 echo "OK"  # pfSense-OP
-ssh admin@5.196.50.52 echo "OK" # pfSense-Cloud
+ssh admin@192.168.255.254 echo "OK" # pfSense-Cloud
 ```

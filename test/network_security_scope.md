@@ -11,7 +11,7 @@ Vérifier que les deux sites (PVE1 @ 51.75.128.134 et PVE2 @ 51.75.128.134) peuv
 
 ### Ressources
 - pfSense-OP : 192.168.255.254 (Site 1 / PVE1)
-- pfSense-Cloud : 5.196.50.52 (Site 2 / PVE2)
+- pfSense-Cloud : 192.168.255.254 (Site 2 / PVE2)
 - VPN interface : IPsec tunnel (à vérifier dans pfSense UI)
 
 ### Test 1.1 : Ping ops-vm depuis web-vm
@@ -198,7 +198,7 @@ Vérifier que la résolution DNS fonctionne correctement entre les deux sites vi
 
 ### Ressources
 - DNS primaire : pfSense-OP (192.168.255.254) avec resolver local
-- DNS secondaire : pfSense-Cloud (5.196.50.52)
+- DNS secondaire : pfSense-Cloud (192.168.255.254)
 - Records : à définir dans pfSense ou Unbound
 
 ### Test 4.1 : DNS resolution depuis ops-vm (S1 interne)

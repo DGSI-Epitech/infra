@@ -135,7 +135,7 @@ fi
 
 echo "== Website external security =="
 
-WEB_EXTERNAL=$(curl -s -o /dev/null -w '%{http_code}' http://5.196.50.52)
+WEB_EXTERNAL=$(curl -s -o /dev/null -w '%{http_code}' http://192.168.255.254)
 
 if [[ "$WEB_EXTERNAL" == "000" || "$WEB_EXTERNAL" == "403" ]]; then
     ok "Website NOT exposed externally"

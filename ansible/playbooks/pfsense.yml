@@ -19,7 +19,7 @@
       name: "VPN_vers_Cloud"
       mode: p2p_shared_key
       protocol: UDP4
-      # Ancien: server_addr: "5.196.50.52"  ← IP hardcodée, utilise PFSENSE_CLOUD_WAN
+      # Ancien: server_addr: "192.168.255.254"  ← IP hardcodée, utilise PFSENSE_CLOUD_WAN
       server_addr: "{{ pfsense_cloud_wan }}"
       # Ancien: server_port: "1194"  ← port hardcodé, utilise VPN_PORT
       server_port: "{{ vpn_port }}"

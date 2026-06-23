@@ -2,7 +2,7 @@
 
 ## Ce qui marche
 - SSH direct sur pfSense-OP : `ssh admin@192.168.255.254`
-- SSH direct sur pfSense-Cloud : `ssh admin@5.196.50.52`
+- SSH direct sur pfSense-Cloud : `ssh admin@192.168.255.254`
 
 ## Ce qui est bloqué
 - Shell PVE1 / PVE2 : **impossible**, pas d'accès console ni root SSH

@@ -1,4 +1,13 @@
 ---
+- name: Remove conflicting Elastic repo entries (ancienne clé GPG)
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/sources.list.d/elastic-8.x.list
+    - /etc/apt/sources.list.d/elastic-8.x.sources
+    - /usr/share/keyrings/elastic-archive-keyring.gpg
+
 - name: Add Elastic GPG key
   get_url:
     url: https://artifacts.elastic.co/GPG-KEY-elasticsearch

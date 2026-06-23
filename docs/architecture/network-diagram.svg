@@ -51,7 +51,7 @@
   <text x="605" y="118" font-size="12" font-weight="bold" fill="#475569">🛡️ pfSense-Cloud — VMID 106</text>
   <rect x="605" y="130" width="135" height="66" rx="6" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
   <text x="672" y="148" text-anchor="middle" font-size="11" font-weight="bold" fill="#475569">WAN</text>
-  <text x="672" y="164" text-anchor="middle" font-size="10" fill="#475569">5.196.50.52</text>
+  <text x="672" y="164" text-anchor="middle" font-size="10" fill="#475569">192.168.255.254</text>
   <text x="672" y="180" text-anchor="middle" font-size="9" fill="#64748b">SSH :22 direct</text>
   <rect x="750" y="130" width="135" height="66" rx="6" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
   <text x="817" y="148" text-anchor="middle" font-size="11" font-weight="bold" fill="#475569">DMZ</text>
@@ -100,9 +100,9 @@
   <text x="50" y="604" font-size="10" font-family="monospace" fill="#0f766e">ssh -fNL 9200:172.16.0.253:9200 \</text>
   <text x="50" y="617" font-size="10" font-family="monospace" fill="#0f766e">     -L 8200:172.16.0.253:8200 \</text>
   <text x="50" y="630" font-size="10" font-family="monospace" fill="#0f766e">  -J admin@192.168.255.254 dgsi-op@…</text>
-  <text x="50" y="651" font-size="10" font-weight="bold" fill="#0f766e">PVE2 (via pfSense-Cloud 5.196.50.52) :</text>
+  <text x="50" y="651" font-size="10" font-weight="bold" fill="#0f766e">PVE2 (via pfSense-Cloud 192.168.255.254) :</text>
   <text x="50" y="666" font-size="10" font-family="monospace" fill="#0f766e">ssh -fNL 5601:10.255.255.253:5601 \</text>
-  <text x="50" y="679" font-size="10" font-family="monospace" fill="#0f766e">  -J admin@5.196.50.52 dgsi-cloud@…</text>
+  <text x="50" y="679" font-size="10" font-family="monospace" fill="#0f766e">  -J admin@192.168.255.254 dgsi-cloud@…</text>
 
   <!-- ═══════════════════ PKI ═══════════════════ -->
   <rect x="390" y="545" width="320" height="150" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
