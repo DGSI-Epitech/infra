@@ -3,4 +3,5 @@
   hosts: ops:bastion:web:services
   become: true
   roles:
+    - tls
     - filebeat
