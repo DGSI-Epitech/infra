@@ -5,17 +5,17 @@
 ssh_public_key: "{{ lookup('pipe', playbook_dir + '/../../ansible/scripts/get_ssh_key.sh ' + playbook_dir + '/../../config.env') }}"
 
 # Réseau site OP
-vm_lan_subnet: "{{ lookup('env', 'VM_LAN_SUBNET') | default('172.16.0.240/28') }}"
-vm_gateway: "{{ lookup('env', 'VM_GATEWAY') | default('172.16.0.254') }}"
+vm_lan_subnet: "{{ lookup('env', 'VM_LAN_SUBNET') | default('172.16.0.240/28', true) }}"
+vm_gateway: "{{ lookup('env', 'VM_GATEWAY') | default('172.16.0.254', true) }}"
 
 # Réseau site Cloud
-vm_cloud_lan_subnet: "{{ lookup('env', 'VM_CLOUD_LAN_SUBNET') | default('192.168.255.240/28') }}"
-vm_cloud_dmz_subnet: "{{ lookup('env', 'VM_CLOUD_DMZ_SUBNET') | default('10.255.255.248/29') }}"
-pfsense_cloud_lan_ip: "{{ lookup('env', 'PFSENSE_CLOUD_LAN_IP') | default('192.168.255.254') }}"
-pfsense_cloud_dmz_ip: "{{ lookup('env', 'PFSENSE_CLOUD_DMZ_IP') | default('10.255.255.254') }}"
-pfsense_cloud_dmz_if: "{{ lookup('env', 'PFSENSE_CLOUD_DMZ_IF') | default('vtnet2') }}"
-pfsense_cloud_wan: "{{ lookup('env', 'PFSENSE_CLOUD_WAN') | default('') }}"
+vm_cloud_lan_subnet: "{{ lookup('env', 'VM_CLOUD_LAN_SUBNET') | default('192.168.255.240/28', true) }}"
+vm_cloud_dmz_subnet: "{{ lookup('env', 'VM_CLOUD_DMZ_SUBNET') | default('10.255.255.248/29', true) }}"
+pfsense_cloud_lan_ip: "{{ lookup('env', 'PFSENSE_CLOUD_LAN_IP') | default('192.168.255.254', true) }}"
+pfsense_cloud_dmz_ip: "{{ lookup('env', 'PFSENSE_CLOUD_DMZ_IP') | default('10.255.255.254', true) }}"
+pfsense_cloud_dmz_if: "{{ lookup('env', 'PFSENSE_CLOUD_DMZ_IF') | default('vtnet2', true) }}"
+pfsense_cloud_wan: "{{ lookup('env', 'PFSENSE_CLOUD_WAN') | default('', true) }}"
 
 # OpenVPN
 vpn_port: "{{ lookup('env', 'VPN_PORT') | default('1194', true) }}"
-vpn_tunnel_network: "{{ lookup('env', 'VPN_TUNNEL_NETWORK') | default('10.3.3.0/30') }}"
+vpn_tunnel_network: "{{ lookup('env', 'VPN_TUNNEL_NETWORK') | default('10.3.3.0/30', true) }}"

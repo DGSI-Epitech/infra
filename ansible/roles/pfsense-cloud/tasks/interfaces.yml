@@ -1,23 +1,22 @@
 ---
 - name: Configurer interface LAN Cloud (vtnet1)
   pfsensible.core.pfsense_interface:
-    name: lan
+    descr: LAN
     interface: vtnet1
     enable: true
     ipv4_type: static
-    ipv4address: "{{ pfsense_cloud_lan_ip }}"
-    ipv4mask: "{{ vm_cloud_lan_subnet.split('/')[1] }}"
+    ipv4_address: "{{ pfsense_cloud_lan_ip }}"
+    ipv4_prefixlen: "{{ vm_cloud_lan_subnet.split('/') | last }}"
     state: present
   tags: [configure, interface]
 
 - name: Assigner et configurer interface DMZ/OPT1 (vtnet2)
   pfsensible.core.pfsense_interface:
-    name: opt1
     descr: DMZ
     interface: "{{ pfsense_cloud_dmz_if }}"
     enable: true
     ipv4_type: static
-    ipv4address: "{{ pfsense_cloud_dmz_ip }}"
-    ipv4mask: "{{ vm_cloud_dmz_subnet.split('/')[1] }}"
+    ipv4_address: "{{ pfsense_cloud_dmz_ip }}"
+    ipv4_prefixlen: "{{ vm_cloud_dmz_subnet.split('/') | last }}"
     state: present
   tags: [configure, interface, dmz]

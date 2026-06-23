@@ -32,7 +32,6 @@
     protocol: any
     source: "{{ vm_cloud_dmz_subnet }}"
     destination: "{{ vm_lan_subnet }}"
-    before: "Allow DMZ to ANY"
     state: present
   tags: [configure, firewall, vpn]
 
@@ -98,13 +97,3 @@
     state: present
   tags: [configure, firewall, vpn]
 
-- name: Autoriser trafic inter-sites sur interface OpenVPN
-  pfsensible.core.pfsense_rule:
-    name: "Allow OpenVPN inter-sites"
-    action: pass
-    interface: openvpn
-    protocol: any
-    source: any
-    destination: any
-    state: present
-  tags: [configure, firewall, vpn]
