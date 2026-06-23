@@ -517,6 +517,13 @@ echo "    Tunnel prêt (localhost:${NETBOX_LOCAL_PORT})."
 
 export NETBOX_SERVER="http://localhost:${NETBOX_LOCAL_PORT}"
 
+# --- Enregistrement ops-vm dans NetBox ---
+
+echo ""
+echo "==> Ansible — Sync agent NetBox (ops-vm + services-vm)..."
+cd "$REPO_ROOT/ansible"
+ansible-playbook playbooks/netbox-sync-deploy.yml -i inventory/onprem.py
+
 # --- ÉTAPE 6 : ELK + Fleet ---
 
 echo ""

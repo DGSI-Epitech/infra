@@ -37,4 +37,6 @@
       no_log: true
 
     - name: Deploy NetBox sync agent
-      import_tasks: ../roles/netbox/tasks/sync_agent.yml
+      include_role:
+        name: netbox
+        tasks_from: sync_agent
