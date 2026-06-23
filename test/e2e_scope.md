@@ -88,7 +88,7 @@ active
 #### Action
 
 ```bash
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.242 "logger TEST_E2E_LOG"
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.242 "logger TEST_E2E_LOG"
 ```
 
 ---
@@ -223,7 +223,7 @@ HTTP 200
 #### Action
 
 ```bash
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.242
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.242
 
 curl http://192.168.255.243
 ```

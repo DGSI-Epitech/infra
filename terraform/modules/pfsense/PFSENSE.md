@@ -30,7 +30,7 @@ Les variables suivantes doivent être renseignées dans `config.env` :
 
 | Variable | Valeur | Description |
 |---|---|---|
-| `PFSENSE_OP_WAN` | `5.196.45.8` | IP WAN routable pfSense OP |
+| `PFSENSE_OP_WAN` | `192.168.255.254` | IP WAN routable pfSense OP |
 | `PFSENSE_CLOUD_WAN` | `5.196.50.52` | IP WAN routable pfSense Cloud |
 | `PFSENSE_PASSWORD` | `pfsense` | Mot de passe compte `admin` pfSense |
 | `VM_GATEWAY` | `172.16.0.254` | Gateway LAN PVE1 (pfSense OP) |
@@ -93,7 +93,7 @@ Ansible se connecte directement sur les IPs WAN avec le compte `admin` en authen
 ```
 Internet
     │
-    ├── PVE1 (OP)  5.196.45.8
+    ├── PVE1 (OP)  192.168.255.254
     │       └── pfSense S1 (op.local)
     │               ├── WAN  vmbr0
     │               └── LAN  vmbr1  172.16.0.240/28  GW 172.16.0.254
@@ -120,7 +120,7 @@ Le webGUI est accessible directement depuis un navigateur via les IPs WAN — la
 
 | pfSense | URL | Login |
 |---|---|---|
-| OP (on-premise) | https://5.196.45.8 | `admin` / `PFSENSE_PASSWORD` (config.env) |
+| OP (on-premise) | https://192.168.255.254 | `admin` / `PFSENSE_PASSWORD` (config.env) |
 | Cloud | https://5.196.50.52 | `admin` / `PFSENSE_PASSWORD` (config.env) |
 
 Accepter le certificat auto-signé lors de la première connexion.

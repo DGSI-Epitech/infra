@@ -154,11 +154,3 @@
         disable: false
         state: present
       tags: [never, restore]
-
-    - name: Activer le remote syslog VPN vers le collecteur
-      pfsensible.core.pfsense_log_settings:
-        enable: true
-        remoteserver: "{{ ops_collector_ip }}:5140"
-        logformat: rfc5424
-        vpn: true
-      tags: [configure, logging, vpn]

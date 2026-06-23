@@ -13,7 +13,7 @@ Internet
    │                                                                        │
    ▼                                                                        ▼
 pfSense-OP (PVE1)                                              pfSense-Cloud (PVE2)
-5.196.45.8                                                     5.196.50.52
+192.168.255.254                                                     5.196.50.52
 LAN: 172.16.0.240/28                                         DMZ: 10.255.255.248/29
    │                                                           LAN: 192.168.255.240/28
    │  OpenVPN 10.3.3.0/29                                         │
@@ -35,7 +35,7 @@ LAN: 172.16.0.240/28                                         DMZ: 10.255.255.248
 
 | VMID | VM | IP | Services |
 |------|----|----|----------|
-| 125 | pfSense-OP | WAN: 5.196.45.8 / LAN: 172.16.0.254 | Firewall, VPN, DNS |
+| 125 | pfSense-OP | WAN: 192.168.255.254 / LAN: 172.16.0.254 | Firewall, VPN, DNS |
 | 2038 | ops-vm | 172.16.0.253/28 | Elasticsearch, Vault, Filebeat |
 | 3038 | services-vm | 172.16.0.241/28 | ⚠️ hors ligne |
 

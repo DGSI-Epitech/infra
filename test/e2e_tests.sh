@@ -11,7 +11,7 @@ CA_CERT="$HOME/.ansible-tls/ca.crt"
 OPS_VM="ubuntu@172.16.0.242"
 BASTION_VM="ubuntu@10.255.255.249"
 
-JUMP_OP="admin@5.196.45.8"
+JUMP_OP="admin@192.168.255.254"
 JUMP_CLOUD="root@51.75.128.134"
 
 WEBSITE_IP="192.168.255.243"

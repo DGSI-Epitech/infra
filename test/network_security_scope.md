@@ -10,14 +10,14 @@ Scope : Tests de connectivité VPN, sécurité firewall, accès Teleport, DNS cr
 Vérifier que les deux sites (PVE1 @ 51.75.128.134 et PVE2 @ 51.75.128.134) peuvent communiquer via le tunnel VPN sur les interfaces de gestion interne.
 
 ### Ressources
-- pfSense-OP : 5.196.45.8 (Site 1 / PVE1)
+- pfSense-OP : 192.168.255.254 (Site 1 / PVE1)
 - pfSense-Cloud : 5.196.50.52 (Site 2 / PVE2)
 - VPN interface : IPsec tunnel (à vérifier dans pfSense UI)
 
 ### Test 1.1 : Ping ops-vm depuis web-vm
 ```bash
 # SSH via ProxyJump vers ops-vm (172.16.0.253)
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.253
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.253
 
 # Depuis ops-vm, ping web-vm sur le LAN PVE2 (192.168.255.243)
 ping -c 4 192.168.255.243
@@ -27,7 +27,7 @@ ping -c 4 192.168.255.243
 ### Test 1.2 : Ping services-vm depuis bastion
 ```bash
 # SSH vers bastion (10.255.255.249) — DMZ PVE2
-ssh -J admin@5.196.45.8 ubuntu@10.255.255.249
+ssh -J admin@192.168.255.254 ubuntu@10.255.255.249
 
 # Depuis bastion, ping services-vm (172.16.0.241) sur DMZ PVE1
 ping -c 4 172.16.0.241
@@ -36,7 +36,7 @@ ping -c 4 172.16.0.241
 
 ### Test 1.3 : Vérifier les routes VPN actives sur pfSense-OP
 ```bash
-ssh admin@5.196.45.8
+ssh admin@192.168.255.254
 
 # Vérifier IPsec peer status
 # Menu : Status > IPsec > ESP Connections
@@ -68,7 +68,7 @@ Tester le mécanisme d'arrêt d'urgence du VPN (kill switch) : vérifier que cou
 
 ### Test 2.1 : Baseline (communication OK)
 ```bash
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.253
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.253
 ping -c 10 192.168.255.243 > /tmp/baseline.txt
 # Attendu : 100% succès (tous les paquets arrivent)
 ```
@@ -76,7 +76,7 @@ ping -c 10 192.168.255.243 > /tmp/baseline.txt
 ### Test 2.2 : Kill switch activation (pfSense UI)
 ```bash
 # SSH vers pfSense-OP
-ssh admin@5.196.45.8
+ssh admin@192.168.255.254
 
 # Menu Status > IPsec > désactiver le tunnel (ou utiliser l'API)
 # Alternativement : via SSH
@@ -86,7 +86,7 @@ ssh admin@5.196.45.8
 ### Test 2.3 : Vérifier la perte de connexion
 ```bash
 # Depuis une autre session, tester la perte imédiate
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.253
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.253
 ping -c 10 192.168.255.243
 # Attendu : timeout ou 100% de perte
 ```
@@ -94,7 +94,7 @@ ping -c 10 192.168.255.243
 ### Test 2.4 : Recovery (réactiver le tunnel)
 ```bash
 # SSH vers pfSense-OP
-ssh admin@5.196.45.8
+ssh admin@192.168.255.254
 
 # Réactiver le tunnel (Menu Status > IPsec > enable)
 # Ou via CLI : ipsecctl -f
@@ -106,7 +106,7 @@ sleep 5  # Laisser le tunnel se rétablir
 ### Test 2.5 : Vérifier le rétablissement
 ```bash
 # Depuis ops-vm, re-tester la connexion
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.253
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.253
 ping -c 10 192.168.255.243
 # Attendu : 100% succès (connexion rétablie)
 ```
@@ -131,7 +131,7 @@ Vérifier que Teleport (access plane) permet de se connecter en SSH et d'accéde
 ### Test 3.1 : Vérifier Teleport est installé/running
 ```bash
 # Sur bastion (accès Teleport probable)
-ssh -J admin@5.196.45.8 ubuntu@10.255.255.249
+ssh -J admin@192.168.255.254 ubuntu@10.255.255.249
 
 # Vérifier si Teleport daemon tourne
 systemctl status teleport
@@ -160,7 +160,7 @@ tsh ssh ubuntu@ops-vm
 # Attendu : authentification réussie, accès aux web apps enregistrées
 
 # Via tunnel SSH si Teleport n'est pas public
-ssh -J admin@5.196.45.8 -L 3080:10.255.255.249:3080 ubuntu@10.255.255.249
+ssh -J admin@192.168.255.254 -L 3080:10.255.255.249:3080 ubuntu@10.255.255.249
 
 # Puis visitez https://localhost:3080
 ```
@@ -170,11 +170,11 @@ ssh -J admin@5.196.45.8 -L 3080:10.255.255.249:3080 ubuntu@10.255.255.249
 # Si Teleport n'est pas disponible, utiliser SSH tunneling direct
 
 # Kibana (bastion :5601)
-ssh -J admin@5.196.45.8 -L 5601:10.255.255.249:5601 ubuntu@10.255.255.249
+ssh -J admin@192.168.255.254 -L 5601:10.255.255.249:5601 ubuntu@10.255.255.249
 # Puis : https://localhost:5601
 
 # Vault (ops-vm :8200)
-ssh -J admin@5.196.45.8 -L 8200:172.16.0.253:8200 ubuntu@172.16.0.253
+ssh -J admin@192.168.255.254 -L 8200:172.16.0.253:8200 ubuntu@172.16.0.253
 # Puis : https://localhost:8200
 ```
 
@@ -197,13 +197,13 @@ ssh -J admin@5.196.45.8 -L 8200:172.16.0.253:8200 ubuntu@172.16.0.253
 Vérifier que la résolution DNS fonctionne correctement entre les deux sites via les serveurs DNS configurés (pfSense) et que les enregistrements intra-site et inter-site se résolvent correctement.
 
 ### Ressources
-- DNS primaire : pfSense-OP (5.196.45.8) avec resolver local
+- DNS primaire : pfSense-OP (192.168.255.254) avec resolver local
 - DNS secondaire : pfSense-Cloud (5.196.50.52)
 - Records : à définir dans pfSense ou Unbound
 
 ### Test 4.1 : DNS resolution depuis ops-vm (S1 interne)
 ```bash
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.253
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.253
 
 # Test résolution locale (interne S1)
 nslookup vault.internal      # Attendu : 172.16.0.253 (ops-vm)
@@ -215,7 +215,7 @@ nslookup web.internal        # Attendu : 192.168.255.243 (web-vm S2)
 
 ### Test 4.2 : DNS resolution depuis bastion (S2 DMZ)
 ```bash
-ssh -J admin@5.196.45.8 ubuntu@10.255.255.249
+ssh -J admin@192.168.255.254 ubuntu@10.255.255.249
 
 # Test résolution locale (interne S2)
 nslookup kibana.internal     # Attendu : 10.255.255.249 (bastion)
@@ -238,7 +238,7 @@ resolvectl status
 
 ### Test 4.4 : Vérifier les records sur pfSense
 ```bash
-ssh admin@5.196.45.8
+ssh admin@192.168.255.254
 
 # Accédez à Services > DNS > Resolver (Unbound)
 # Vérifier les forward zones (split-DNS pour domaines inter-site)
@@ -289,7 +289,7 @@ brew install nmap
 ### Test 5.2 : Scan depuis l'extérieur (WAN) vers pfSense-OP
 ```bash
 # Scanner les ports publics depuis un host externe (ou via simulation)
-nmap -p 22,80,443,500,4500 5.196.45.8
+nmap -p 22,80,443,500,4500 192.168.255.254
 
 # Résultats attendus :
 # 22 (SSH) : filtered (bloqué intentionnellement)
@@ -301,7 +301,7 @@ nmap -p 22,80,443,500,4500 5.196.45.8
 
 ### Test 5.3 : Scan depuis S1 interne vers S2 (Bastion)
 ```bash
-ssh -J admin@5.196.45.8 ubuntu@172.16.0.253
+ssh -J admin@192.168.255.254 ubuntu@172.16.0.253
 
 # Scanner bastion (S2) depuis ops-vm (S1 interne)
 nmap -p 22,80,443,5601,8200,9200 10.255.255.249
@@ -316,7 +316,7 @@ nmap -p 22,80,443,5601,8200,9200 10.255.255.249
 
 ### Test 5.4 : Scan depuis S2 interne vers S1 (ops-vm)
 ```bash
-ssh -J admin@5.196.45.8 ubuntu@10.255.255.249
+ssh -J admin@192.168.255.254 ubuntu@10.255.255.249
 
 # Scanner ops-vm (S1) depuis bastion (S2)
 nmap -p 22,80,443,8200,9200 172.16.0.253
