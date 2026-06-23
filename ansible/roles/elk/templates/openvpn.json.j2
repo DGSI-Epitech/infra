@@ -1,0 +1,15 @@
+{
+  "description": "OpenVPN logs",
+  "processors": [
+    {
+      "grok": {
+        "field": "message",
+        "patterns": [
+          "%{DATA:vpn.user}\/%{IP:source.ip}",
+          "%{GREEDYDATA:event.reason}"
+        ],
+        "ignore_failure": true
+      }
+    }
+  ]
+}

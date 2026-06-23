@@ -113,7 +113,7 @@ source "proxmox-iso" "pfsense" {
 additional_iso_files {
     cd_content = {
       "/config.xml" = templatefile("${path.root}/http/config.xml.pkrtpl.hcl", {
-        admin_authorized_keys_b64 = base64encode(var.pfsense_admin_ssh_public_key)
+        admin_authorized_keys_b64 = base64encode(var.pfsense_admin_ssh_public_key)        
       })
     }
     cd_label         = "PFSENSE_CFG"

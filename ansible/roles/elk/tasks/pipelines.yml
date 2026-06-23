@@ -1,0 +1,25 @@
+- name: Deploy ingest pipelines
+  uri:
+    url: "http://localhost:9200/_ingest/pipeline/{{ item.name }}"
+    method: PUT
+    body_format: json
+    body: "{{ lookup('file', item.file) }}"
+  loop:
+    - { name: "pfsense", file: "files/ingest-pipelines/pfsense.json" }
+    - { name: "teleport", file: "files/ingest-pipelines/teleport.json" }
+    - { name: "vpn", file: "files/ingest-pipelines/vpn.json" }
+    - { name: "auth", file: "files/ingest-pipelines/auth.json" }
+
+- name: Upload ingest pipelines
+  uri:
+    url: "{{ elasticsearch_url }}/_ingest/pipeline/{{ item }}"
+    method: PUT
+    user: "{{ elastic_username }}"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body: "{{ lookup('template', item + '.json.j2') }}"
+    status_code:
+      - 200
+      - 201
+  loop: "{{ elk_ingest_pipelines }}"

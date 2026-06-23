@@ -1,0 +1,19 @@
+{
+  "description": "Teleport audit logs",
+  "processors": [
+    {
+      "rename": {
+        "field": "user",
+        "target_field": "user.name",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "addr.remote",
+        "target_field": "source.ip",
+        "ignore_missing": true
+      }
+    }
+  ]
+}

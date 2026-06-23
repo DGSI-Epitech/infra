@@ -1,0 +1,15 @@
+{
+  "description": "Ubuntu authentication logs",
+  "processors": [
+    {
+      "grok": {
+        "field": "message",
+        "patterns": [
+          "Failed password for %{DATA:user.name} from %{IP:source.ip}",
+          "Accepted password for %{DATA:user.name} from %{IP:source.ip}"
+        ],
+        "ignore_failure": true
+      }
+    }
+  ]
+}

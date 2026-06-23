@@ -108,3 +108,6 @@
     rule: allow
     port: "{{ elk_es_cluster_port | string }}"
     proto: tcp
+
+- name: Deploy ingest pipelines
+  import_tasks: pipelines.yml

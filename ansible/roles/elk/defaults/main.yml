@@ -13,3 +13,9 @@ elk_elastic_password: "changeme"
 elk_kibana_system_password: "changeme"
 
 elk_tls_host_dir: /etc/ssl/internal
+
+elk_ingest_pipelines:
+  - pfsense
+  - teleport
+  - openvpn
+  - auth
