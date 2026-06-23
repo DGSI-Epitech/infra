@@ -1,3 +1,6 @@
+- name: Fetch NetBox secrets from Vault
+  import_tasks: vault_secrets.yml
+
 - name: Install and bootstrap NetBox
   import_tasks: install_netbox.yml
 

@@ -417,6 +417,7 @@ echo "==> Ansible — TLS + Vault (ops-vm)..."
 cd "$REPO_ROOT/ansible"
 ansible-playbook playbooks/tls.yml   -i inventory/onprem.py --limit ops
 ansible-playbook playbooks/vault.yml -i inventory/onprem.py
+ansible-playbook playbooks/secrets-init.yml -i inventory/onprem.py
 
 # --- ÉTAPE 5 : services-vm — NetBox ---
 
