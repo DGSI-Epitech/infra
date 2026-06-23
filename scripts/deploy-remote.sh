@@ -410,6 +410,12 @@ dnat_rule tcp 3022 ${BASTION_IP} 3022
 # OpenVPN (pfSense-Cloud) : ${PROXMOX_HOST_REMOTE}:1194 UDP → ${PFSENSE_CLOUD_WAN_TRANSIT}:1194
 dnat_rule udp 1194 ${PFSENSE_CLOUD_WAN_TRANSIT} 1194
 
+# pfSense-Cloud SSH (Ansible) : ${PROXMOX_HOST_REMOTE}:2222 → 192.168.255.254:22 (LAN pfSense)
+dnat_rule tcp 2222 192.168.255.254 22
+# MASQUERADE sur vmbr4 pour que pfSense voit la requête venir de PVE2 (routing symétrique)
+iptables -t nat -C POSTROUTING -o vmbr4 -d 192.168.255.254 -p tcp --dport 22 -j MASQUERADE 2>/dev/null \
+  || iptables -t nat -A POSTROUTING -o vmbr4 -d 192.168.255.254 -p tcp --dport 22 -j MASQUERADE
+
 # Persister dans /etc/network/interfaces (post-up vmbr3)
 if ! grep -q "dport 3080" /etc/network/interfaces 2>/dev/null; then
   sed -i '/^#Cloud DMZ — bastion$/i\\tpost-up iptables -t nat -A PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 3080 -j DNAT --to-destination ${BASTION_IP}:443\n\tpost-up iptables -t nat -A PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 3022 -j DNAT --to-destination ${BASTION_IP}:3022\n\tpost-down iptables -t nat -D PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 3080 -j DNAT --to-destination ${BASTION_IP}:443\n\tpost-down iptables -t nat -D PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 3022 -j DNAT --to-destination ${BASTION_IP}:3022' \
@@ -419,8 +425,12 @@ if ! grep -q "dport 1194" /etc/network/interfaces 2>/dev/null; then
   sed -i '/^#Transit Proxmox→pfSense WAN$/i\\tpost-up iptables -t nat -A PREROUTING -p udp -d ${PROXMOX_HOST_REMOTE} --dport 1194 -j DNAT --to-destination ${PFSENSE_CLOUD_WAN_TRANSIT}:1194\n\tpost-down iptables -t nat -D PREROUTING -p udp -d ${PROXMOX_HOST_REMOTE} --dport 1194 -j DNAT --to-destination ${PFSENSE_CLOUD_WAN_TRANSIT}:1194' \
     /etc/network/interfaces
 fi
+if ! grep -q "dport 2222" /etc/network/interfaces 2>/dev/null; then
+  sed -i '/^#Cloud LAN — website + pfSense LAN$/i\\tpost-up iptables -t nat -A PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 2222 -j DNAT --to-destination 192.168.255.254:22\n\tpost-up iptables -t nat -A POSTROUTING -o vmbr4 -d 192.168.255.254 -p tcp --dport 22 -j MASQUERADE\n\tpost-down iptables -t nat -D PREROUTING -p tcp -d ${PROXMOX_HOST_REMOTE} --dport 2222 -j DNAT --to-destination 192.168.255.254:22\n\tpost-down iptables -t nat -D POSTROUTING -o vmbr4 -d 192.168.255.254 -p tcp --dport 22 -j MASQUERADE' \
+    /etc/network/interfaces
+fi
 DNATEOF
-echo "    DNAT configuré — Teleport (3080→${BASTION_IP}:443, 3022→${BASTION_IP}:3022) + OpenVPN (1194→${PFSENSE_CLOUD_WAN_TRANSIT}:1194)."
+echo "    DNAT configuré — Teleport (3080→${BASTION_IP}:443, 3022→${BASTION_IP}:3022) + OpenVPN (1194→${PFSENSE_CLOUD_WAN_TRANSIT}:1194) + pfSense SSH (2222→192.168.255.254:22)."
 
 # --- Ansible — déploiement Teleport sur bastion ---
 
