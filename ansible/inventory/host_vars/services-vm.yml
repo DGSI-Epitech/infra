@@ -2,11 +2,11 @@
 tls_san:
   - "IP:{{ ansible_host }}"
   - "IP:127.0.0.1"
-  - "DNS:ops-vm"
+  - "DNS:services-vm"
   - "DNS:localhost"
-  - "DNS:elasticsearch"
+  - "DNS:netbox"
 
 teleport_labels:
-  role: ops
+  role: services
   site: onprem
-  services: elasticsearch,vault
+  services: netbox
