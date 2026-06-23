@@ -86,7 +86,7 @@ proxy_jump_pfsense_op    = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/
 proxy_jump_pfsense_cloud = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host_remote}"
 
 pfsense_common = {
-    "ansible_user":               "admin",
+    "ansible_user":               "root",
     "ansible_password":           pfsense_password,
     "ansible_connection":         "ssh",
     "ansible_python_interpreter": "/usr/local/bin/python3.11",
@@ -159,8 +159,8 @@ inventory = {
             },
             "pfsense-cloud": {
                 **pfsense_common,
-                "ansible_host":            pfsense_cloud_wan,
-                "ansible_ssh_common_args": proxy_jump_pfsense_cloud,
+                "ansible_host": pfsense_cloud_wan,
+                "ansible_port": 2222,
             },
         }
     }

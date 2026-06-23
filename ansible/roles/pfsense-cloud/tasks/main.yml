@@ -6,8 +6,8 @@
     state: present
   tags: [configure, ssh]
 
-- name: Configure interfaces
-  import_tasks: interfaces.yml
+# - name: Configure interfaces
+#   import_tasks: interfaces.yml
 
 - name: Configure firewall rules
   import_tasks: firewall.yml
