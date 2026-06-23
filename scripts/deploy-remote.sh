@@ -250,8 +250,9 @@ add_bridge() {
   fi
 }
 
-add_bridge "vmbr3" "10.255.255.254/29" "Cloud DMZ — bastion" "10.255.255.248/29"
-add_bridge "vmbr4" "192.168.255.254/28" "Cloud LAN — website + pfSense LAN"
+add_bridge "vmbr5" "10.0.1.1/30" "Transit Proxmox→pfSense WAN" "10.0.1.0/30"
+add_bridge "vmbr3" "10.255.255.252/29" "Cloud DMZ — bastion" "10.255.255.248/29"
+add_bridge "vmbr4" "192.168.255.252/28" "Cloud LAN — website + pfSense LAN"
 SSHEOF
 echo "    Bridges Cloud opérationnels."
 
