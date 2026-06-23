@@ -1,0 +1,37 @@
+---
+# ===================================================================
+# fleet-integrations — variables par défaut
+# ===================================================================
+
+# --- Accès Kibana (réutilise les mêmes conventions que le rôle elk/kibana) ---
+kibana_port: 5601
+kibana_elastic_password: "changeme"
+
+# --- Proxy sortant pour epr.elastic.co (ops-vm est derrière un proxy) ---
+# Si vide, aucune config de proxy n'est poussée dans kibana.yml.
+fleet_registry_proxy_url: ""          # ex: "https://proxy.interne.local:3128"
+# Si le proxy nécessite une authentification, NE PAS mettre user:pass dans
+# fleet_registry_proxy_url (bug connu Kibana, voir notes du rôle).
+# Préférer un proxy sans auth dédié à ce flux, ou un miroir EPR local.
+
+# --- Intégration pfSense (input UDP syslog) ---
+fleet_pfsense_integration_name: "pfsense-syslog"
+fleet_pfsense_package_version: "1.25.4"
+fleet_pfsense_udp_host: "0.0.0.0"
+fleet_pfsense_udp_port: 5514
+fleet_pfsense_internal_networks:
+  - private
+fleet_pfsense_preserve_original_event: true
+# tz_offset uniquement utile si pfSense envoie en format BSD (on impose Syslog format)
+fleet_pfsense_tz_offset: "UTC"
+
+# --- Intégration Teleport (Custom Logs sur fichier d'audit JSON) ---
+fleet_teleport_integration_name: "teleport-audit-log"
+fleet_log_package_version: "2.4.1"
+# Chemin du fichier d'audit Teleport sur le bastion — à ajuster selon teleport_data_dir
+teleport_audit_log_path: "/var/lib/teleport/log/*.json"
+fleet_teleport_log_paths:
+  - "{{ teleport_audit_log_path }}"
+
+# --- Cible de la policy Fleet (Default Policy créée par le rôle elk) ---
+fleet_target_policy_name: "Default Policy"

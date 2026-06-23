@@ -1,0 +1,41 @@
+---
+# ===================================================================
+# Configure xpack.fleet.registryProxyUrl dans kibana.yml pour que
+# Kibana puisse télécharger les packages d'intégration (pfsense, log)
+# depuis epr.elastic.co via le proxy sortant d'ops-vm.
+#
+# ATTENTION :
+#   - Mettre les identifiants dans l'URL (https://user:pass@proxy:port)
+#     est documenté par Elastic MAIS un bug connu (kibana#100518) peut
+#     provoquer une erreur "407 Proxy Authentication Required" malgré
+#     une config correcte. Si ça bloque : tester un proxy sans auth
+#     dédié à ce flux, ou héberger un miroir EPR local (lite distribution).
+#   - HTTPS uniquement si le proxy nécessite une authentification.
+# ===================================================================
+
+- name: Add xpack.fleet.registryProxyUrl to kibana.yml
+  lineinfile:
+    path: "{{ kibana_dir }}/config/kibana.yml"
+    regexp: '^xpack\.fleet\.registryProxyUrl:'
+    line: "xpack.fleet.registryProxyUrl: {{ fleet_registry_proxy_url }}"
+    insertafter: EOF
+  register: fi_proxy_conf
+
+- name: Restart Kibana if proxy config changed
+  command: docker compose restart kibana
+  args:
+    chdir: "{{ kibana_dir }}"
+  changed_when: true
+  when: fi_proxy_conf.changed
+
+- name: Wait for Kibana to be ready again after restart
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/status"
+    method: GET
+    validate_certs: false
+    status_code: 200
+  register: fi_kibana_status_after_proxy
+  retries: 40
+  delay: 15
+  until: fi_kibana_status_after_proxy.status == 200
+  when: fi_proxy_conf.changed

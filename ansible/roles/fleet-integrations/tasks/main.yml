@@ -1,0 +1,200 @@
+---
+# ===================================================================
+# fleet-integrations
+# ---------------------------------------------------------------
+# Ajoute, via l'API Fleet, deux intégrations sur la Default Policy
+# existante (créée par le rôle elk/kibana) :
+#   1. pfSense (input UDP syslog)      -> ops-vm reçoit pfSense-OP + pfSense-Cloud
+#   2. Custom Logs (Teleport audit)    -> agent sur le bastion lit le fichier JSON
+#
+# Convention reprise du rôle kibana existant :
+#   - auth basic elastic/elk_elastic_password (pas d'API key dédiée)
+#   - header kbn-xsrf obligatoire sur tout POST
+#   - validate_certs: false (cohérent avec le reste du repo)
+#   - delegate_to: groups['ops'][0] pour tous les appels API Kibana
+#
+# ATTENTION — à vérifier avant la première exécution en prod :
+#   Les noms de "vars" ci-dessous (udp_host, udp_port, internal_networks,
+#   tz_offset, preserve_original_event) suivent le pattern standard des
+#   intégrations Elastic basées sur un input UDP, mais n'ont pas été
+#   confirmés contre le manifeste exact du package pfsense 1.25.4 (pas
+#   d'accès direct à epr.elastic.co depuis cet environnement de travail).
+#   -> Avant le rollout : Kibana UI -> Integrations -> pfSense -> Add ->
+#      "Preview API request" pour confirmer la structure JSON exacte,
+#      et corriger ce fichier si besoin.
+# ===================================================================
+
+- name: Ensure Kibana can reach the Elastic Package Registry through the outbound proxy
+  include_tasks: registry_proxy.yml
+  when: fleet_registry_proxy_url | length > 0
+
+- name: Get Fleet agent policies (find Default Policy)
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+    method: GET
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  delegate_to: "{{ groups['ops'][0] }}"
+  register: fi_agent_policies
+
+- name: Fail clearly if the target policy does not exist
+  fail:
+    msg: >
+      Aucune policy nommée '{{ fleet_target_policy_name }}' trouvée dans Fleet.
+      Policies disponibles : {{ fi_agent_policies.json['items'] | map(attribute='name') | list }}
+  when: fi_agent_policies.json['items'] | selectattr('name', 'equalto', fleet_target_policy_name) | list | length == 0
+
+- name: Set target policy ID
+  set_fact:
+    fi_target_policy_id: "{{ (fi_agent_policies.json['items'] | selectattr('name', 'equalto', fleet_target_policy_name) | first).id }}"
+
+- name: Get currently installed/available packages (check pfsense + log)
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/epm/packages/{{ item.name }}/{{ item.version }}"
+    method: GET
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [200, 404]
+  delegate_to: "{{ groups['ops'][0] }}"
+  loop:
+    - { name: "pfsense", version: "{{ fleet_pfsense_package_version }}" }
+    - { name: "log", version: "{{ fleet_log_package_version }}" }
+  loop_control:
+    label: "{{ item.name }}-{{ item.version }}"
+  register: fi_package_lookup
+
+- name: Install package if not already installed
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/epm/packages/{{ item.item.name }}/{{ item.item.version }}"
+    method: POST
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body: {}
+    status_code: [200, 409]
+  delegate_to: "{{ groups['ops'][0] }}"
+  loop: "{{ fi_package_lookup.results }}"
+  loop_control:
+    label: "{{ item.item.name }}-{{ item.item.version }}"
+  when: item.status == 404
+  register: fi_package_install
+  retries: 3
+  delay: 10
+  until: fi_package_install is not failed
+
+# -------------------------------------------------------------
+# 1. Intégration pfSense (UDP syslog) sur ops-vm
+# -------------------------------------------------------------
+- name: Check if pfSense integration policy already exists
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies?kuery=ingest-package-policies.name:{{ fleet_pfsense_integration_name }}"
+    method: GET
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  delegate_to: "{{ groups['ops'][0] }}"
+  register: fi_pfsense_existing
+
+- name: Create pfSense package policy (UDP input)
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "{{ fleet_pfsense_integration_name }}"
+      policy_id: "{{ fi_target_policy_id }}"
+      package:
+        name: "pfsense"
+        version: "{{ fleet_pfsense_package_version }}"
+      inputs:
+        pfsense-udp:
+          enabled: true
+          streams:
+            pfsense.log:
+              enabled: true
+              vars:
+                udp_host: "{{ fleet_pfsense_udp_host }}"
+                udp_port: "{{ fleet_pfsense_udp_port }}"
+                internal_networks: "{{ fleet_pfsense_internal_networks }}"
+                tz_offset: "{{ fleet_pfsense_tz_offset }}"
+                preserve_original_event: "{{ fleet_pfsense_preserve_original_event }}"
+    status_code: [200, 201]
+  delegate_to: "{{ groups['ops'][0] }}"
+  when: fi_pfsense_existing.json['items'] | length == 0
+  register: fi_pfsense_create
+
+# -------------------------------------------------------------
+# 2. Intégration Teleport audit log (Custom Logs / package "log")
+#    -> assignée à la MÊME Default Policy : suppose que l'agent du
+#       bastion Teleport est enrôlé dans cette policy par défaut.
+#       Si le bastion a sa propre policy dédiée, surcharger
+#       fleet_target_policy_name pour cette partie (voir note finale).
+# -------------------------------------------------------------
+- name: Check if Teleport audit log integration already exists
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies?kuery=ingest-package-policies.name:{{ fleet_teleport_integration_name }}"
+    method: GET
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  delegate_to: "{{ groups['ops'][0] }}"
+  register: fi_teleport_existing
+
+- name: Create Teleport audit log package policy (Custom Logs)
+  uri:
+    url: "https://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+    method: POST
+    url_username: elastic
+    url_password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      name: "{{ fleet_teleport_integration_name }}"
+      policy_id: "{{ fi_target_policy_id }}"
+      package:
+        name: "log"
+        version: "{{ fleet_log_package_version }}"
+      inputs:
+        logfile-logfile:
+          enabled: true
+          streams:
+            log.logs:
+              enabled: true
+              vars:
+                paths: "{{ fleet_teleport_log_paths }}"
+                data_stream.dataset: "teleport.audit"
+                tags:
+                  - "teleport-audit"
+    status_code: [200, 201]
+  delegate_to: "{{ groups['ops'][0] }}"
+  when: fi_teleport_existing.json['items'] | length == 0
+  register: fi_teleport_create
+
+- name: Summary
+  debug:
+    msg:
+      - "pfSense integration : {{ 'créée' if (fi_pfsense_create is defined and fi_pfsense_create is not skipped) else 'déjà présente' }}"
+      - "Teleport integration : {{ 'créée' if (fi_teleport_create is defined and fi_teleport_create is not skipped) else 'déjà présente' }}"
+      - "Policy cible : {{ fleet_target_policy_name }} ({{ fi_target_policy_id }})"
