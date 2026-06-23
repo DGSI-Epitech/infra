@@ -99,7 +99,7 @@
         compression: "{{ openvpn_client.compression }}"
         state: present
       tags: [configure, vpn]
-      
+
     - name: Autoriser trafic inter-sites sur interface OpenVPN
       pfsensible.core.pfsense_rule:
         name: "Allow OpenVPN inter-sites"
@@ -110,21 +110,6 @@
         destination: any
         state: present
       tags: [configure, firewall, vpn]
-
-    - name: Configurer client OpenVPN (connexion vers Cloud)
-      pfsensible.core.pfsense_openvpn_client:
-        name: "{{ openvpn_client.name }}"
-        mode: "{{ openvpn_client.mode }}"
-        protocol: "{{ openvpn_client.protocol }}"
-        server_addr: "{{ openvpn_client.server_addr }}"
-        server_port: "{{ openvpn_client.server_port }}"
-        tunnel_network: "{{ openvpn_client.tunnel_network }}"
-        remote_network: "{{ openvpn_client.remote_network }}"
-        shared_key: "{{ openvpn_shared_key }}"
-        data_ciphers: "{{ openvpn_client.data_ciphers }}"
-        compression: "{{ openvpn_client.compression }}"
-        state: present
-      tags: [configure, vpn]
 
     - name: Configurer les serveurs DNS (Forwarders)
       pfsensible.core.pfsense_setup:
