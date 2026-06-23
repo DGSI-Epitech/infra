@@ -43,7 +43,7 @@ Les variables suivantes doivent être renseignées dans `config.env` :
 ```bash
 cd ansible
 
-# Configuration complète (firewall, VPN, DNS, CA)
+# Configuration complète (firewall, VPN, DNS)
 ansible-playbook -i inventory/onprem.py playbooks/pfsense.yml
 
 # Couper le VPN en urgence (kill-switch)
@@ -72,8 +72,6 @@ Ansible se connecte directement sur les IPs WAN avec le compte `admin` en authen
 | Règle OpenVPN interface | Autorise tout le trafic inter-sites sur l'interface OpenVPN |
 | Client OpenVPN | Connexion vers pfSense Cloud (`5.196.50.52:1194`) — tunnel `10.3.3.0/30` |
 | DNS Forwarders | `192.168.255.254` (Cloud via VPN) + `1.1.1.1` + `8.8.8.8` |
-| CA interne | Crée `CAPfsense` (RSA 4096, SHA-256, 10 ans) si absente |
-| Export CA | Sauvegarde `CAPfsense.crt` en local (uniquement à la création) |
 
 ### pfSense Cloud — Site cloud (cloud.local)
 
@@ -132,7 +130,6 @@ Accepter le certificat auto-signé lors de la première connexion.
 1. Ouvrir l'URL ci-dessus dans le navigateur
 2. Aller dans **Firewall > Rules > WAN** — les règles SSH (22), HTTPS (443) et OpenVPN (1194) doivent être présentes
 3. Aller dans **Services > DNS Forwarder** ou **DNS Resolver** pour vérifier les forwarders
-4. Aller dans **System > Cert. Manager > CAs** pour vérifier la CA `CAPfsense`
 
 ### Prérequis : SSH activé sur pfSense
 
@@ -186,6 +183,3 @@ La collection n'est pas installée :
 ansible-galaxy collection install -r requirements.yml
 ```
 
-### CA skipped à la sauvegarde
-
-La tâche "Sauvegarder le certificat public CA en local" est sautée si la CA existait déjà. C'est normal — `ca_result.ca` n'est renvoyé que lors de la création.
