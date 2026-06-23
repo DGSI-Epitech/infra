@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DGSI EPITECH — Network Connectivity</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d1117;
+      --surface: #161b22;
+      --border:  #30363d;
+      --accent:  #58a6ff;
+      --green:   #3fb950;
+      --red:     #f85149;
+      --yellow:  #e3b341;
+      --text:    #c9d1d9;
+      --muted:   #8b949e;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ── Header ── */
+    header {
+      max-width: 900px;
+      margin: 0 auto 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .logo {
+      width: 40px; height: 40px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; font-weight: 800; color: #0d1117;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1.35rem; color: var(--accent); }
+    header p  { color: var(--muted); font-size: 0.82rem; margin-top: 0.2rem; }
+
+    /* ── Layout ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.2rem;
+    }
+    .card-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    /* ── Preset host buttons ── */
+    .host-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0.55rem 0.75rem;
+      color: var(--text);
+      cursor: pointer;
+      margin-bottom: 0.45rem;
+      font-size: 0.82rem;
+      transition: border-color 0.15s, background 0.15s;
+      text-align: left;
+    }
+    .host-btn:hover {
+      border-color: var(--accent);
+      background: rgba(88, 166, 255, 0.06);
+    }
+    .host-btn .h-name { font-weight: 600; }
+    .host-btn .h-ip {
+      font-family: 'Courier New', monospace;
+      font-size: 0.77rem;
+      color: var(--muted);
+    }
+    .host-btn .h-tag {
+      font-size: 0.68rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-left: 0.4rem;
+    }
+    .tag-cloud  { background: rgba(88,166,255,0.15); color: var(--accent); }
+    .tag-onprem { background: rgba(63,185,80,0.15);  color: var(--green); }
+    .tag-vpn    { background: rgba(227,179,65,0.15); color: var(--yellow); }
+
+    /* ── Ping form ── */
+    .ping-form {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.8rem;
+    }
+    .ping-form input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0.55rem 0.75rem;
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .ping-form input:focus { border-color: var(--accent); }
+    .ping-form input::placeholder { color: var(--muted); }
+
+    .btn-ping {
+      background: var(--accent);
+      color: #0d1117;
+      border: none;
+      border-radius: 7px;
+      padding: 0.55rem 1.1rem;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .btn-ping:hover    { opacity: 0.85; }
+    .btn-ping:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.78rem;
+      min-height: 1.2rem;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .dot.idle    { background: var(--border); }
+    .dot.loading { background: var(--yellow); animation: blink 0.8s infinite; }
+    .dot.ok      { background: var(--green); }
+    .dot.fail    { background: var(--red); }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+
+    /* ── Terminal output ── */
+    .terminal {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0.85rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      min-height: 160px;
+      max-height: 280px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+    .terminal.success { color: var(--green); }
+    .terminal.error   { color: var(--red); }
+
+    /* ── Footer ── */
+    footer {
+      max-width: 900px;
+      margin: 2rem auto 0;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">D</div>
+    <div>
+      <h1>DGSI EPITECH — Network Connectivity</h1>
+      <p>Vérification de la connectivité inter-sites · web-vm (192.168.255.253) · Cloud LAN</p>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- Preset hosts -->
+    <div class="card">
+      <div class="card-title">Hôtes connus</div>
+
+      <button class="host-btn" onclick="pingHost('192.99.62.116')">
+        <span><span class="h-name">Proxmox Cloud (PVE2)</span><span class="h-tag tag-cloud">cloud</span></span>
+        <span class="h-ip">192.99.62.116</span>
+      </button>
+
+      <button class="host-btn" onclick="pingHost('51.75.128.134')">
+        <span><span class="h-name">Proxmox On-Prem (PVE1)</span><span class="h-tag tag-onprem">on-prem</span></span>
+        <span class="h-ip">51.75.128.134</span>
+      </button>
+
+      <button class="host-btn" onclick="pingHost('192.168.255.254')">
+        <span><span class="h-name">pfSense Cloud (LAN)</span><span class="h-tag tag-cloud">cloud</span></span>
+        <span class="h-ip">192.168.255.254</span>
+      </button>
+
+      <button class="host-btn" onclick="pingHost('10.255.255.249')">
+        <span><span class="h-name">Bastion (Teleport)</span><span class="h-tag tag-cloud">DMZ</span></span>
+        <span class="h-ip">10.255.255.249</span>
+      </button>
+
+      <button class="host-btn" onclick="pingHost('172.16.0.241')">
+        <span><span class="h-name">ops-vm (ES · Vault)</span><span class="h-tag tag-vpn">VPN requis</span></span>
+        <span class="h-ip">172.16.0.241</span>
+      </button>
+
+      <button class="host-btn" onclick="pingHost('172.16.0.242')">
+        <span><span class="h-name">services-vm (Netbox)</span><span class="h-tag tag-vpn">VPN requis</span></span>
+        <span class="h-ip">172.16.0.242</span>
+      </button>
+
+      <button class="host-btn" onclick="pingHost('10.3.3.1')">
+        <span><span class="h-name">OpenVPN Server</span><span class="h-tag tag-vpn">VPN requis</span></span>
+        <span class="h-ip">10.3.3.1</span>
+      </button>
+    </div>
+
+    <!-- Custom ping -->
+    <div class="card">
+      <div class="card-title">Ping manuel</div>
+      <div class="ping-form">
+        <input type="text" id="ip-input"
+               placeholder="ex: 172.16.0.253"
+               onkeydown="if(event.key==='Enter') doPing()" />
+        <button class="btn-ping" id="ping-btn" onclick="doPing()">&#9654; Ping</button>
+      </div>
+      <div class="status-bar">
+        <div class="dot idle" id="dot"></div>
+        <span id="status-text">En attente d'une cible…</span>
+      </div>
+      <pre class="terminal" id="output">$ ping -c 4 &lt;ip&gt;</pre>
+    </div>
+
+  </div>
+
+  <footer>
+    Hébergé sur web-vm · LAN Cloud (192.168.255.0/28) · DGSI EPITECH Infrastructure
+  </footer>
+
+  <script>
+    function pingHost(ip) {
+      document.getElementById('ip-input').value = ip;
+      doPing();
+    }
+
+    async function doPing() {
+      const ip = document.getElementById('ip-input').value.trim();
+      if (!ip) return;
+
+      const btn    = document.getElementById('ping-btn');
+      const dot    = document.getElementById('dot');
+      const status = document.getElementById('status-text');
+      const output = document.getElementById('output');
+
+      btn.disabled     = true;
+      dot.className    = 'dot loading';
+      status.textContent = 'Ping vers ' + ip + '…';
+      output.className   = 'terminal';
+      output.textContent = '$ ping -c 4 ' + ip + '\n…';
+
+      try {
+        const resp = await fetch('/ping', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ ip })
+        });
+        const data = await resp.json();
+
+        if (data.error) {
+          dot.className      = 'dot fail';
+          status.textContent = 'Erreur : ' + data.error;
+          output.className   = 'terminal error';
+          output.textContent = data.error;
+        } else if (data.success) {
+          dot.className      = 'dot ok';
+          status.textContent = ip + ' — accessible ✓';
+          output.className   = 'terminal success';
+          output.textContent = data.output;
+        } else {
+          dot.className      = 'dot fail';
+          status.textContent = ip + ' — injoignable ✗';
+          output.className   = 'terminal error';
+          output.textContent = data.output;
+        }
+      } catch (e) {
+        dot.className      = 'dot fail';
+        status.textContent = 'Erreur réseau';
+        output.className   = 'terminal error';
+        output.textContent = e.toString();
+      }
+
+      btn.disabled = false;
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,3 @@
+- [Ubuntu 22.04 gunicorn package name](project-ubuntu-gunicorn-package.md) — `gunicorn` not `python3-gunicorn`; wrong name causes hard APT failure
+- [TLS role deploys world-readable private key](project-tls-key-permissions.md) — `mode: 0644` on server.key is a pre-existing issue activated on each new VM
+- [website role nginx serves plain HTTP](project-nginx-no-tls-website-role.md) — no TLS on nginx despite HTTPS-everywhere policy; certs already on host via tls role

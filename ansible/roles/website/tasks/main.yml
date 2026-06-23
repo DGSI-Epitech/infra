@@ -1,0 +1,111 @@
+---
+- name: Install required packages
+  apt:
+    name:
+      - nginx
+      - python3
+      - python3-flask
+      - gunicorn
+      - iputils-ping
+    state: present
+    update_cache: true
+
+- name: Create website system group
+  group:
+    name: "{{ website_group }}"
+    system: true
+
+- name: Create website system user
+  user:
+    name: "{{ website_user }}"
+    group: "{{ website_group }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Create app directory
+  file:
+    path: "{{ website_app_dir }}"
+    state: directory
+    owner: "{{ website_user }}"
+    group: "{{ website_group }}"
+    mode: "0755"
+
+- name: Create static directory
+  file:
+    path: "{{ website_static_dir }}"
+    state: directory
+    owner: "{{ website_user }}"
+    group: "{{ website_group }}"
+    mode: "0755"
+
+- name: Deploy Flask app
+  template:
+    src: app.py.j2
+    dest: "{{ website_app_dir }}/app.py"
+    owner: "{{ website_user }}"
+    group: "{{ website_group }}"
+    mode: "0644"
+  notify: Restart website
+
+- name: Deploy HTML frontend
+  copy:
+    src: index.html
+    dest: "{{ website_static_dir }}/index.html"
+    owner: "{{ website_user }}"
+    group: "{{ website_group }}"
+    mode: "0644"
+  notify: Restart website
+
+- name: Deploy systemd service
+  template:
+    src: website.service.j2
+    dest: /etc/systemd/system/website.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart website
+
+- name: Deploy nginx config
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/website
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Enable nginx site
+  file:
+    src: /etc/nginx/sites-available/website
+    dest: /etc/nginx/sites-enabled/website
+    state: link
+  notify: Reload nginx
+
+- name: Remove default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+
+- name: Allow HTTP
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+
+- name: Allow HTTPS
+  community.general.ufw:
+    rule: allow
+    port: "443"
+    proto: tcp
+
+- name: Enable and start website service
+  systemd:
+    name: website
+    enabled: true
+    state: started
+
+- name: Enable and start nginx
+  systemd:
+    name: nginx
+    enabled: true
+    state: started
