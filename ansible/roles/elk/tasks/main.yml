@@ -1,4 +1,53 @@
 ---
+## --- SECRETS DEPUIS VAULT (si déjà stockés par un run précédent) ---
+
+- name: Slurp vault-init.json (vault root token)
+  slurp:
+    src: /root/vault-init.json
+  become: true
+  register: elk_vault_init_raw
+  no_log: true
+
+- name: Set vault root token
+  set_fact:
+    elk_vault_root_token: "{{ (elk_vault_init_raw.content | b64decode | from_json).root_token }}"
+  no_log: true
+
+# 200 = mot de passe déjà en Vault (run précédent), 404 = absent → on garde le default puis on le stockera
+- name: Check if elastic password already in Vault
+  uri:
+    url: "https://127.0.0.1:8200/v1/secret/data/elk/elastic-password"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ elk_vault_root_token }}"
+    ca_path: "{{ elk_tls_host_dir }}/ca.crt"
+    status_code: [200, 404]
+  register: elk_vault_elastic_check
+  no_log: true
+
+- name: Use elastic password from Vault
+  set_fact:
+    elk_elastic_password: "{{ elk_vault_elastic_check.json.data.data.value }}"
+  when: elk_vault_elastic_check.status == 200
+  no_log: true
+
+- name: Check if kibana_system password already in Vault
+  uri:
+    url: "https://127.0.0.1:8200/v1/secret/data/elk/kibana-system-password"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ elk_vault_root_token }}"
+    ca_path: "{{ elk_tls_host_dir }}/ca.crt"
+    status_code: [200, 404]
+  register: elk_vault_kibana_system_check
+  no_log: true
+
+- name: Use kibana_system password from Vault
+  set_fact:
+    elk_kibana_system_password: "{{ elk_vault_kibana_system_check.json.data.data.value }}"
+  when: elk_vault_kibana_system_check.status == 200
+  no_log: true
+
 - name: Set vm.max_map_count for Elasticsearch
   ansible.posix.sysctl:
     name: vm.max_map_count
@@ -71,6 +120,38 @@
   retries: 10
   delay: 15
   until: elk_kibana_pw.status == 200
+  no_log: true
+
+## --- SECRETS → VAULT (premier run uniquement) ---
+
+- name: Store elastic password in Vault
+  uri:
+    url: "https://127.0.0.1:8200/v1/secret/data/elk/elastic-password"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ elk_vault_root_token }}"
+    body_format: json
+    body:
+      data:
+        value: "{{ elk_elastic_password }}"
+    ca_path: "{{ elk_tls_host_dir }}/ca.crt"
+    status_code: 200
+  when: elk_vault_elastic_check.status == 404
+  no_log: true
+
+- name: Store kibana_system password in Vault
+  uri:
+    url: "https://127.0.0.1:8200/v1/secret/data/elk/kibana-system-password"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ elk_vault_root_token }}"
+    body_format: json
+    body:
+      data:
+        value: "{{ elk_kibana_system_password }}"
+    ca_path: "{{ elk_tls_host_dir }}/ca.crt"
+    status_code: 200
+  when: elk_vault_kibana_system_check.status == 404
   no_log: true
 
 - name: Create Filebeat ILM policy
