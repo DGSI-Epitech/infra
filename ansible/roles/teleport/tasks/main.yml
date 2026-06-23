@@ -146,9 +146,12 @@
 # FIREWALL — règles UFW spécifiques Teleport (443 déjà ouvert par le rôle base)
 # =============================================================================
 
-- name: Allow Teleport SSH proxy port (3022)
+# "limit" (et non "allow") : throttle au niveau connexion (iptables recent),
+# indépendant du protocole — protège 3022 sans avoir besoin de parser les
+# logs d'audit Teleport (que fail2ban ne sait pas lire).
+- name: Allow Teleport SSH proxy port (3022) with connection rate limiting
   community.general.ufw:
-    rule: allow
+    rule: limit
     port: "{{ teleport_proxy_ssh_port | string }}"
     proto: tcp
   become: true
@@ -165,6 +168,34 @@
   community.general.ufw:
     rule: allow
     port: "{{ teleport_auth_port | string }}"
+    proto: tcp
+    src: "{{ teleport_onprem_cidr }}"
+  become: true
+
+# Le rôle base ouvre le 22 sans restriction de source — on le retire ici pour
+# ne laisser SSH joignable que depuis les réseaux reliés par le VPN
+# site-to-site (DMZ Cloud + LAN on-prem). Tout le reste est rejeté par la
+# policy "default deny" déjà active (rôle base).
+- name: Remove unrestricted SSH rule added by base role
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    delete: true
+  become: true
+
+- name: Allow SSH from Cloud DMZ ({{ teleport_dmz_cidr }})
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    src: "{{ teleport_dmz_cidr }}"
+  become: true
+
+- name: Allow SSH from on-prem LAN via VPN ({{ teleport_onprem_cidr }})
+  community.general.ufw:
+    rule: allow
+    port: "22"
     proto: tcp
     src: "{{ teleport_onprem_cidr }}"
   become: true

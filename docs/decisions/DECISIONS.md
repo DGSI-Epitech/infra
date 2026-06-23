@@ -52,6 +52,146 @@ Pour les VMs PVE1 (ops-vm, services-vm), le trafic vers `10.255.255.249:3025` tr
 
 ---
 
+## fail2ban sur le bastion — durcissement port 22
+
+**Date :** 2026-06-23
+
+### Contexte
+
+Le bastion est le seul host exposé sur internet. Le rôle `base` ouvre le port 22 sur tous les hosts (y compris bastion) sans protection anti-bruteforce — c'est le premier trou évident à combler avant d'aller plus loin sur le durcissement.
+
+### Décisions
+
+**Nouveau rôle dédié (`fail2ban`) plutôt qu'ajout direct dans `base` ou `teleport`**
+
+`base` est partagé par tous les hosts (ops, services, bastion, web) — fail2ban n'est utile que sur un host exposé à internet, pas sur les VMs internes. L'ajouter dans `teleport.yml` (`roles: base, tls, teleport, fail2ban`) garde le scope correct sans polluer `base`.
+
+**`banaction = ufw` plutôt que l'action iptables par défaut de fail2ban**
+
+Tout le firewall du repo passe par `community.general.ufw` (`base`, `teleport`). L'action par défaut de fail2ban crée ses propres chaînes iptables (`f2b-sshd`), ce qui peut entrer en conflit d'ordonnancement avec les chaînes gérées par UFW. Configurer `banaction = ufw` fait passer les bans par `ufw insert ... deny`, dans le même système que le reste de l'infra.
+
+**Scope limité au jail `sshd` (port 22) — port 3022 (Teleport SSH proxy) volontairement exclu**
+
+Le jail `sshd` standard parse les logs d'échec d'auth OpenSSH (`backend = systemd`, journald sur Ubuntu 22.04) — il protège le port 22 utilisé par Ansible. Le port 3022 est le proxy SSH de Teleport : protocole et logs d'audit propres à Teleport, pas de lignes `auth.log` exploitables par le filtre `sshd`. Protéger ce port demanderait soit un filtre fail2ban custom sur les events d'audit Teleport, soit (plus naturel) la fonctionnalité native `connection_limits` de Teleport — non traité dans cette passe.
+
+### Vérification
+
+```bash
+ansible bastion -i inventory/onprem.py -m shell -a "fail2ban-client status sshd" --become
+```
+
+---
+
+## SSH (22) restreint au VPN site-to-site sur le bastion
+
+**Date :** 2026-06-23
+
+### Contexte
+
+fail2ban protège contre le bruteforce mais n'empêche pas une connexion SSH directe depuis n'importe quelle IP — le port 22 reste ouvert au monde via la règle générique du rôle `base`. Le bastion ne doit accepter SSH que depuis les réseaux reliés par le tunnel OpenVPN site-to-site (pfSense OP ↔ pfSense Cloud), pas depuis internet en direct.
+
+### Décisions
+
+**Suppression de la règle UFW générique de `base`, remplacée par deux règles scoping dans `teleport`**
+
+`base` ouvre `22/tcp` sans `src` sur tous les hosts — correct pour les VMs internes (ops, services, web), pas pour le bastion qui est le seul host avec une façade internet. Le rôle `teleport` (qui gère déjà le scoping CIDR du port 3025) supprime cette règle (`delete: true`) et la remplace par deux `allow` scopés sur `teleport_dmz_cidr` (`10.255.255.248/29`) et `teleport_onprem_cidr` (`172.16.0.0/24`) — réutilisation des mêmes variables que pour le port 3025, plutôt que d'introduire un nouveau CIDR dédié.
+
+**Pourquoi ces deux CIDR représentent "le VPN"**
+
+Le tunnel OpenVPN site-to-site (`vpn_tunnel_network`, rôle `pfsense-cloud`) relie justement le LAN on-prem (`172.16.0.0/24`) et la DMZ cloud (`10.255.255.248/29`). Restreindre SSH à ces deux plages revient à n'accepter que le trafic qui transite par ce tunnel — combiné à la policy `default deny` du rôle `base`, toute autre source (y compris l'IP publique du Proxmox cloud) est rejetée.
+
+**Risque de lockout — pas traité automatiquement**
+
+Si l'opérateur est connecté en SSH brut depuis une IP hors de ces deux plages au moment du run, il perd l'accès SSH (mais pas Teleport, port 3022, non touché). Documenté dans `docs/architecture/bastion.md` comme précaution avant de jouer `teleport.yml`.
+
+### Vérification
+
+```bash
+ansible bastion -i inventory/onprem.py -m shell -a "ufw status numbered" --become
+```
+
+---
+
+## Rate limiting UFW sur le port 3022 (Teleport SSH proxy)
+
+**Date :** 2026-06-23
+
+### Contexte
+
+fail2ban ne couvre que le port 22 (jail `sshd` standard, basé sur le format de log OpenSSH). Le port 3022, proxy SSH de Teleport, utilise son propre protocole et son propre format d'audit — pas de bruteforce-protection dessus malgré le fait qu'il soit exposé sur internet via DNAT.
+
+### Décisions
+
+**`ufw limit` plutôt qu'un filtre fail2ban custom**
+
+Écrire un filtre fail2ban pour le format d'audit Teleport (JSON structuré, pas des lignes `auth.log`) est possible mais plus lourd à maintenir. `ufw limit` repose sur le module iptables `recent` : il bloque une IP source qui ouvre 6 connexions ou plus en 30 secondes, indépendamment du protocole — donc applicable à Teleport sans rien savoir de son format de log. Seul changement : `rule: allow` → `rule: limit` dans `roles/teleport/tasks/main.yml`.
+
+**Pas appliqué au port 443 (web UI)**
+
+`limit` ne distingue pas trafic légitime de malveillant — un navigateur ouvrant plusieurs connexions HTTP/2 en rafale pourrait se faire bloquer. Le risque de faux positif est plus élevé sur 443 (usage humain interactif) que sur 3022 (sessions SSH, moins fréquentes). Le port 443 reste en `allow` simple.
+
+### Vérification
+
+```bash
+ansible bastion -i inventory/onprem.py -m shell -a "ufw status verbose" --become
+```
+
+doit montrer `3022/tcp LIMIT Anywhere`.
+
+---
+
+## Logs UFW expédiés vers Kibana via filebeat
+
+**Date :** 2026-06-23
+
+### Contexte
+
+UFW (policy `default deny`, rôles `base`/`teleport`) rejette déjà du trafic indésirable, mais ces rejets ne sont loggés nulle part par défaut — aucune visibilité sur les tentatives bloquées (scan, bruteforce, erreurs de config).
+
+### Décisions
+
+**`ufw logging on` dans `base` (tous les hosts, pas seulement bastion)**
+
+Le coût est négligeable (logs uniquement sur connexions effectivement filtrées) et utile partout, pas seulement sur l'host exposé à internet — ça peut aussi révéler du trafic interne anormal sur ops/services/web.
+
+**Réutilisation de l'input `syslog` existant de filebeat plutôt qu'un nouvel input dédié**
+
+`/var/log/ufw.log` est ajouté aux `paths` de l'input `filestream` `syslog` déjà présent dans `roles/filebeat/templates/filebeat.yml.j2` (qui suit déjà `/var/log/syslog` et `/var/log/auth.log`). Pas de nouveau rôle ni de module Elastic dédié — `ufw.log` existe déjà nativement via le drop-in rsyslog livré avec le paquet `ufw` (`/etc/rsyslog.d/20-ufw.conf`), donc rien à configurer côté rsyslog.
+
+### Vérification
+
+```bash
+ansible ops:bastion:web -i inventory/onprem.py -m shell -a "tail -5 /var/log/ufw.log" --become
+```
+
+puis recherche `log.file.path: "/var/log/ufw.log"` dans Kibana.
+
+---
+
+## Attente cloud-init avant SSH dans deploy-remote.sh
+
+**Date :** 2026-06-23
+
+### Contexte
+
+`wait_for_ssh()` dans `scripts/deploy-remote.sh` timeoutait à 120s sur bastion/website alors que les VMs n'avaient pas fini cloud-init (observé à 200s+ pour bastion — apt upgrade, kernel, bind9...). Le script échouait sur un faux problème ("inaccessible") alors qu'il fallait juste attendre.
+
+### Décisions
+
+**`wait_for_cloud_init()` via l'agent QEMU plutôt qu'augmenter bêtement le timeout SSH**
+
+Augmenter le timeout de `wait_for_ssh` aurait masqué le problème sans le résoudre proprement (on devine une durée au lieu de vérifier l'état réel). À la place, une nouvelle fonction lance `cloud-init status --wait` via `agent/exec` (même mécanisme que `inject_ssh_key`/`configure_network`) et poll `agent/exec-status` jusqu'à la fin réelle de cloud-init (jusqu'à 10 min), insérée entre `configure_network` et `wait_for_ssh`. `wait_for_ssh` reste ensuite un filet de sécurité (timeout porté à 180s, largement suffisant une fois cloud-init confirmé terminé).
+
+**Échec silencieux plutôt que bloquant si l'agent ne répond pas**
+
+Si `agent/exec` ne renvoie pas de PID (cas limite, agent indisponible), la fonction continue sans bloquer le script — `wait_for_ssh` reste le dernier filet, pour ne pas introduire un nouveau point de blocage plus fragile que l'ancien.
+
+### Vérification
+
+Relancer `scripts/deploy-remote.sh` et observer dans les logs `"==> Attente fin cloud-init ..."` se terminer par `"cloud-init ... terminé."` avant que `wait_for_ssh` démarre.
+
+---
+
 ## Déploiement VMs Cloud PVE2 — bridges et réseau
 
 **Date :** 2026-06-01

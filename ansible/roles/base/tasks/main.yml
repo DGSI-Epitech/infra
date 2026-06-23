@@ -137,6 +137,11 @@
     state: enabled
     policy: deny
 
+# Les connexions rejetées remontent dans /var/log/ufw.log (rsyslog) → filebeat → Kibana
+- name: Enable UFW logging
+  community.general.ufw:
+    logging: "on"
+
 - name: Allow Vault port
   community.general.ufw:
     rule: allow

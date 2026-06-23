@@ -110,10 +110,54 @@ ENDJSON
   echo "    Réseau configuré sur ${label}."
 }
 
+# Attend la fin réelle de cloud-init via l'agent QEMU (cloud-init status --wait),
+# plutôt que de tenter SSH avec un timeout fixe pendant que la VM installe
+# encore ses paquets (apt, kernel...) — évite les faux "inaccessible".
+wait_for_cloud_init() {
+  local vmid="$1"
+  local label="$2"
+  local timeout=600
+  local elapsed=0
+  echo ""
+  echo "==> Attente fin cloud-init ${label} (VM ${vmid})..."
+  local tmpjson
+  tmpjson=$(mktemp)
+  cat > "$tmpjson" << 'ENDJSON'
+{"command":["cloud-init","status","--wait"]}
+ENDJSON
+  local pid
+  pid=$(curl -s -k -X POST \
+    "${PROXMOX_API_REMOTE}/nodes/${PROXMOX_NODE_REMOTE}/qemu/${vmid}/agent/exec" \
+    -H "CSRFPreventionToken: ${CSRF}" \
+    -b "PVEAuthCookie=${TICKET}" \
+    -H "Content-Type: application/json" \
+    -d "@${tmpjson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['pid'])" 2>/dev/null)
+  rm -f "$tmpjson"
+  if [[ -z "$pid" ]]; then
+    echo "    Impossible de lancer cloud-init status sur ${label}, on continue sans attendre."
+    return
+  fi
+  while true; do
+    local exited
+    exited=$(curl -s -k -b "PVEAuthCookie=${TICKET}" \
+      "${PROXMOX_API_REMOTE}/nodes/${PROXMOX_NODE_REMOTE}/qemu/${vmid}/agent/exec-status?pid=${pid}" | \
+      python3 -c "import sys,json; print('1' if json.load(sys.stdin).get('data',{}).get('exited') else '0')" 2>/dev/null || echo "0")
+    [[ "$exited" == "1" ]] && break
+    sleep 10
+    elapsed=$((elapsed + 10))
+    echo "    ${elapsed}s — cloud-init ${label} toujours en cours..."
+    if [[ $elapsed -ge $timeout ]]; then
+      echo "    cloud-init ${label} pas confirmé terminé après ${timeout}s — on tente SSH quand même."
+      return
+    fi
+  done
+  echo "    cloud-init ${label} terminé."
+}
+
 wait_for_ssh() {
   local host="$1"
   local label="$2"
-  local timeout=120
+  local timeout=180
   local elapsed=0
   echo ""
   echo "==> Vérification SSH ${label} (${host})..."
@@ -378,6 +422,9 @@ inject_ssh_key "${VM_ID_WEBSITE}"  "website"
 
 configure_network "${VM_ID_BASTION}" "bastion" "${BASTION_IP}/29" "10.255.255.254"
 configure_network "${VM_ID_WEBSITE}"  "website" "${WEBSITE_IP}/28" "192.168.255.254"
+
+wait_for_cloud_init "${VM_ID_BASTION}" "bastion"
+wait_for_cloud_init "${VM_ID_WEBSITE}"  "website"
 
 wait_for_ssh "${BASTION_IP}" "bastion"
 wait_for_ssh "${WEBSITE_IP}"  "website"

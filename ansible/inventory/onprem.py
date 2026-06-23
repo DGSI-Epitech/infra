@@ -67,7 +67,8 @@ pfsense_cloud_wan = env.get("PFSENSE_CLOUD_WAN", "")
 pfsense_password  = env.get("PFSENSE_PASSWORD", "pfsense")
 vm_password       = env.get("VM_PASSWORD", "")
 pfsense_username  = env.get("PFSENSE_USERNAME", "admin")
-proxmox_host      = env.get("PROXMOX_HOST", "")
+proxmox_host        = env.get("PROXMOX_HOST", "")
+proxmox_host_remote = env.get("PROXMOX_HOST_REMOTE") or env.get("PROXMOX_NODE_ADDRESS_REMOTE", "")
 
 # Env proxmox ecole (pfSense comme jump host) — garder pour l'autre environnement
 # proxy_jump       = f"-o StrictHostKeyChecking=no -o ProxyJump={pfsense_username}@{pfsense_op_wan} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
@@ -77,11 +78,12 @@ proxmox_host      = env.get("PROXMOX_HOST", "")
 # Ancien: proxy_jump utilisait pfsense_op_wan comme jump → cassait quand PFSENSE_OP_WAN = IP interne
 proxmox_ssh_user  = env.get("PROXMOX_SSH_USER", "root")
 proxy_jump        = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
-proxy_jump_cloud  = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+# Bastion/web sont sur PVE2 (cloud) — hôte Proxmox différent de l'onprem (PROXMOX_HOST)
+proxy_jump_cloud  = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host_remote} -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
 # ProxyJump pour pfSense (Proxmox → IP WAN interne pfSense)
 proxy_jump_pfsense_op    = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host}"
-proxy_jump_pfsense_cloud = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host}"
+proxy_jump_pfsense_cloud = f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump={proxmox_ssh_user}@{proxmox_host_remote}"
 
 pfsense_common = {
     "ansible_user":               "admin",
