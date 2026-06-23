@@ -5,6 +5,7 @@ filebeat.inputs:
     paths:
       - /var/log/syslog
       - /var/log/auth.log
+      - /var/log/ufw.log
 
   - type: filestream
     id: docker-containers

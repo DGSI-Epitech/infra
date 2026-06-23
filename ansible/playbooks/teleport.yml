@@ -6,3 +6,4 @@
     - base
     - tls
     - teleport
+    - fail2ban
