@@ -168,6 +168,30 @@ puis recherche `log.file.path: "/var/log/ufw.log"` dans Kibana.
 
 ---
 
+## Attente cloud-init avant SSH dans deploy-remote.sh
+
+**Date :** 2026-06-23
+
+### Contexte
+
+`wait_for_ssh()` dans `scripts/deploy-remote.sh` timeoutait à 120s sur bastion/website alors que les VMs n'avaient pas fini cloud-init (observé à 200s+ pour bastion — apt upgrade, kernel, bind9...). Le script échouait sur un faux problème ("inaccessible") alors qu'il fallait juste attendre.
+
+### Décisions
+
+**`wait_for_cloud_init()` via l'agent QEMU plutôt qu'augmenter bêtement le timeout SSH**
+
+Augmenter le timeout de `wait_for_ssh` aurait masqué le problème sans le résoudre proprement (on devine une durée au lieu de vérifier l'état réel). À la place, une nouvelle fonction lance `cloud-init status --wait` via `agent/exec` (même mécanisme que `inject_ssh_key`/`configure_network`) et poll `agent/exec-status` jusqu'à la fin réelle de cloud-init (jusqu'à 10 min), insérée entre `configure_network` et `wait_for_ssh`. `wait_for_ssh` reste ensuite un filet de sécurité (timeout porté à 180s, largement suffisant une fois cloud-init confirmé terminé).
+
+**Échec silencieux plutôt que bloquant si l'agent ne répond pas**
+
+Si `agent/exec` ne renvoie pas de PID (cas limite, agent indisponible), la fonction continue sans bloquer le script — `wait_for_ssh` reste le dernier filet, pour ne pas introduire un nouveau point de blocage plus fragile que l'ancien.
+
+### Vérification
+
+Relancer `scripts/deploy-remote.sh` et observer dans les logs `"==> Attente fin cloud-init ..."` se terminer par `"cloud-init ... terminé."` avant que `wait_for_ssh` démarre.
+
+---
+
 ## Déploiement VMs Cloud PVE2 — bridges et réseau
 
 **Date :** 2026-06-01

@@ -132,6 +132,22 @@ ssh {
 }
 ```
 
+### 6. Cloud (PVE2) — attendre la fin de cloud-init avant de tenter SSH
+
+`scripts/deploy-remote.sh` suit la même séquence que `deploy.sh` pour bastion/website (`wait_for_agent` → `inject_ssh_key` → `configure_network` → `wait_for_ssh`), via le même mécanisme QEMU agent décrit au point 3.
+
+**Problème rencontré :** `wait_for_ssh` avait un timeout fixe de 120s, mais cloud-init sur bastion/website installe beaucoup de paquets (apt upgrade, kernel, bind9...) — observé en pratique à 200s+ pour bastion. Le script déclarait l'host "inaccessible" alors que la VM finissait simplement de démarrer, sans lien avec un vrai problème réseau/clé.
+
+**Fix — `wait_for_cloud_init()` :** entre `configure_network` et `wait_for_ssh`, le script lance `cloud-init status --wait` via l'agent QEMU (`POST .../agent/exec`) et poll `agent/exec-status` jusqu'à ce que la commande se termine (jusqu'à 10 min), avant de tenter le moindre SSH :
+
+```bash
+configure_network "${VM_ID_BASTION}" "bastion" ...
+wait_for_cloud_init "${VM_ID_BASTION}" "bastion"   # bloque sur "cloud-init status --wait"
+wait_for_ssh        "${BASTION_IP}"    "bastion"   # ne démarre qu'une fois cloud-init fini
+```
+
+Si l'agent ne répond pas (cas limite), la fonction continue sans bloquer plutôt que d'échouer tout le script — `wait_for_ssh` reste le filet de sécurité final (timeout relevé à 180s en complément).
+
 ---
 
 ## Séquence complète d'un déploiement
