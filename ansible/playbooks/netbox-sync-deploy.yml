@@ -3,8 +3,38 @@
   hosts: services:ops
   become: true
   vars:
-    netbox_api_token: "0123456789abcdef0123456789abcdef01234567"
-    netbox_remote_url: "http://255.241:8080"
+    netbox_port: 8080
+    netbox_remote_url: "http://{{ hostvars[groups['services'][0]]['ansible_host'] }}:{{ netbox_port }}"
   tasks:
+    - name: Slurp vault-init.json from ops-vm
+      slurp:
+        src: /root/vault-init.json
+      become: true
+      delegate_to: "{{ groups['ops'][0] }}"
+      register: sync_vault_init_raw
+      no_log: true
+
+    - name: Set vault root token
+      set_fact:
+        sync_vault_root_token: "{{ (sync_vault_init_raw.content | b64decode | from_json).root_token }}"
+      no_log: true
+
+    - name: Fetch NetBox token from Vault
+      uri:
+        url: "https://127.0.0.1:8200/v1/secret/data/netbox"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ sync_vault_root_token }}"
+        ca_path: /etc/ssl/internal/ca.crt
+        status_code: 200
+      delegate_to: "{{ groups['ops'][0] }}"
+      register: sync_vault_netbox
+      no_log: true
+
+    - name: Set netbox_api_token from Vault
+      set_fact:
+        netbox_api_token: "{{ sync_vault_netbox.json.data.data.api_token }}"
+      no_log: true
+
     - name: Deploy NetBox sync agent
       import_tasks: ../roles/netbox/tasks/sync_agent.yml

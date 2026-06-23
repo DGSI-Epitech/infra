@@ -524,7 +524,7 @@ echo "==> Ansible — ELK + Fleet (ops-vm)..."
 cd "$REPO_ROOT/ansible"
 ansible-playbook playbooks/elk.yml           -i inventory/onprem.py
 ansible-playbook playbooks/kibana.yml        -i inventory/onprem.py  # ← crée le token Fleet dans Vault
-ansible-playbook playbooks/filebeat.yml      -i inventory/onprem.py
+ansible-playbook playbooks/filebeat.yml      -i inventory/onprem.py --limit ops
 ansible-playbook playbooks/elastic-agent.yml -i inventory/onprem.py  # ← lit le token depuis Vault
 
 echo ""
