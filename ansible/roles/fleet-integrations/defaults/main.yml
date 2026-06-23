@@ -25,11 +25,13 @@ fleet_pfsense_preserve_original_event: true
 # tz_offset uniquement utile si pfSense envoie en format BSD (on impose Syslog format)
 fleet_pfsense_tz_offset: "UTC"
 
-# --- Intégration Teleport (Custom Logs sur fichier d'audit JSON) ---
+# --- Intégration Teleport (package Elastic dédié "teleport", data stream teleport.audit) ---
 fleet_teleport_integration_name: "teleport-audit-log"
-fleet_log_package_version: "2.4.1"
-# Chemin du fichier d'audit Teleport sur le bastion — à ajuster selon teleport_data_dir
-teleport_audit_log_path: "/var/lib/teleport/log/*.json"
+fleet_teleport_package_version: "1.6.2"
+# Chemin du fichier d'audit Teleport sur le bastion.
+# Teleport écrit par défaut en JSON dans {data_dir}/log/ (rotation ~24h, jamais supprimé).
+# Si teleport_data_dir != /var/lib/teleport dans group_vars/host_vars, AJUSTER CE CHEMIN.
+teleport_audit_log_path: "{{ teleport_data_dir | default('/var/lib/teleport') }}/log/*.json"
 fleet_teleport_log_paths:
   - "{{ teleport_audit_log_path }}"
 
