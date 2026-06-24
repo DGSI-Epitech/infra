@@ -70,6 +70,18 @@
   become: true
 
 # =============================================================================
+# CA INTERNE — Teleport v16 valide la chaîne TLS au démarrage
+# =============================================================================
+
+- name: Set SSL_CERT_FILE for Teleport service
+  copy:
+    content: "SSL_CERT_FILE={{ teleport_tls_dir }}/ca.crt\n"
+    dest: /etc/default/teleport
+    mode: "0644"
+  become: true
+  notify: Restart Teleport node
+
+# =============================================================================
 # CONFIGURATION — ssh_service uniquement (pas d'auth ni de proxy)
 # =============================================================================
 

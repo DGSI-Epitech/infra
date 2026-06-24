@@ -1,6 +1,6 @@
 ---
 - name: Deploy NetBox sync agent on all VMs
-  hosts: services:ops
+  hosts: services:ops:web
   become: true
   vars:
     netbox_port: 8080

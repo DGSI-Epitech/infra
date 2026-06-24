@@ -1,0 +1,7 @@
+---
+- name: Deploy Teleport node agent on on-prem VMs
+  hosts: ops:services
+  become: true
+  roles:
+    - tls
+    - teleport-node

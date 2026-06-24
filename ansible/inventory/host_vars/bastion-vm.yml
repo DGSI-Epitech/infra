@@ -1,6 +1,7 @@
 ---
 tls_san:
   - "IP:{{ ansible_host }}"
+  - "IP:192.99.62.116"
   - "IP:51.75.128.134"
   - "IP:127.0.0.1"
   - "DNS:bastion"

@@ -1,10 +1,9 @@
 version: v3
 teleport:
-  nodename: {{ inventory_hostname }}
+  nodename: {{ inventory_hostname }}.cloud.local
   data_dir: {{ teleport_data_dir }}
   auth_token: "{{ teleport_join_token }}"
-  auth_servers:
-    - "{{ teleport_auth_server }}"
+  proxy_server: "{{ teleport_proxy_server }}"
   log:
     output: stderr
     severity: INFO
